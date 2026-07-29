@@ -94,6 +94,10 @@ Bỏ một file video **quay trên nền đen** vào đó, khai báo một dòng
 Vì sao phải nền đen? Vì `blend` cộng ánh sáng chứ không dán đè — chỗ đen cộng
 vào 0 nên biến mất.
 
+**Tự tạo video bằng Gemini:** xem [`TAO-VIDEO-HIEU-UNG.md`](TAO-VIDEO-HIEU-UNG.md)
+— có sáu prompt mẫu đã viết sẵn (rồng lửa, vòng phép, cánh hoa, sét, bụi sao,
+bươm bướm) và cách kiểm xem nền có đủ đen chưa.
+
 ---
 
 ## Khi có gì đó hỏng
