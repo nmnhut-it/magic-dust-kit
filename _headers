@@ -1,0 +1,17 @@
+# Hai dòng cross-origin isolation, đúng thứ `serve.py` gửi khi chạy ở nhà.
+# Đảo GƯƠNG VÔ CỰC chạy Python trong Web Worker và cần SharedArrayBuffer để
+# lệnh `input()` biết dừng lại chờ; trình duyệt chỉ cho dùng SharedArrayBuffer
+# khi trang được "cross-origin isolated".
+#
+# `credentialless` (chứ không phải `require-corp`) để mấy file tải từ CDN
+# (Pyodide, MediaPipe, three.js) vẫn vào được mà không cần header CORP của họ.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+
+# Bài của học sinh nằm ở đây; sửa xong bấm R là phải thấy bản mới ngay.
+/student/*
+  Cache-Control: no-store
+
+/pygrade/*
+  Cache-Control: no-store
