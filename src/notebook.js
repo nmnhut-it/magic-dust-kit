@@ -8,7 +8,7 @@
 //     thì mỗi lần bấm CHẠY phải đợi vài giây.
 //   · Bài lưu trong localStorage. Xong hết thì trang ghép lại thành hai file
 //     `student/*.py` để sân khấu thật đọc, rồi mới mở cổng sang đó.
-import { CELLS, SCENE, DARK_SCENE, LAYER } from './cells.js';
+import { CELLS, SCENE, DARK_SCENE, LAYER } from './cells.js?v=3';   // xem ghi chú ?v= trong index.html
 
 export { CELLS };
 

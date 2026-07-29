@@ -99,9 +99,13 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 <main id="cells"></main>
 
 <script type="module">
-import { mountCodeBox } from './src/highlight.js';
+// ?v= là số phiên bản. Trình duyệt coi đường dẫn khác nhau là file khác nhau,
+// nên đổi số này là mọi máy nạp bản mới ngay — kể cả máy đang giữ bản cũ trong
+// bộ nhớ đệm. Đã gặp thật: sau một lần cập nhật, trang chết trắng vì trình
+// duyệt giữ notebook.js cũ trong 4 tiếng. Sửa file trong src/ thì bump số này.
+import { mountCodeBox } from './src/highlight.js?v=3';
 import { CELLS, cellSource, saveCell, publishFiles, bootPython, runCell, loadDemo, paintPixels,
-         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor } from './src/notebook.js';
+         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor } from './src/notebook.js?v=3';
 
 const statusEl = document.getElementById('status');
 const host = document.getElementById('cells');
