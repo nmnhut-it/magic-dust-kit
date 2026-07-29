@@ -12,7 +12,9 @@
 #   (row * width + col) * 4 — khó hiểu quá nên đã bỏ.)
 # ============================================================================
 
-TASKS = ("flip", "blur", "blend", "compose", "blur_background", "scene",
+import traceback
+
+TASKS = ("flip", "blur", "blend", "blend_alpha", "compose", "blur_background", "scene",
          "negative", "grayscale", "flip_vertical", "drop_blue")
 EXTRA_TASKS = ("negative", "grayscale", "flip_vertical", "drop_blue")
 
@@ -213,10 +215,40 @@ def _check_blur_background(fn):
     return True, "blur_background"
 
 
+def _check_blend_alpha(fn):
+    """Trộn hai ảnh theo tỉ lệ — đè ảnh thật sự, không phải cộng ánh sáng."""
+    image = solid(2, 1, 200, 0, 0)        # nền: đỏ
+    layer = solid(2, 1, 0, 0, 200)        # lớp trên: xanh dương
+    out = blank(2, 1)
+    fn(image, layer, 50, out, 2, 1)       # 50% -> nửa đỏ nửa xanh
+    pixel = list(out[0][0])
+    if pixel == [100, 0, 100]:
+        pass
+    elif pixel == [200, 0, 200]:
+        return False, "blend_alpha: đang CỘNG hai màu; phải trộn theo tỉ lệ rồi chia 100"
+    elif pixel == [0, 0, 200]:
+        return False, "blend_alpha: đang lấy nguyên lớp trên, chưa pha với ảnh nền"
+    elif pixel == [200, 0, 0]:
+        return False, "blend_alpha: đang giữ nguyên ảnh nền, chưa pha lớp trên vào"
+    else:
+        return False, f"blend_alpha: với strength 50 thì ô phải là [100,0,100], đang ra {pixel}"
+
+    out = blank(2, 1)
+    fn(image, layer, 0, out, 2, 1)        # 0% -> y nguyên nền
+    if list(out[0][0]) != [200, 0, 0]:
+        return False, "blend_alpha: strength 0 nghĩa là không pha gì, phải ra đúng ảnh nền"
+    out = blank(2, 1)
+    fn(image, layer, 100, out, 2, 1)      # 100% -> chỉ còn lớp trên
+    if list(out[0][0]) != [0, 0, 200]:
+        return False, "blend_alpha: strength 100 nghĩa là che hẳn, phải ra đúng lớp trên"
+    return True, "blend_alpha"
+
+
 CHECKERS = {
     "flip": _check_flip,
     "blur": _check_blur,
     "blend": _check_blend,
+    "blend_alpha": _check_blend_alpha,
     "compose": _check_compose,
     "blur_background": _check_blur_background,
     "scene": _check_scene,
@@ -237,7 +269,29 @@ def check_one(name, namespace=None):
     try:
         return CHECKERS[name](fn)
     except Exception as err:
-        return False, f"{name}: chạy tới đâu thì văng lỗi tới đó — {type(err).__name__}: {err}"
+        return False, f"{name}: {_where(err)}{type(err).__name__}: {err}"
+
+
+def _where(err):
+    """Chỉ đúng hàm và dòng làm vỡ chương trình.
+
+    "chạy tới đâu thì văng lỗi tới đó" nghe thì hay nhưng học sinh không biết
+    lỗi nằm ở hàm nào — nhất là mấy bài gọi lại hàm của bài trước.
+    """
+    frames = traceback.extract_tb(err.__traceback__)
+    mine = []
+    for frame in frames:
+        if frame.name in ("check_one", "_where") or frame.name.startswith("_check"):
+            continue
+        mine.append(frame)
+    if not mine:
+        return ""
+    last = mine[-1]
+    line = last.line.strip() if last.line else ""
+    place = f"vỡ trong hàm {last.name}()"
+    if line:
+        place += f", ở dòng: {line}"
+    return place + " — "
 
 
 def check_all(namespace=None):
@@ -276,6 +330,10 @@ def _run(fn, image, width, height, layer=None):
     out = blank(width, height)
     if layer is None:
         fn(image, out, width, height)
+    elif isinstance(layer, list) and len(layer) == 2 and isinstance(layer[1], int):
+        # blend_alpha: layer là [lớp trên, độ đậm]
+        top, strength = layer
+        fn(image, top, strength, out, width, height)
     elif isinstance(layer, list) and len(layer) == 2 and isinstance(layer[1][0], list):
         # compose: layer là [nền, mặt nạ]; mặt nạ là bảng SỐ chứ không phải bảng ô
         background, mask = layer
@@ -348,6 +406,11 @@ def _case_compose():
             person, [background, mask], 3, 1, expected)
 
 
+def _case_blend_alpha():
+    return ("nền [200,0,0], lớp trên [0,0,200], strength 50",
+            solid(1, 1, 200, 0, 0), [solid(1, 1, 0, 0, 200), 50], 1, 1, [[[100, 0, 100]]])
+
+
 CASES = {
     "flip": _case_flip,
     "flip_vertical": _case_flip_vertical,
@@ -355,6 +418,7 @@ CASES = {
     "grayscale": _case_grayscale,
     "drop_blue": _case_drop_blue,
     "blend": _case_blend,
+    "blend_alpha": _case_blend_alpha,
     "compose": _case_compose,
     "blur": _case_blur,
 }

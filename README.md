@@ -117,7 +117,8 @@ Khác mỗi chỗ: máy gọi hàm của bạn hàng chục lần mỗi giây tr
 |---|---|---|
 | `flip` | soi gương trái–phải | `F` |
 | `blur` | mỗi ô lấy màu trung bình với hàng xóm | `B` |
-| `blend` | ghép lớp hiệu ứng lên khung hình, kẹp ở 255 | `N` |
+| `blend` | cộng ánh sáng — cho lửa, sét, hào quang | `N` |
+| `blend_alpha` | đè ảnh lên ảnh, pha theo tỉ lệ (alpha) | `Y` |
 | `compose` | tách người khỏi phòng rồi dán lên nền khác | `O` |
 | `blur_background` | nền mờ, người vẫn nét (kiểu họp trực tuyến) | `Z` |
 | `scene` | cả cảnh phim: nền video · lớp sau · người · hiệu ứng trước | `S` |
@@ -167,7 +168,8 @@ Sáu bài ảnh bắt buộc là một bậc thang, bài sau dùng lại hàm c�
 | `flip` | ảnh là bảng ô, đổi chỗ ô là đổi ảnh |
 | `blur` | trộn một ô với hàng xóm |
 | `compose` | **tách nền** — mặt nạ nói ô nào là người |
-| `blend` | **đè hình A lên hình B** bằng phép cộng ánh sáng |
+| `blend` | **cộng ánh sáng** — đúng cho thứ phát sáng |
+| `blend_alpha` | **đè ảnh lên ảnh**, pha theo tỉ lệ — đúng cho thứ che phía sau |
 | `blur_background` | gọi lại `blur` + `compose`: nền mờ, người nét |
 | `scene` | gọi lại `blend` + `compose`: **nền video · lớp sau · người · hiệu ứng trước** |
 

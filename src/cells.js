@@ -132,6 +132,54 @@ SỰ cộng được: giữa ảnh 9, cạnh 6, góc 4. Chia cho \`count\` chứ
 là số nguyên.`,
   },
   {
+    id: 'blend_alpha', kind: 'blend_alpha', title: 'blend_alpha — đè ảnh lên ảnh, pha theo tỉ lệ',
+    idea: `\`blend\` cộng ánh sáng nên chỉ hợp với thứ tự PHÁT SÁNG: lửa, sét, hào quang.
+Đem cộng một tấm ảnh thường lên ảnh khác thì trắng bệch, xấu ngay.
+
+Muốn ĐÈ một tấm ảnh lên tấm khác thì phải PHA: lấy một phần của ảnh dưới cộng
+với phần còn lại của ảnh trên. Đè 30% nghĩa là mỗi màu lấy 70 phần nền và 30
+phần lớp trên, rồi chia cho 100. Đó chính là cái mà mọi phần mềm ảnh gọi là độ
+mờ (alpha, opacity).`,
+    input: '`image` (ảnh dưới), `layer` (ảnh đè lên), `strength` — một số 0..100: 0 là không đè gì, 100 là che hẳn.',
+    job: 'Với mỗi màu: `(màu_nền × (100 - strength) + màu_trên × strength) // 100`.',
+    output: 'Hai ảnh chồng nhau mờ ảo, chỉnh `strength` là chỉnh độ đậm nhạt.',
+    stub: `${PIXEL_HEADER}
+#
+# strength là MỘT số từ 0 tới 100 (phần trăm), không phải ảnh.
+#     strength = 0   -> giữ nguyên ảnh nền
+#     strength = 100 -> chỉ còn lớp trên
+#     strength = 30  -> 70 phần nền + 30 phần lớp trên
+#
+# Công thức cho MỖI màu:
+#     (nen * (100 - strength) + tren * strength) // 100
+#
+# Dùng // để kết quả là số nguyên; màu không nhận số lẻ.
+def blend_alpha(image, layer, strength, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: pha hai màu theo tỉ lệ
+            out[row][col] = image[row][col]
+`,
+    answer: `def blend_alpha(image, layer, strength, out, width, height):
+    rest = 100 - strength
+    for row in range(height):
+        for col in range(width):
+            base = image[row][col]
+            top = layer[row][col]
+            out[row][col] = [(base[0] * rest + top[0] * strength) // 100,
+                             (base[1] * rest + top[1] * strength) // 100,
+                             (base[2] * rest + top[2] * strength) // 100]
+`,
+    why: `\`rest\` tính một lần ngoài vòng lặp, vì nó không đổi — tính lại mấy nghìn lần
+chẳng để làm gì. Thử \`strength = 0\` rồi \`= 100\` để tự kiểm: một đằng phải ra
+đúng ảnh nền, một đằng ra đúng lớp trên. Hai mốc đó chứng minh công thức đúng
+mà không cần tính tay.
+
+Khi nào dùng cái nào: \`blend\` (cộng) cho thứ PHÁT SÁNG — lửa, sét, bụi phép.
+\`blend_alpha\` (pha) cho thứ CHE MẤT phía sau — dán ảnh, làm mờ dần, chuyển
+cảnh. Phần mềm dựng phim thật cũng chia đúng hai kiểu đó.`,
+  },
+  {
     id: 'compose', kind: 'compose', title: 'compose — ghép nền, người, rồi hiệu ứng',
     idea: `Phim trường xanh làm thế này: máy có một tấm MẶT NẠ nói rõ ô nào là người, ô
 nào không. Ghép ảnh chỉ là đi từng ô rồi hỏi một câu — ô này là người hay là

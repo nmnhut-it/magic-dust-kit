@@ -28,6 +28,7 @@ const MODES = {
   a: 'negative', w: 'grayscale', v: 'flip_vertical', c: 'drop_blue',
   o: 'compose',                    // ghép nền: cần mặt nạ người từ MediaPipe
   z: 'blur_background',            // nền mờ, người nét — kiểu họp trực tuyến
+  y: 'blend_alpha',                // đè ảnh nền lên khung hình, pha 50%
   s: 'scene',                      // bài cuối: nền video + lớp sau + người + hiệu ứng trước
 };
 const BACKDROP = './lessons/assets/storybook/portal-courtyard-v3.webp';
@@ -200,6 +201,9 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       const background = clipGrid('background'), behind = clipGrid('behind'), front = clipGrid('front');
       if (!background || !behind || !front) { say('Đang tải ba đoạn video…'); state.busy = false; return; }
       result = call('scene', image, mask, background, behind, front, out, W, H);
+    } else if (state.mode === 'blend_alpha') {
+      if (!state.backdrop) { say('Đang tải ảnh nền…'); state.busy = false; return; }
+      result = call('blend_alpha', image, state.backdrop, 50, out, W, H);
     } else if (state.mode === 'blur_background') {
       const mask = personMask();
       if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }

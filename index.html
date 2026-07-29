@@ -108,6 +108,12 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .shot.fx video{width:200px;height:150px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000}
 .ans-warn{margin:0 0 10px;color:#e2c072;font-size:13px}
 .ans-copy{margin-top:10px;color:#0b0f18;background:#e2c072}
+.btn-preview{width:calc(100% - 32px);margin:0 16px 12px;padding:12px;border-radius:10px;
+  border:1px dashed var(--line);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn-preview>span{font:700 9.5px/1 ui-monospace,monospace;letter-spacing:1px;color:#5f7f92;width:100%}
+.stage-btn{color:#0b0f18;background:#9fe8d5;font:700 11px/1 ui-monospace,monospace;padding:9px 12px;border-radius:8px}
+#stale{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:rgba(200,162,74,.12);
+  border:1px solid rgba(200,162,74,.4);color:#e2c072;font-size:13px}
 </style>
 
 <header>
@@ -127,7 +133,8 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 import { mountCodeBox } from './src/highlight.js?v=4';
 import { EFFECT_CLIPS } from './src/cells.js?v=4';
 import { CELLS, cellSource, saveCell, publishFiles, bootPython, runCell, loadDemo, paintPixels,
-         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor, runChain } from './src/notebook.js?v=4';
+         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor, runChain,
+         legacyWork } from './src/notebook.js?v=4';
 
 const statusEl = document.getElementById('status');
 const host = document.getElementById('cells');
@@ -142,6 +149,18 @@ const gate = buildGate();
 const lab = buildLab();
 const card = buildCard();
 gate.update();
+
+// Đề bài từng đổi cách biểu diễn ảnh. Máy nào còn giữ bài đời cũ thì nói thẳng,
+// vì code cũ chạy trên dữ liệu mới sẽ vỡ với thông báo chẳng ai đoán ra.
+const stale = legacyWork();
+if (stale.length) {
+  const warn = document.createElement('p');
+  warn.id = 'stale';
+  warn.textContent = `Máy bạn còn ${stale.length} bài viết theo đề CŨ (ảnh phẳng px[i]): `
+    + stale.join(', ') + '. Đề bài giờ dùng image[row][col], nên mấy ô đã được trả về đề mới.'
+    + ' Bài cũ vẫn nằm trong máy, không mất.';
+  document.querySelector('header').appendChild(warn);
+}
 
 bootPython(say)
   .then(rt => { runtime = rt; return loadDemo().catch(() => null); })
@@ -213,6 +232,7 @@ function build(cell) {
     shots.innerHTML = '';
     drawOutput(result.output);
     drawEffects(result.output);
+    if (cell.kind === 'setup' && result.rows) return drawButtons(result.rows);
     if (result.rows) return drawTable(result.rows);
     if (demo && result.pixels) {
       const firstLabel = cell.id === 'blur_background' ? 'KHUNG HÌNH'
@@ -292,6 +312,28 @@ function build(cell) {
     box.appendChild(canvas);
     shots.appendChild(box);
     paintPixels(canvas, pixels, demo.width, demo.height);
+  }
+
+
+  // Ô setup: dựng NÚT THẬT y như ở sân khấu, bấm được luôn — chứ đọc bảng chữ
+  // thì không biết bảng phép của mình trông ra sao.
+  function drawButtons(rows) {
+    const strip = document.createElement('div');
+    strip.className = 'btn-preview';
+    const title = document.createElement('span');
+    title.textContent = 'BẢNG PHÉP CỦA BẠN — bấm thử đi';
+    strip.appendChild(title);
+    for (const row of rows) {
+      if (!row.hit) continue;
+      const name = (row.got.match(/"([^"]+)"/) || [])[1];
+      const button = document.createElement('button');
+      button.className = 'stage-btn';
+      button.textContent = row.input;
+      button.title = row.got;
+      button.onclick = () => { shots.querySelectorAll('.shot.fx').forEach(box => box.remove()); drawEffects([`play_effect("${name}")`]); };
+      strip.appendChild(button);
+    }
+    shots.appendChild(strip);
   }
 
   function drawTable(rows) {

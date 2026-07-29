@@ -7,6 +7,8 @@
 from magic_stage import new_image
 
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
+
+# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
 # out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
 #
 # Ảnh là bảng ô vuông xếp theo HÀNG và CỘT, đánh số từ 0:
@@ -57,6 +59,38 @@ def blur(image, out, width, height):
     for row in range(height):
         for col in range(width):
             # lượt của bạn: cộng màu các ô quanh đây rồi chia trung bình
+            out[row][col] = image[row][col]
+
+
+# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
+# out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
+#
+# Ảnh là bảng ô vuông xếp theo HÀNG và CỘT, đánh số từ 0:
+#
+#     image[row][col]  ->  [đỏ, xanh lá, xanh dương]     mỗi số từ 0 tới 255
+#
+#     image[0][0]      ô góc trên bên trái
+#     image[0][1]      ô kế bên phải nó
+#     image[1][0]      ô ngay bên dưới ô đầu
+#
+# Lấy riêng một màu thì thêm một dấu ngoặc nữa:
+#     image[row][col][0] là đỏ · [1] xanh lá · [2] xanh dương
+#
+# width = số cột · height = số hàng
+#
+# strength là MỘT số từ 0 tới 100 (phần trăm), không phải ảnh.
+#     strength = 0   -> giữ nguyên ảnh nền
+#     strength = 100 -> chỉ còn lớp trên
+#     strength = 30  -> 70 phần nền + 30 phần lớp trên
+#
+# Công thức cho MỖI màu:
+#     (nen * (100 - strength) + tren * strength) // 100
+#
+# Dùng // để kết quả là số nguyên; màu không nhận số lẻ.
+def blend_alpha(image, layer, strength, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: pha hai màu theo tỉ lệ
             out[row][col] = image[row][col]
 
 

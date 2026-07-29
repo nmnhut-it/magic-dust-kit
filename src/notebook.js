@@ -14,7 +14,24 @@ export { CELLS };
 
 const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
 const KEY = 'magicdust.kit.';
-const CELL_KEY = 'magicdust.kit.cell.';
+// Số 2 trong khoá là ĐỜI của đề bài. Đề bài từng dùng ảnh phẳng (px[i]) rồi
+// đổi sang mảng ba chiều (image[row][col]); bài cũ lưu trong máy học sinh vẫn
+// chạy được cú pháp nhưng vỡ ngay khi gặp dữ liệu mới, với thông báo khó hiểu
+// kiểu "+=: 'int' and 'list'". Đổi đời khoá là mọi máy bắt đầu lại từ đề mới.
+const CELL_KEY = 'magicdust.kit.cell2.';
+const OLD_CELL_KEY = 'magicdust.kit.cell.';
+
+// Còn bài đời cũ trong máy không? Trang dùng cái này để báo cho học sinh biết.
+export function legacyWork() {
+  try {
+    const found = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(OLD_CELL_KEY)) found.push(key.slice(OLD_CELL_KEY.length));
+    }
+    return found;
+  } catch { return []; }
+}
 const DEMO_W = 160, DEMO_H = 120;
 const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, new_image\n\n';
 
@@ -240,8 +257,12 @@ function runOnDemo(py, cell, demo) {
     ? `_image, _mask, _out, ${width}, ${height}`
     : `_image, _mask, _background, _out, ${width}, ${height}`;
   if (cell.kind === 'scene') args = `_image, _mask, _background, _behind, _layer, _out, ${width}, ${height}`;
+  if (cell.kind === 'blend_alpha') args = `_image, _layer, 50, _out, ${width}, ${height}`;   // 50% cho dễ nhìn
   py.globals.set('_image', py.toPy(toGrid(baseFor(cell, demo), width, height)));
   if (cell.kind === 'blend') py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
+  // blend_alpha đè ẢNH lên ẢNH, nên lớp trên là một tấm ảnh thường (nhân vật),
+  // không phải lớp hiệu ứng nền đen.
+  if (cell.kind === 'blend_alpha') py.globals.set('_layer', py.toPy(toGrid(demo.person, width, height)));
   if (cell.kind === 'compose' || cell.kind === 'scene') {
     py.globals.set('_mask', py.toPy(demo.mask));
     py.globals.set('_background', py.toPy(toGrid(demo.base, width, height)));
@@ -350,6 +371,7 @@ export function runChain({ py }, names, demo) {
       py.globals.set('_out', py.toPy(blankGrid(width, height)));
       let args = `_image, _out, ${width}, ${height}`;
       if (name === 'blend') args = `_image, _layer, _out, ${width}, ${height}`;
+      if (name === 'blend_alpha') args = `_image, _layer, 50, _out, ${width}, ${height}`;
       if (name === 'compose') args = `_image, _mask, _background, _out, ${width}, ${height}`;
       if (name === 'blur_background') args = `_image, _mask, _out, ${width}, ${height}`;
       if (name === 'scene') args = `_image, _mask, _background, _behind, _layer, _out, ${width}, ${height}`;
