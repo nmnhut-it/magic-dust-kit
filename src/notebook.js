@@ -8,135 +8,15 @@
 //     thì mỗi lần bấm CHẠY phải đợi vài giây.
 //   · Bài lưu trong localStorage. Xong hết thì trang ghép lại thành hai file
 //     `student/*.py` để sân khấu thật đọc, rồi mới mở cổng sang đó.
-import { mountCodeBox } from './highlight.js';
+import { CELLS, SCENE, DARK_SCENE, LAYER } from './cells.js';
+
+export { CELLS };
 
 const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
 const KEY = 'magicdust.kit.';
 const CELL_KEY = 'magicdust.kit.cell.';
 const DEMO_W = 160, DEMO_H = 120;
-const SCENE = './lessons/assets/camera-effects/plates/bg-lighthouse.webp';
-const LAYER = './lessons/assets/camera-effects/plates/fx-dragon.webp';
 const SPELL_PREAMBLE = 'from magic_stage import play_effect, say\n\n';
-
-const IMAGE_INTRO = `Máy đưa cho bạn một danh sách số rất dài tên là \`px\`. Mỗi ô ảnh chiếm 4 số liền
-nhau: đỏ, xanh lá, xanh dương, độ đục. Ô ở hàng \`row\` cột \`col\` bắt đầu tại
-\`o = (row * width + col) * 4\`. Bạn ĐỌC \`px\`, GHI vào \`out\` — đừng ghi đè lên \`px\`,
-vì nửa ảnh sau sẽ đọc nhầm phần vừa bị bạn sửa.`;
-
-export const CELLS = [
-  {
-    id: 'flip', kind: 'image', title: 'flip — soi gương trái phải',
-    note: `Ô ở cột \`col\` lấy màu của ô cột \`width - 1 - col\` trong CÙNG hàng: cột 0 lấy cột
-cuối, cột cuối lấy cột 0. ${IMAGE_INTRO}`,
-    stub: `def flip(px, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            o = (row * width + col) * 4
-            # lượt của bạn: tính chỗ lấy màu rồi chép đủ ba kênh sang out
-            out[o] = px[o]
-            out[o + 1] = px[o + 1]
-            out[o + 2] = px[o + 2]
-`,
-  },
-  {
-    id: 'blur', kind: 'image', title: 'blur — làm mờ',
-    note: `Mỗi ô lấy màu TRUNG BÌNH của chính nó và các ô hàng xóm sát bên. Ô sát mép chỉ có
-4 hoặc 6 hàng xóm, nên phải đếm xem đã cộng được bao nhiêu ô rồi chia cho đúng số
-đó — chia cứng cho 9 thì viền ảnh tối sầm. Và nhớ bỏ qua hàng xóm rơi ra ngoài
-ảnh: chỉ số âm trong Python không báo lỗi, nó đếm ngược từ cuối danh sách.`,
-    stub: `def blur(px, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            o = (row * width + col) * 4
-            # lượt của bạn: cộng màu các ô quanh đây rồi chia trung bình
-            out[o] = px[o]
-            out[o + 1] = px[o + 1]
-            out[o + 2] = px[o + 2]
-`,
-  },
-  {
-    id: 'blend', kind: 'blend', title: 'blend — ghép lớp hiệu ứng',
-    note: `\`layer\` là lớp hiệu ứng quay trên nền đen, cùng kích thước khung hình. Cộng ánh
-sáng chứ không dán đè: ô đen của lớp cộng vào 0 nên nền giữ nguyên, ô sáng đẩy
-nền lên. Cộng quá 255 thì kẹp lại bằng \`min(255, ...)\`, kẹp riêng từng kênh màu.`,
-    stub: `def blend(px, layer, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn: cộng px[i] với layer[i] rồi kẹp bằng min(255, ...)
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
-`,
-  },
-  {
-    id: 'negative', kind: 'image', title: 'negative — âm bản', extra: true,
-    note: 'Sáng thành tối, tối thành sáng: mỗi kênh màu lấy 255 trừ đi giá trị cũ.',
-    stub: `def negative(px, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
-`,
-  },
-  {
-    id: 'grayscale', kind: 'image', title: 'grayscale — đen trắng', extra: true,
-    note: `Một ô ảnh màu có ba con số khác nhau. Ảnh đen trắng thì cả ba PHẢI bằng nhau —
-lấy trung bình cộng của chúng rồi ghi cùng con số đó vào cả ba kênh.`,
-    stub: `def grayscale(px, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
-`,
-  },
-  {
-    id: 'flip_vertical', kind: 'image', title: 'flip_vertical — lộn đầu xuống chân', extra: true,
-    note: 'Giống `flip` nhưng đổi hàng: ô ở hàng `row` lấy màu của ô hàng `height - 1 - row`, cùng cột.',
-    stub: `def flip_vertical(px, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            o = (row * width + col) * 4
-            # lượt của bạn
-            out[o] = px[o]
-            out[o + 1] = px[o + 1]
-            out[o + 2] = px[o + 2]
-`,
-  },
-  {
-    id: 'drop_blue', kind: 'image', title: 'drop_blue — tắt kênh xanh dương', extra: true,
-    note: `Giữ nguyên đỏ và xanh lá, cho kênh xanh dương bằng 0. Cả ảnh ngả vàng cam — cách
-nhanh nhất để thấy ba con số kia thật sự là ba màu riêng chứ không phải một.`,
-    stub: `def drop_blue(px, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
-`,
-  },
-  {
-    id: 'on_fingers', kind: 'fingers', title: 'on_fingers — giơ mấy ngón thì ra phép gì',
-    note: `Máy đếm số ngón tay bạn giơ lên camera rồi gọi hàm này. Viết chuỗi
-\`if / elif / else\`: 1 ngón ra \`dragon\`, 2 ngón ra \`phoenix\`, 3 ngón ra \`sakura\`,
-số khác thì \`say(...)\` một câu cho biết chưa gán. \`else\` phải nằm cuối cùng.`,
-    stub: `def on_fingers(count):
-    say("thấy " + str(count) + " ngón tay")
-    # lượt của bạn: thay dòng trên bằng if / elif / else gọi play_effect(...)
-`,
-  },
-  {
-    id: 'on_voice', kind: 'voice', title: 'on_voice — nói gì thì ra phép gì',
-    note: `Micro nghe được một từ thì máy gọi hàm này, đưa vào từ đó đã chuyển sang chữ
-thường. Vẫn \`if / elif / else\`, chỉ khác chỗ so sánh chuỗi: "rồng" hoặc "dragon"
-ra \`dragon\`, "hoa"/"sakura" ra \`sakura\`, "mưa"/"rain" ra \`rain\`, từ lạ thì đọc
-lại cho biết máy nghe ra gì. Nhớ dấu tiếng Việt — "rong" không khớp "rồng".`,
-    stub: `def on_voice(word):
-    say("nghe được: " + word)
-    # lượt của bạn: viết if / elif / else ở đây
-`,
-  },
-];
 
 const FINGER_TASKS = [[1, 'dragon'], [2, 'phoenix'], [3, 'sakura']];
 const VOICE_TASKS = [['rồng', 'dragon'], ['hoa', 'sakura'], ['mưa', 'rain']];
@@ -261,18 +141,36 @@ function runOnDemo(py, cell, demo) {
   const args = cell.kind === 'blend'
     ? `_px, _layer, _out, ${demo.width}, ${demo.height}`
     : `_px, _out, ${demo.width}, ${demo.height}`;
-  py.globals.set('_px', py.toPy(demo.base));
+  py.globals.set('_px', py.toPy(baseFor(cell, demo)));
   if (cell.kind === 'blend') py.globals.set('_layer', py.toPy(demo.layer));
-  py.globals.set('_out', py.toPy(new Array(demo.base.length).fill(255)));
+  py.globals.set('_out', py.toPy(new Array(baseFor(cell, demo).length).fill(255)));
   try {
     py.runPython(`${cell.id}(${args})`);
     return py.globals.get('_out').toJs();
   } catch { return null; }                    // lỗi đã được bộ chấm nói rồi
 }
 
+// Hai nền: cảnh sáng cho hầu hết các phép, nền tối riêng cho lend — cộng
+// một lớp sáng lên nền vốn đã sáng thì trắng xoá, học sinh không thấy gì.
 export async function loadDemo() {
-  const [base, layer] = await Promise.all([grab(SCENE), grab(LAYER)]);
-  return { base, layer, width: DEMO_W, height: DEMO_H };
+  const [base, dark, layer] = await Promise.all([grab(SCENE), grab(DARK_SCENE), grab(LAYER)]);
+  return { base, dark, layer, width: DEMO_W, height: DEMO_H };
+}
+
+// Ảnh vào của một ô: lend lấy nền tối, còn lại lấy cảnh sáng.
+export function baseFor(cell, demo) {
+  return cell.kind === 'blend' ? demo.dark : demo.base;
+}
+
+// Mật khẩu mở đáp án — băm bằng djb2 để không nằm chình ình trong mã nguồn.
+// Đây là cái chốt cửa cho vui, không phải khoá két: ai chịu khó đọc mã vẫn mở
+// được. Mục đích chỉ là để học sinh không lỡ tay bấm ra đáp án.
+const PASSWORD_HASH = 756893813;
+
+export function passwordOk(text) {
+  let hash = 5381;
+  for (const ch of String(text)) hash = ((hash * 33) ^ ch.codePointAt(0)) >>> 0;
+  return hash === PASSWORD_HASH;
 }
 
 function grab(src) {

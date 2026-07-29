@@ -71,6 +71,22 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .card-list li{display:flex;gap:8px;color:#42596a}
 .card-list li.on{color:#15503a;font-weight:700}
 .card-note{margin:16px 0 0;font:400 12.5px/1.6 ui-sans-serif,system-ui,sans-serif;color:#5d7280}
+.brief{padding:14px 16px;color:var(--dim)}
+.brief .idea{margin:0 0 12px;white-space:pre-wrap}
+.brief code,.cell-note code{color:var(--ink)}
+.brief dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0}
+.brief dt{font:700 10px/1.7 ui-monospace,monospace;letter-spacing:1px;color:#5f7f92}
+.brief dd{margin:0}
+.answer:empty{display:none}
+.answer{margin:0 16px 14px;padding:14px;border-radius:10px;border:1px dashed rgba(200,162,74,.5);background:rgba(200,162,74,.07)}
+.ans-head{margin:0 0 10px;font:700 11px/1.5 ui-monospace,monospace;letter-spacing:.6px;color:#e2c072}
+.ans-code{margin:0;padding:12px;border-radius:8px;background:#050810;overflow:auto;
+  font:400 12.5px/1.6 ui-monospace,Menlo,Consolas,monospace;color:var(--ink)}
+.ans-why{margin:10px 0 0;color:var(--dim);font-size:13.5px}
+.ans-lock{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ans-pass{padding:8px 10px;border-radius:7px;border:1px solid var(--line);background:#050810;color:var(--ink);
+  font:400 13px/1.3 ui-monospace,monospace}
+.ans-msg{font:400 12px/1.4 ui-monospace,monospace;color:var(--bad)}
 </style>
 
 <header>
@@ -85,7 +101,7 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 <script type="module">
 import { mountCodeBox } from './src/highlight.js';
 import { CELLS, cellSource, saveCell, publishFiles, bootPython, runCell, loadDemo, paintPixels,
-         loadPassed, savePassed, scoreOf, studentName } from './src/notebook.js';
+         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor } from './src/notebook.js';
 
 const statusEl = document.getElementById('status');
 const host = document.getElementById('cells');
@@ -113,15 +129,27 @@ function build(cell) {
       <h2>${cell.title}</h2>
       <span class="tag ${cell.extra ? 'extra' : ''}">${cell.extra ? 'BÀI THÊM' : 'BẮT BUỘC'}</span>
     </div>
-    <p class="cell-note"></p>
+    <div class="brief">
+      <p class="idea"></p>
+      <dl>
+        <dt>VÀO</dt><dd class="in"></dd>
+        <dt>LÀM</dt><dd class="job"></dd>
+        <dt>RA</dt><dd class="out"></dd>
+      </dl>
+    </div>
     <div class="codebox"></div>
     <div class="cell-bar">
       <button class="run" disabled>▶ CHẠY &amp; CHẤM</button>
       <button class="reset">↺ đề gốc</button>
+      <button class="key">🔑 đáp án</button>
       <span class="verdict"></span>
     </div>
+    <div class="answer"></div>
     <div class="shots"></div>`;
-  el.querySelector('.cell-note').innerHTML = prose(cell.note);
+  el.querySelector('.idea').innerHTML = prose(cell.idea);
+  el.querySelector('.in').innerHTML = prose(cell.input);
+  el.querySelector('.job').innerHTML = prose(cell.job);
+  el.querySelector('.out').innerHTML = prose(cell.output);
   host.appendChild(el);
 
   const box = mountCodeBox(el.querySelector('.codebox'), cellSource(cell));
@@ -152,7 +180,7 @@ function build(cell) {
     shots.innerHTML = '';
     if (result.rows) return drawTable(result.rows);
     if (!demo || !result.pixels) return;
-    frame('ẢNH VÀO', demo.base);
+    frame('ẢNH VÀO', baseFor(cell, demo));
     if (cell.kind === 'blend') frame('LỚP HIỆU ỨNG', demo.layer);
     frame('ẢNH RA — code của bạn dựng', result.pixels);
   }
@@ -185,6 +213,7 @@ function build(cell) {
 
   runBtn.onclick = run;
   el.querySelector('.reset').onclick = () => { box.value = cell.stub; saveCell(cell, cell.stub); };
+  el.querySelector('.key').onclick = () => showAnswer(cell, el.querySelector('.answer'));
   return { enable: () => { runBtn.disabled = false; } };
 }
 
@@ -203,6 +232,43 @@ function buildGate() {
     publishFiles();
     hint.innerHTML = '<a href="./san-khau.html"><button class="run">⤳ RA SÂN KHẤU THẬT — code của bạn đi theo</button></a>';
   } };
+}
+
+// Đáp án khoá bằng mật khẩu — dành cho bố mẹ mở ra giảng khi con bí, chứ không
+// phải để con bấm cho nhanh. Mở một ô thì mở luôn cả trang cho tới lúc tải lại.
+let answersUnlocked = false;
+
+function showAnswer(cell, host) {
+  if (host.dataset.open === 'yes') { host.textContent = ''; host.dataset.open = 'no'; return; }
+  if (!answersUnlocked) return askPassword(host, () => showAnswer(cell, host));
+  host.dataset.open = 'yes';
+  host.innerHTML = `
+    <p class="ans-head">ĐÁP ÁN — dành cho bố mẹ hoặc thầy cô giảng lại</p>
+    <pre class="ans-code"></pre>
+    <p class="ans-why"></p>`;
+  host.querySelector('.ans-code').textContent = cell.answer;
+  host.querySelector('.ans-why').innerHTML = prose(cell.why);
+}
+
+function askPassword(host, done) {
+  host.dataset.open = 'no';
+  host.innerHTML = `
+    <p class="ans-head">Đáp án khoá lại. Nhờ bố mẹ hoặc thầy cô mở giúp nhé.</p>
+    <div class="ans-lock">
+      <input type="password" class="ans-pass" placeholder="mật khẩu" autocomplete="off">
+      <button class="ans-go">MỞ</button>
+      <span class="ans-msg"></span>
+    </div>`;
+  const field = host.querySelector('.ans-pass');
+  const msg = host.querySelector('.ans-msg');
+  const submit = () => {
+    if (!passwordOk(field.value)) { msg.textContent = 'Chưa đúng.'; field.select(); return; }
+    answersUnlocked = true;
+    done();
+  };
+  host.querySelector('.ans-go').onclick = submit;
+  field.onkeydown = event => { if (event.key === 'Enter') submit(); };
+  field.focus();
 }
 
 // Bảng điểm: nằm cuối trang, luôn hiện, để chụp màn hình gửi bố mẹ.
