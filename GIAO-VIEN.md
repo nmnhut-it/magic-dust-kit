@@ -8,82 +8,131 @@ Cắt từ `D:/magic-dust`: đồ chơi VFX (`index.html` + `src/`) và **một*
 GƯƠNG VÔ CỰC (`lessons/islandFXFORGE.html` + `lessons/engine/` + `py/`). Không
 có bản đồ saga, không có node nào khác — mở đảo là vào thẳng.
 
-Ba file học sinh sửa (`src/my-spells.js`, `src/my-image-spells.js`,
-`assets/my-fx/`) là file MỚI, không có trong dự án gốc. Phần còn lại của `src/`
-là mã gốc, chỉ sửa đúng bốn chỗ để nối bài của học sinh vào:
-`spells.js` (trộn bảng thần chú + bảng gợi ý), `studio-effects.js` (trộn video),
-`main.js` (một dòng gọi `mountPixelStage`).
+**Bài tập của học sinh là Python thật, chạy thật.** Trang đồ chơi nạp Pyodide
+ngay trong trình duyệt (`src/py-runtime.js`), đọc hai file trong `student/`, rồi
+gọi hàm của các em: đổi số ngón tay thì gọi `on_fingers`, micro nghe được từ thì
+gọi `on_voice`, và mỗi khung hình khi bật F/B/N thì gọi `flip`/`blur`/`blend`.
+Sửa file rồi bấm `R` là nạp lại — không phải tải lại trang, không phải chờ
+Pyodide khởi động lần nữa.
+
+Phần mã máy chỉ sửa bốn chỗ so với bản gốc: `spells.js` và `studio-effects.js`
+(trộn bảng hiệu ứng của học sinh), `main.js` (ba dòng: gọi `mountPython`, đẩy số
+ngón tay và từ nghe được sang Python).
+
+## Vì sao 96×72 chứ không phải cả khung hình
+
+Đo bằng chính Pyodide trong trình duyệt (Python thuần, không numpy):
+
+| cỡ | flip | blur |
+|---|---|---|
+| 64×48 | 250 hình/giây | 47 |
+| **96×72** | **159** | **22** |
+| 128×96 | 92 | 13 |
+| 320×240 | 11 | 2 |
+
+96×72 là chỗ `blur` — hàm nặng nhất — vẫn còn mượt. Muốn nét hơn thì đổi `W`,`H`
+trong `src/py-runtime.js`, nhưng nhớ rằng Python chạy ở luồng chính nên hình 3D
+sẽ khựng theo. Vì vậy phần ảnh chạy cách khung (`FRAME_EVERY = 2`).
 
 ## Thứ tự dạy đề nghị
 
-1. Chơi đồ chơi trước — chưa động vào code. Xoè tay, giơ 1–2 ngón, bấm `3`–`0`.
-2. Bài tập 1 (thần chú hạt): sửa số trong `genCuaBan` rồi xem đổi gì trên màn
-   hình. Đây là bài "sửa thấy ngay", để lấy đà.
-3. Đảo gương: viết `flip`/`blend` bằng Python trên lưới 8×8 và 256×256.
-4. Bài tập 3: viết lại đúng hai phép đó bằng JavaScript trên camera. Chỗ này là
-   cả điểm rơi của buổi học — **cùng một phép tính, khác cái máy chạy nó**.
-5. Bài tập 2 (video nền đen) để cuối, coi như phần thưởng, và nó giải thích
-   luôn vì sao `blend` phải cộng chứ không phải đè.
+1. Chơi trước, chưa động vào code: xoè tay, giơ 1–2 ngón, bấm `3`–`0`.
+2. `student/spells.py` → `on_fingers`. Đây là bài `if/elif/else` đầu tiên mà
+   **điều kiện là bàn tay thật của các em**. Sai thì thấy ngay, không cần chấm.
+3. `on_voice` — cũng `if/elif/else`, nhưng so sánh chuỗi. Chỗ này lộ ra chuyện
+   micro nghe "rồng" có khi ra "Rồng" hay "trồng"; đó là bài học về dữ liệu bẩn.
+4. Đảo gương: viết `flip`/`blend` bằng Python trên lưới 8×8 rồi 256×256.
+5. `student/image_spells.py`: đúng ba phép đó, giờ chạy trên camera. Điểm rơi
+   của cả buổi — **cùng một phép tính, khác cái máy chạy nó**.
+6. Video nền đen (`assets/my-fx/`) để cuối, coi như thưởng, và nó giải thích
+   luôn vì sao `blend` phải cộng chứ không dán đè.
 
-## Đáp án bài tập 3
+## Đáp án
 
-Bấm `T` trong đồ chơi là máy tự chấm. Đây là bản đủ:
+### `student/spells.py`
 
-```js
-export function flip(px, out, width, height) {
-  for (let row = 0; row < height; row++) {
-    for (let col = 0; col < width; col++) {
-      const o = (row * width + col) * 4;
-      const from = (row * width + (width - 1 - col)) * 4;
-      out[o] = px[from]; out[o + 1] = px[from + 1]; out[o + 2] = px[from + 2]; out[o + 3] = 255;
-    }
-  }
-}
+```python
+def on_fingers(count):
+    if count == 1:
+        play_effect("dragon")
+    elif count == 2:
+        play_effect("phoenix")
+    elif count == 3:
+        play_effect("sakura")
+    else:
+        say("chưa gán phép cho số này")
 
-export function blur(px, out, width, height) {
-  for (let row = 0; row < height; row++) {
-    for (let col = 0; col < width; col++) {
-      let r = 0, g = 0, b = 0, dem = 0;
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          const nr = row + dr, nc = col + dc;
-          if (nr < 0 || nc < 0 || nr >= height || nc >= width) continue;
-          const n = (nr * width + nc) * 4;
-          r += px[n]; g += px[n + 1]; b += px[n + 2]; dem++;
-        }
-      }
-      const o = (row * width + col) * 4;
-      out[o] = r / dem; out[o + 1] = g / dem; out[o + 2] = b / dem; out[o + 3] = 255;
-    }
-  }
-}
 
-export function blend(px, layer, out, width, height) {
-  for (let i = 0; i < px.length; i += 4) {
-    out[i] = Math.min(255, px[i] + layer[i]);
-    out[i + 1] = Math.min(255, px[i + 1] + layer[i + 1]);
-    out[i + 2] = Math.min(255, px[i + 2] + layer[i + 2]);
-    out[i + 3] = 255;
-  }
-}
+def on_voice(word):
+    if word == "rồng" or word == "dragon":
+        play_effect("dragon")
+    elif word == "hoa" or word == "sakura":
+        play_effect("sakura")
+    elif word == "mưa" or word == "rain":
+        play_effect("rain")
+    else:
+        say("nghe được: " + word)
+```
+
+### `student/image_spells.py`
+
+```python
+def flip(px, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            o = (row * width + col) * 4
+            f = (row * width + (width - 1 - col)) * 4
+            out[o] = px[f]
+            out[o + 1] = px[f + 1]
+            out[o + 2] = px[f + 2]
+
+
+def blur(px, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            do = xanh_la = xanh_duong = dem = 0
+            for dr in (-1, 0, 1):
+                nr = row + dr
+                if nr < 0 or nr >= height:
+                    continue
+                for dc in (-1, 0, 1):
+                    nc = col + dc
+                    if nc < 0 or nc >= width:
+                        continue
+                    i = (nr * width + nc) * 4
+                    do += px[i]
+                    xanh_la += px[i + 1]
+                    xanh_duong += px[i + 2]
+                    dem += 1
+            o = (row * width + col) * 4
+            out[o] = do // dem
+            out[o + 1] = xanh_la // dem
+            out[o + 2] = xanh_duong // dem
+
+
+def blend(px, layer, out, width, height):
+    for i in range(0, len(px), 4):
+        out[i] = min(255, px[i] + layer[i])
+        out[i + 1] = min(255, px[i + 1] + layer[i + 1])
+        out[i + 2] = min(255, px[i + 2] + layer[i + 2])
 ```
 
 ## Chỗ học sinh hay vấp
 
-- **Quên kênh alpha.** Không gán `out[o + 3] = 255` thì ảnh trong suốt, nhìn ra
-  toàn màu nền. Bộ chạy đã tô sẵn 255 cho cả khung trước khi gọi hàm, nên lỗi
-  này ít khi bung ra — nhưng nếu em nào tự tạo mảng mới thì gặp ngay.
-- **Lật bằng cách đổi chỗ tại chỗ.** Có em viết `px[o] = px[from]` trên chính
-  dải số đầu vào, nửa sau ảnh sẽ lật đè lên nửa đã lật. Vì vậy hàm có hai dải
-  riêng: đọc `px`, ghi `out`.
-- **`blur` đọc ra ngoài mép.** `nr`/`nc` âm hoặc vượt cỡ thì `px[n]` ra
-  `undefined`, cộng vào thành `NaN`, ảnh đen thui. Bỏ qua hàng xóm ngoài ảnh và
-  chia cho số ô thực sự cộng được (`dem`), đừng chia cứng cho 9.
-- **`blend` nhân đôi vòng lặp.** Không cần `row`/`col` — cộng thẳng theo chỉ số
-  `i` là xong, vì hai ảnh cùng kích thước. Ai đã viết bằng `row`/`col` cũng
-  đúng, không cần bắt sửa.
-- **Video hiệu ứng không có nền đen** → cả khung hình sáng trắng lên khi bấm.
-  Đó là bằng chứng sống cho việc "cộng ánh sáng" chứ không phải "dán đè".
+- **Quên bấm `R`.** Sửa file xong nhìn màn hình không đổi rồi tưởng mình sai.
+  Nhắc các em: lưu file → bấm `R` → thấy dòng `Đã nạp lại student/*.py`.
+- **Ghi đè lên `px`.** Có em viết `px[o] = px[f]` cho gọn; nửa ảnh sau sẽ lật
+  đè lên phần vừa bị sửa. Đó là lý do hàm có hai danh sách riêng: đọc `px`,
+  ghi `out`.
+- **`blur` chia cứng cho 9.** Ô sát mép chỉ có 4 hoặc 6 hàng xóm, chia cho 9
+  thì viền ảnh tối sầm. Phải đếm `dem` rồi chia cho `dem`.
+- **`blur` đọc ra ngoài ảnh.** `nr`/`nc` âm trong Python KHÔNG lỗi — nó đếm
+  ngược từ cuối danh sách, nên ảnh có vệt lạ chứ không báo gì. Phải `continue`
+  khi ra ngoài.
+- **`on_voice` so sánh chuỗi có dấu.** Micro trả về chữ thường nhưng có dấu
+  tiếng Việt; `"rong"` sẽ không khớp `"rồng"`.
+- **Video hiệu ứng không có nền đen** → cả khung sáng trắng khi bấm. Bằng chứng
+  sống cho chuyện "cộng ánh sáng" chứ không phải "dán đè".
 
 ## Kiểm tra nhanh trước buổi dạy
 
@@ -91,12 +140,12 @@ export function blend(px, layer, out, width, height) {
 python serve.py
 ```
 
-Mở đồ chơi, bấm `T` — phải thấy ba dòng `✖ ... chưa viết` (đề bài còn nguyên).
-Mở đảo gương, chạy thử một ô code — phải thấy cửa sổ so sánh ảnh mở ra.
+Mở đồ chơi, chờ dòng `Python sẵn sàng`, bấm `T` — phải thấy ba dòng `✖` (đề bài
+còn nguyên). Mở đảo gương, chạy một ô code — phải thấy cửa sổ so sánh ảnh.
 
 ## Camera trên máy trường
 
-Camera chỉ chạy ở `localhost` hoặc HTTPS. Nếu muốn học sinh mở từ máy khác trong
-phòng máy thì phải có HTTPS — đơn giản nhất là mỗi máy tự chạy `serve.py` của
-mình. Máy nào không có webcam vẫn học được bài tập 3: bấm `T` để chấm, và đảo
-gương thì không cần camera.
+Camera chỉ chạy ở `localhost` hoặc HTTPS. Đơn giản nhất là mỗi máy tự chạy
+`serve.py` của mình. Máy không có webcam vẫn học được: bấm `T` để chấm phần ảnh,
+gõ `student.fingers(2)` trong Console để thử phần `if/elif`, và đảo gương thì
+không cần camera.

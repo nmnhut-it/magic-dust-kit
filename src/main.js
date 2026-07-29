@@ -11,7 +11,7 @@ import { AudioManager } from './audio.js';
 import { Efk } from './effekseer.js';
 import { StudioEffects } from './studio-effects.js';
 import { Segmentation } from './segmentation.js';
-import { mountPixelStage } from './pixel-stage.js';
+import { mountPython } from './py-runtime.js';
 import { Lotus3DEngine } from '../lessons/weather-lab/lotus-3d.js';
 
 const $=id=>document.getElementById(id);
@@ -445,6 +445,7 @@ function updateVoiceCharge(now){
 function updateCasting(dt){
   if(casting)return;
   const fingerCount=manualFingerOverride!=null?manualFingerOverride:lastFingerCount;
+  student.fingers(fingerCount);          // BÀI TẬP 1: on_fingers() trong student/spells.py
   const target=manualFingerOverride!=null?FINGER_TO_SPELL[fingerCount]:null;
   // Simulated finger input has no real hand landmark to anchor VFX to — pin a
   // fixed on-screen point so keyboard/API-driven testing shows the effect
@@ -499,7 +500,14 @@ function updatePresence(){
 
 // ── Gesture detection ─────────────────────────────────────────────────────────
 const videoEl=document.querySelector('.input_video'),ocv=$('ocv'),ctx2d=ocv.getContext('2d');
-mountPixelStage(videoEl);   // BÀI TẬP 3: F lật · B mờ · N chồng lớp · X tắt · T tự chấm
+// Mã Python của học sinh (student/*.py) chạy ngay trong trang này: số ngón
+// tay và từ nghe được đẩy sang cho hàm của các em, còn F/B/N gọi ba phép xử
+// lý ảnh. R nạp lại file sau khi sửa, T tự chấm.
+const student=mountPython({video:videoEl,
+  playEffect:name=>runVoiceSpell(name,true),
+  cast:name=>runVoiceSpell(name,true),
+  onStatus:text=>{voiceStatEl.textContent=text;}});
+window.student=student;   // console: student.fingers(2) · student.voice('mưa')
 const studio=new StudioEffects({THREE,scene,camera:cam3,renderer,video:videoEl,handCanvas:ocv,statusEl:ptxtEl});
 const lotus3d=new Lotus3DEngine(document.body);
 const studioGestureTrigger=new StableGestureTrigger({holdMs:700,releaseMs:220});
@@ -759,6 +767,7 @@ if(SpeechRecognitionImpl){
     voiceStatEl.textContent=`voice: heard “${alternatives[0].trim()}”`;
     const now=performance.now();
     if(now-lastVoiceActionAt<1200)return;
+    student.voice(alternatives[0].trim().toLowerCase());   // BÀI TẬP 1: on_voice() trong student/spells.py
     const spokenSpell=alternatives.map(voiceSpell).find(Boolean);
     if(spokenSpell){
       lastVoiceActionAt=now;

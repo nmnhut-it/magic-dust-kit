@@ -1,21 +1,20 @@
 # Magic Dust — Bộ Đồ Nghề
 
 Bạn vừa bước qua Gương Vô Cực. Đây là xưởng của bạn: mã nguồn của chính đồ chơi
-mà bạn vừa chơi, mở ra sửa được hết.
+bạn vừa chơi. **Bạn viết Python, và Python của bạn điều khiển camera thật.**
 
 Trong này có hai thứ:
 
 | | |
 |---|---|
-| `index.html` | **Đồ chơi VFX** — camera bật lên, tay bạn hiện trong khung, xoè bàn tay là bụi sáng bay ra |
-| `lessons/islandFXFORGE.html` | **Đảo GƯƠNG VÔ CỰC** — bài học viết Python để lật ảnh, chồng lớp, chỉnh sáng |
+| `index.html` | **Đồ chơi VFX** — camera bật lên, tay bạn hiện trong khung, và mã Python bạn viết quyết định phép nào hiện ra |
+| `lessons/islandFXFORGE.html` | **Đảo GƯƠNG VÔ CỰC** — nơi bạn học lật ảnh, ghép lớp, chỉnh sáng trên lưới số nhỏ |
 
 ---
 
 ## Chạy nó lên
 
-Cần **Python 3** (máy nào cũng cài sẵn được, tải ở python.org) và **Chrome**
-hoặc **Edge**.
+Cần **Python 3** (tải ở python.org) và **Chrome** hoặc **Edge**.
 
 ```bash
 python serve.py
@@ -26,67 +25,91 @@ Rồi mở:
 - đồ chơi → <http://localhost:8123/index.html>
 - đảo gương → <http://localhost:8123/lessons/islandFXFORGE.html>
 
-> **Đừng mở file bằng cách nhấp đúp vào `index.html`.** Trình duyệt sẽ không cho
-> dùng camera khi mở kiểu `file://`. Cũng đừng dùng Live Server của VS Code —
-> đảo gương cần hai dòng tiêu đề đặc biệt mà chỉ `serve.py` gửi kèm (đọc phần
-> đầu file đó nếu bạn tò mò tại sao).
+> **Đừng nhấp đúp vào `index.html`.** Mở kiểu `file://` thì trình duyệt không
+> cho dùng camera. Cũng đừng dùng Live Server của VS Code — đảo gương cần hai
+> dòng tiêu đề đặc biệt mà chỉ `serve.py` gửi kèm.
 
-Lần đầu vào đảo gương sẽ hơi lâu: trình duyệt phải tải cả một bộ Python về máy.
+Lần đầu mở, trang phải tải Python về máy nên hơi lâu. Xong sẽ hiện
+`Python sẵn sàng` ở góc phải.
 
 ---
 
-## Ba bài tập
+## Bài của bạn nằm ở thư mục `student/`
 
-Mọi thứ bạn cần sửa nằm trong **ba chỗ**, không phải mò khắp nơi.
+Hai file Python, mở bằng bất cứ trình soạn thảo nào. **Sửa xong thì lưu file,
+quay ra trang web bấm phím `R`** — máy nạp lại mã của bạn ngay, không phải tải
+lại trang.
 
-### 1. Thần chú của riêng bạn — `src/my-spells.js`
+Mấy phím cần nhớ:
 
-Viết một hàm đặt từng hạt sáng vào chỗ của nó, đặt tên, gán cho số ngón tay.
-Trong file đã có sẵn một ví dụ bốn dòng (vòng tròn xoáy) để bạn đọc trước.
-Thêm xong, giơ đúng số ngón tay đó lên camera là niệm được.
+| Phím | Việc |
+|---|---|
+| `R` | nạp lại `student/*.py` sau khi bạn sửa |
+| `T` | máy tự chấm ba hàm xử lý ảnh và nói bạn sai ở đâu |
+| `F` `B` `N` | chạy `flip` / `blur` / `blend` của bạn trên hình camera |
+| `X` | tắt phép xử lý ảnh |
 
-### 2. Hiệu ứng video của bạn — `assets/my-fx/`
+### `student/spells.py` — chọn phép bằng tay và bằng giọng nói
 
-Bỏ một file video **quay trên nền đen** vào thư mục đó, khai báo một dòng trong
-`src/my-spells.js`, thế là gọi được bằng phím. Vì sao phải nền đen thì bài tập 3
-sẽ trả lời.
+Hai hàm, cả hai đều là bài `if / elif / else`:
 
-### 3. Ba phép xử lý ảnh — `src/my-image-spells.js`
+```python
+def on_fingers(count):    # máy đếm số ngón tay bạn giơ lên rồi gọi hàm này
+    ...
 
-Đây là bài chính. Ở đảo gương bạn viết `flip` và `blend` bằng Python trên lưới
-8×8 — đủ nhỏ để nhìn thấy từng con số. Giờ viết lại bằng JavaScript, và chúng
-chạy 30 lần mỗi giây trên khuôn mặt bạn:
+def on_voice(word):       # micro nghe được một từ thì gọi hàm này
+    ...
+```
+
+Trong hàm bạn gọi `play_effect("dragon")` để mở một lớp hiệu ứng, hoặc
+`say("...")` để hiện chữ. Tên hiệu ứng dùng được: `dragon`, `koto`, `rose`,
+`phoenix`, `butterfly`, `sakura`, `smoke`, `rain`, `flower`, `magic`,
+`lightning`.
+
+Giơ tay lên camera là thấy ngay mã của bạn chạy.
+
+### `student/image_spells.py` — ba phép xử lý ảnh
+
+Ở đảo gương bạn viết `flip` và `blend` bằng Python trên lưới 8×8, đủ nhỏ để
+nhìn từng con số. Ở đây vẫn đúng phép tính đó, nhưng máy gọi nhiều lần mỗi giây
+trên hình từ camera:
 
 | Hàm | Việc của nó | Phím thử |
 |---|---|---|
 | `flip` | soi gương trái–phải | `F` |
 | `blur` | mỗi ô lấy màu trung bình với hàng xóm | `B` |
-| `blend` | cộng lớp hiệu ứng lên khung hình, kẹp ở 255 | `N` |
+| `blend` | ghép lớp hiệu ứng lên khung hình, kẹp ở 255 | `N` |
 
-Phím `X` tắt hết. Phím **`T` là máy tự chấm** ba hàm đó bằng một ảnh tí hon và
-nói cho bạn sai ở đâu — bấm `T` trước khi hỏi ai.
+Bấm `T` trước khi hỏi ai — máy dựng một ảnh tí hon rồi chỉ đúng chỗ bạn sai.
 
-Hàm nào chưa viết thì màn hình báo tên hàm còn thiếu; phần còn lại của đồ chơi
-vẫn chạy bình thường, không sập.
+### `assets/my-fx/` — hiệu ứng video của riêng bạn
+
+Bỏ một file video **quay trên nền đen** vào đó, khai báo một dòng trong
+`src/my-spells.js`, rồi gọi nó từ Python bằng `play_effect("tên_bạn_đặt")`.
+Vì sao phải nền đen? Vì `blend` cộng ánh sáng chứ không dán đè — chỗ đen cộng
+vào 0 nên biến mất.
 
 ---
 
 ## Khi có gì đó hỏng
 
-- **Không thấy tay** → kiểm tra bạn đang ở `localhost` chứ không phải `file://`,
-  và trình duyệt đã cho phép dùng camera. Ngồi cách camera khoảng một sải tay,
-  phòng đủ sáng.
+- **Góc màn hình hiện `✖ SyntaxError: ... (line 48)`** → mã Python của bạn sai
+  cú pháp ở đúng dòng đó. Sửa, lưu, bấm `R`.
+- **`Chưa thấy hàm on_fingers()`** → bạn đổi tên hàm, hoặc chưa lưu file.
+- **Không thấy tay** → phải mở qua `localhost` chứ không phải `file://`, và cho
+  phép trình duyệt dùng camera. Ngồi cách camera một sải tay, phòng đủ sáng.
 - **Đảo gương đứng ở "Loading Python"** → bạn đang mở bằng Live Server hoặc
   `python -m http.server`. Phải là `python serve.py`.
-- **Đồ chơi báo `✖ ... chưa viết`** → đúng rồi đấy, đó là bài tập 3 đang chờ bạn.
-- **Trong Console có mấy dòng đỏ về `.mp3` và `.efk`** → kệ nó. Bộ này cố ý
-  không kèm file âm thanh; thiếu thì đồ chơi tự bỏ qua.
+- **Console có mấy dòng đỏ về `.mp3` và `.efk`** → kệ nó, bộ này cố ý không kèm
+  file âm thanh.
 
-## Mấy phím tiện tay
+## Mấy phím tiện tay khác
 
 `1`/`2` giữ để giả bộ giơ 1–2 ngón · `Space` niệm luôn · `3`–`0`, `D`, `R` gọi
-hiệu ứng video · `G` thu gọn bảng thần chú · `M` đổi kiểu tách nền ·
-`P` chụp ảnh.
+hiệu ứng có sẵn · `G` thu gọn bảng thần chú · `M` đổi kiểu tách nền · `P` chụp ảnh.
+
+Muốn thử mà không giơ tay: mở Console gõ `student.fingers(2)` hoặc
+`student.voice("mưa")`.
 
 ## Bộ này lấy từ đâu
 
