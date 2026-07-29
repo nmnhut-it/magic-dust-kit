@@ -248,6 +248,35 @@ def setup():
 Mỗi lời gọi mọc một nút thật ở góc phải sân khấu. Cạnh đó có ô gõ từ để thử
 `on_voice()` khi máy không có micro — gõ "mưa" rồi Enter là thấy hàm mình chạy.
 
+## `stage` — bài cuối cùng, tự dựng sân khấu của mình
+
+Không có đáp án đúng. `stage()` chạy đúng một lần lúc sân khấu mở, và mọi thứ
+trong đó là quyết định của bạn:
+
+```python
+def stage():
+    set_background("rung")        # nền phía sau bạn: rung · cong_kotopia · hai_dang
+    set_behind("rain")            # hiệu ứng bay SAU LƯNG bạn
+    set_front("dragon")           # hiệu ứng phủ TRƯỚC MẶT bạn
+    add_button("Rồng Lửa", "dragon")
+    add_button("Mưa Giông", "rain")
+```
+
+Đề bài chỉ đòi ít nhất một nền và một nút — làm được bấy nhiêu là qua bài.
+Ba lớp `background`/`behind`/`front` xếp chồng đúng thứ tự các em đã tự tay
+dựng ở bài `scene`; lần này máy lo phần lắp ráp, các em ra quyết định. Và nó
+**là thật**: mở `san-khau.html` lên, `stage()` của bạn tự chạy ngay — nền,
+hai lớp hiệu ứng, và bảng nút hiện đúng như những gì bạn vừa viết, không phải
+một bản xem trước giả.
+
+`set_background`/`set_behind`/`set_front` không chỉ nhận tên có sẵn
+(`rung`/`cong_kotopia`/`hai_dang` cho nền, các tên trong bảng phím ở trên cho
+lớp trước/sau) — chúng còn nhận đúng cái tên bạn vừa đặt cho video của mình ở
+khung **"+ HIỆU ỨNG CỦA BẠN"**. Tải một clip `.mp4` quay trên nền đen lên,
+đặt tên `rong_tu_ve` chẳng hạn, rồi gọi thẳng `set_front("rong_tu_ve")` —
+video của chính bạn giờ là lớp phủ trước mặt, y hệt cách `play_effect()` đã
+dùng cái tên đó.
+
 ## Máy chấm giúp ngay lúc bật máy chủ
 
 Mỗi lần chạy `CHAY.bat` (hoặc `python serve.py`), cửa sổ đen in ra bảng chấm
@@ -296,6 +325,9 @@ play_effect("rong_lua")
 
 Tên có dấu hoặc có khoảng trắng sẽ được đổi thành chữ thường không dấu, vì đó
 là tên bạn gõ trong Python. "Rồng Lửa của Bảo" thành `rong_lua_cua_bao`.
+
+Cái tên đó dùng được ở CẢ bài `stage` — `set_background`/`set_behind`/
+`set_front` nhận đúng tên bạn vừa đặt, không chỉ mấy tên có sẵn trong đề.
 
 **Cách của thợ (máy nhà, sửa file thoải mái).** Bỏ video vào `assets/my-fx/` rồi
 khai một dòng trong `src/my-spells.js`:

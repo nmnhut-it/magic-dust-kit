@@ -137,6 +137,22 @@ def drop_blue(image, out, width, height):
 
 Ảnh là mảng ba chiều `image[row][col][màu]`, giống hệt bên đảo Gương Vô Cực.
 
+### `stage()` — không có đáp án đúng, đây là đáp án MẪU
+
+```python
+def stage():
+    set_background("rung")
+    set_behind("rain")
+    set_front("dragon")
+
+    add_button("Rồng Lửa", "dragon")
+    add_button("Phượng Hoàng", "phoenix")
+    add_button("Hoa Anh Đào", "sakura")
+```
+
+Đổi tên nền/hiệu ứng/nút thoải mái — miễn có ít nhất một `set_background` và
+một `add_button` là qua bài (xem "Chấm tự động" bên dưới).
+
 `grayscale` là bài đáng dừng lại nhất: nhiều em ghi trung bình vào đúng một
 kênh rồi thắc mắc sao ảnh ngả đỏ. Người chấm phân biệt hai lỗi đó bằng hai câu
 khác nhau — "ba kênh phải bằng nhau" và "đã bằng nhau nhưng chưa phải trung
@@ -176,6 +192,15 @@ kết quả (`check_all()` nằm cuối `student/image_spells.py`).
 Chấm ở ba chỗ dùng chung một bộ đề, nên không có chuyện máy chủ nói đạt mà
 trang nói chưa.
 
+**Bài `stage` không có đáp án đúng** — cả ba nơi chấm (`runStageCell` trong
+`src/notebook.js`, phím `T`/`san-khau.html`, và `cham.py`) chỉ đòi ít nhất một
+`set_background(...)` và một `add_button(...)`; không so khớp tên nền/hiệu
+ứng cụ thể nào. Đây là bài duy nhất trong bộ cố ý chấm lỏng như vậy, vì đề bài
+nói rõ "dựng cái bạn thấy đã mắt nhất". `stage()` chạy thật trên
+`san-khau.html`: `set_background`/`set_behind`/`set_front` chọn đúng ba lớp
+mà bài `scene` đã dạy, và sân khấu tự vào `scene` mode ngay khi nạp — không
+cần bấm phím `S`.
+
 ## `blend` chưa xong thì phép video vẫn chạy
 
 Đáng nói vì dễ hiểu nhầm: `play_effect(...)` do JavaScript ghép lớp
@@ -201,6 +226,10 @@ lặng làm các em tưởng máy hỏng.
   tiếng Việt; `"rong"` sẽ không khớp `"rồng"`.
 - **Video hiệu ứng không có nền đen** → cả khung sáng trắng khi bấm. Bằng chứng
   sống cho chuyện "cộng ánh sáng" chứ không phải "dán đè".
+- **`stage()` quên `set_background`.** Bài không đòi tên nền cụ thể, nhưng
+  thiếu cả `set_background` lẫn `add_button` thì báo lỗi rõ ràng
+  ("chưa chọn nền" / "chưa gắn nút nào") — không phải chấm sai, đọc kỹ thông
+  báo là biết thiếu gì.
 
 ## Kiểm tra nhanh trước buổi dạy
 

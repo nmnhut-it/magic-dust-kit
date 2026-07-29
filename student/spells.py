@@ -1,10 +1,4 @@
-# ============================================================================
-#  BÀI TẬP 1 — BỘ CHỌN THẦN CHÚ VÀ BẢNG NÚT CỦA BẠN
-#  Cùng đề bài với trang làm bài. Sửa xong bấm R ở sân khấu.
-# ============================================================================
-
-from magic_stage import play_effect, say, add_button, fingers_now
-
+from magic_stage import play_effect, say, add_button, fingers_now, set_background, set_behind, set_front
 
 # Máy gọi setup() một lần sau khi nạp mã của bạn.
 #     add_button("Rồng Lửa", "dragon")   -> mọc một nút, bấm là ra rồng
@@ -14,6 +8,22 @@ from magic_stage import play_effect, say, add_button, fingers_now
 # và cả hiệu ứng video bạn tự bỏ vào ở sân khấu.
 def setup():
     # lượt của bạn: gọi add_button(...) cho mấy phép bạn thích
+    pass
+
+
+# Máy gọi stage() một lần khi sân khấu mở.
+#
+#     set_background("rung")        nền phía sau bạn
+#         chọn: rung · cong_kotopia · hai_dang
+#     set_behind("rain")            hiệu ứng bay SAU LƯNG bạn
+#     set_front("dragon")           hiệu ứng phủ TRƯỚC MẶT bạn
+#         chọn: dragon · phoenix · sakura · rain
+#         (và cả video bạn tự bỏ vào ở sân khấu)
+#     add_button("Rồng Lửa", "dragon")   thêm một nút bấm
+#
+# Không có đáp án đúng. Dựng cái bạn thấy đã mắt nhất.
+def stage():
+    # lượt của bạn
     pass
 
 

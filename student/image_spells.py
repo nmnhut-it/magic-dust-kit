@@ -1,10 +1,4 @@
-# ============================================================================
-#  BÀI TẬP 2 — CÁC PHÉP XỬ LÝ ẢNH
-#  Cùng đề bài với trang làm bài. Sửa xong bấm R ở sân khấu, bấm T để chấm.
-# ============================================================================
-
 from magic_stage import new_image
-
 
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
 # out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
@@ -76,6 +70,35 @@ def blur(image, out, width, height):
 #
 # width = số cột · height = số hàng
 #
+# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với image.
+# Số màu chỉ chạy từ 0 tới 255, cộng quá thì kẹp bằng min(255, ...).
+#
+# Gợi ý: đặt tên cho hai ô trước cho dễ đọc, rồi mới cộng.
+#     base = image[row][col]
+#     glow = layer[row][col]
+def blend(image, layer, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
+            out[row][col] = image[row][col]
+
+
+# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
+# out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
+#
+# Ảnh là bảng ô vuông xếp theo HÀNG và CỘT, đánh số từ 0:
+#
+#     image[row][col]  ->  [đỏ, xanh lá, xanh dương]     mỗi số từ 0 tới 255
+#
+#     image[0][0]      ô góc trên bên trái
+#     image[0][1]      ô kế bên phải nó
+#     image[1][0]      ô ngay bên dưới ô đầu
+#
+# Lấy riêng một màu thì thêm một dấu ngoặc nữa:
+#     image[row][col][0] là đỏ · [1] xanh lá · [2] xanh dương
+#
+# width = số cột · height = số hàng
+#
 # strength là MỘT số từ 0 tới 100 (phần trăm), không phải ảnh.
 #     strength = 0   -> giữ nguyên ảnh nền
 #     strength = 100 -> chỉ còn lớp trên
@@ -123,35 +146,6 @@ def compose(person, mask, background, out, width, height):
         for col in range(width):
             # lượt của bạn: hỏi mặt nạ rồi lấy màu từ đúng tấm ảnh
             out[row][col] = background[row][col]
-
-
-# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
-# out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
-#
-# Ảnh là bảng ô vuông xếp theo HÀNG và CỘT, đánh số từ 0:
-#
-#     image[row][col]  ->  [đỏ, xanh lá, xanh dương]     mỗi số từ 0 tới 255
-#
-#     image[0][0]      ô góc trên bên trái
-#     image[0][1]      ô kế bên phải nó
-#     image[1][0]      ô ngay bên dưới ô đầu
-#
-# Lấy riêng một màu thì thêm một dấu ngoặc nữa:
-#     image[row][col][0] là đỏ · [1] xanh lá · [2] xanh dương
-#
-# width = số cột · height = số hàng
-#
-# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với image.
-# Số màu chỉ chạy từ 0 tới 255, cộng quá thì kẹp bằng min(255, ...).
-#
-# Gợi ý: đặt tên cho hai ô trước cho dễ đọc, rồi mới cộng.
-#     base = image[row][col]
-#     glow = layer[row][col]
-def blend(image, layer, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
-            out[row][col] = image[row][col]
 
 
 # Hai hàm bạn đã viết, giờ đem ra dùng lại:

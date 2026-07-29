@@ -13,7 +13,9 @@
 // không phải chép qua chép lại — đổi lại, khi Python chạy thì hình đứng yên
 // trong chốc lát, nên phần xử lý ảnh chạy cách khung (xem FRAME_EVERY).
 import { storedSource } from './student-store.js?v=4';
-import { toGrid, toFlat, blankGrid } from './notebook.js?v=4';   // cùng cách dịch ảnh với trang làm bài
+import { toGrid, toFlat, blankGrid } from './notebook.js?v=4';
+import { BACKDROPS, EFFECT_CLIPS } from './cells.js?v=4';   // cùng cách dịch ảnh với trang làm bài
+import { listClips } from './my-fx-store.js?v=4';   // video của chính học sinh — cùng kho với my-fx-panel.js
 
 const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
 const GRADER = './pygrade/grader.py';        // bộ chấm dùng chung, học sinh không sửa
@@ -45,7 +47,10 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   const ui = buildPanel();
   const say = (text, bad = false) => { ui.log.textContent = text; ui.log.style.color = bad ? '#ffb4b4' : '#eaf4ff'; onStatus?.(text); };
 
-  const state = { py: null, mode: null, frame: 0, layer: null, lastFingers: -1, busy: false };
+  // `pick` là sân khấu do học sinh chọn trong stage(); mặc định để trống, máy
+  // chỉ dùng đồ có sẵn khi các em chưa chọn gì.
+  const state = { py: null, mode: null, frame: 0, layer: null, lastFingers: -1, busy: false,
+                  pick: { behind: null, front: null } };
 
   // ── nạp Pyodide + hai file của học sinh ────────────────────────────────────
   async function boot() {
@@ -68,7 +73,12 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       // Bao nhiêu ngón tay đang giơ NGAY LÚC NÀY. Có nó thì on_voice mới kết
       // hợp được hai điều kiện: đúng thế tay VÀ đúng lời niệm.
       fingers_now: () => state.lastFingers < 0 ? 0 : state.lastFingers,
+      // Ba lệnh để học sinh tự dựng sân khấu trong hàm stage().
+      set_background: name => { pickBackdrop(String(name)); return true; },
+      set_behind: name => { state.pick.behind = String(name); return true; },
+      set_front: name => { state.pick.front = String(name); return true; },
     });
+    await loadCustomClips();
     await reload();
   }
 
@@ -85,12 +95,20 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
 
   async function reload() {
     try {
+      await loadCustomClips();   // học sinh có thể vừa tải video mới lên trước khi bấm R
       const sources = await Promise.all([readFile(GRADER), ...FILES.map(readFile)]);
       for (const source of sources) state.py.runPython(source);
       // setup() là chỗ học sinh tự gắn nút cho phép của mình. Xoá bảng cũ
       // trước, nếu không mỗi lần bấm R lại mọc thêm một bộ nút trùng.
       ui.buttons.textContent = '';
+      state.pick = { behind: null, front: null };
       if (state.py.globals.get('setup')) call('setup');
+      if (state.py.globals.get('stage')) {
+        call('stage');       // bài cuối: học sinh tự dựng sân khấu
+        // Sân khấu của bạn tự mở ngay — không cần bấm phím S để xem thành quả.
+        setMode('scene');
+        say('Sân khấu bạn dựng — đang chạy');
+      }
       say('Python sẵn sàng — sửa file trong student/ rồi bấm R để nạp lại');
       return true;
     } catch (err) { say(pyError(err), true); return false; }
@@ -150,22 +168,79 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   };
   backdrop.src = BACKDROP;
 
-  // Ba clip cho bài `scene`. Mỗi khung hình lấy đúng ảnh đang chiếu của chúng,
-  // nên học sinh ghép VIDEO thật chứ không phải ba tấm ảnh chết.
-  const clips = {};
-  for (const [role, src] of Object.entries(SCENE_CLIPS)) {
+  // Clip video của chính học sinh (bảng "+ HIỆU ỨNG CỦA BẠN") — tên → blob URL.
+  // Nạp lại mỗi lần boot/reload để clip vừa tải lên cũng dùng được ngay trong
+  // set_background/set_behind/set_front, không chỉ trong play_effect().
+  let customClips = {};
+  async function loadCustomClips() {
+    for (const url of Object.values(customClips)) URL.revokeObjectURL(url);
+    customClips = {};
+    for (const clip of await listClips()) customClips[clip.name] = URL.createObjectURL(clip.blob);
+  }
+
+  // Nền do học sinh chọn: ảnh có sẵn thì vẽ vào lưới, video (có sẵn hoặc do
+  // chính học sinh tự bỏ vào) thì đọc từng khung.
+  function pickBackdrop(name) {
+    const custom = customClips[name];
+    const src = custom || BACKDROPS[name];
+    if (!src) {
+      const choices = [...Object.keys(BACKDROPS), ...Object.keys(customClips)].join(' · ');
+      say(`Chưa có nền tên "${name}" — chọn: ${choices}`, true);
+      return;
+    }
+    if (custom || /\.(mp4|webm)$/.test(src)) {
+      state.backdropClip = getClip(src);
+      state.backdropClip.play().catch(() => {});
+      state.backdrop = null;                 // đọc từng khung trong tick()
+    } else {
+      state.backdropClip = null;
+      backdrop.src = src;                    // onload phía trên dựng lại lưới
+    }
+    say(`Nền: ${name}`);
+  }
+
+  // Khung hình hiện tại của nền, dù nền là ảnh hay video.
+  function backdropGrid() {
+    if (state.backdropClip) return clipGridOf(state.backdropClip);
+    return state.backdrop;
+  }
+
+  // Clip cho bài `scene`/`stage`, tính theo src chứ không theo tên — một
+  // nguồn video (có sẵn hay của học sinh) chỉ cần dựng một thẻ <video> duy
+  // nhất dù được gọi làm nền, lớp sau, hay lớp trước.
+  function makeClip(src) {
     const clip = document.createElement('video');
     clip.src = src; clip.muted = true; clip.loop = true; clip.playsInline = true;
     clip.play().catch(() => {});          // trình duyệt chặn autoplay: bấm một cái là chạy
-    clips[role] = clip;
+    return clip;
   }
+  const clipCache = new Map();
+  function getClip(src) {
+    if (!clipCache.has(src)) clipCache.set(src, makeClip(src));
+    return clipCache.get(src);
+  }
+  for (const src of Object.values(SCENE_CLIPS)) getClip(src);
   const clipCv = document.createElement('canvas'); clipCv.width = W; clipCv.height = H;
   const clipCtx = clipCv.getContext('2d', { willReadFrequently: true });
-  function clipGrid(role) {
-    const clip = clips[role];
+  function clipGridOf(clip) {
     if (!clip?.videoWidth) return null;
     clipCtx.drawImage(clip, 0, 0, W, H);
     return toGrid(Array.from(clipCtx.getImageData(0, 0, W, H).data), W, H);
+  }
+
+  // Lớp sau / lớp trước: ưu tiên thứ học sinh chọn trong stage() — hiệu ứng có
+  // sẵn (EFFECT_CLIPS) hoặc chính video học sinh vừa tải lên (customClips).
+  function clipGrid(role) {
+    const chosen = state.pick[role];
+    if (chosen) {
+      const src = customClips[chosen] || EFFECT_CLIPS[chosen];
+      if (!src) {
+        say(`Chưa có hiệu ứng tên "${chosen}" cho set_${role} — kiểm tra lại tên bạn gõ.`, true);
+        return clipGridOf(getClip(SCENE_CLIPS[role]));
+      }
+      return clipGridOf(getClip(src));
+    }
+    return clipGridOf(getClip(SCENE_CLIPS[role]));
   }
 
   // Mặt nạ người, thu về đúng cỡ 96x72 rồi đọc kênh độ đục thành số 0..255.
@@ -203,18 +278,20 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
     } else if (state.mode === 'scene') {
       const mask = personMask();
       if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }
-      const background = clipGrid('background'), behind = clipGrid('behind'), front = clipGrid('front');
+      const background = backdropGrid() || clipGrid('background'), behind = clipGrid('behind'), front = clipGrid('front');
       if (!background || !behind || !front) { say('Đang tải ba đoạn video…'); state.busy = false; return; }
       result = call('scene', image, mask, background, behind, front, out, W, H);
     } else if (state.mode === 'blend_over') {
       const mask = personMask();
       if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }
-      if (!state.backdrop) { say('Đang tải ảnh nền…'); state.busy = false; return; }
+      const under = backdropGrid();
+      if (!under) { say('Đang tải ảnh nền…'); state.busy = false; return; }
       // lớp dưới là ảnh nền, lớp trên là bạn, alpha là mặt nạ người
-      result = call('blend_over', state.backdrop, image, mask, out, W, H);
+      result = call('blend_over', under, image, mask, out, W, H);
     } else if (state.mode === 'blend_alpha') {
-      if (!state.backdrop) { say('Đang tải ảnh nền…'); state.busy = false; return; }
-      result = call('blend_alpha', image, state.backdrop, 50, out, W, H);
+      const under = backdropGrid();
+      if (!under) { say('Đang tải ảnh nền…'); state.busy = false; return; }
+      result = call('blend_alpha', image, under, 50, out, W, H);
     } else if (state.mode === 'blur_background') {
       const mask = personMask();
       if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }
@@ -222,8 +299,9 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
     } else if (state.mode === 'compose') {
       const mask = personMask();
       if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }
-      if (!state.backdrop) { say('Đang tải ảnh nền…'); state.busy = false; return; }
-      result = call('compose', image, mask, state.backdrop, out, W, H);
+      const under = backdropGrid();
+      if (!under) { say('Đang tải ảnh nền…'); state.busy = false; return; }
+      result = call('compose', image, mask, under, out, W, H);
     } else {
       result = call(state.mode, image, out, W, H);
     }

@@ -34,7 +34,8 @@ export function legacyWork() {
 }
 const DEMO_W = 160, DEMO_H = 120;
 const IMAGE_PREAMBLE = 'from magic_stage import new_image\n\n';
-const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, fingers_now' + '\n\n';
+const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, fingers_now, '
+  + 'set_background, set_behind, set_front' + '\n\n';
 
 
 const FINGER_TASKS = [[1, 'dragon'], [2, 'phoenix'], [3, 'sakura']];
@@ -93,7 +94,7 @@ export function saveCell(cell, source) {
 // Ô nào thuộc file nào. Khai một chỗ duy nhất — trước đây danh sách này nằm
 // rải trong lời gọi và tôi thêm bài mới mà quên sửa, thành ra sân khấu báo
 // "chưa thấy hàm compose" dù học sinh đã làm xong.
-const SPELL_KINDS = ['fingers', 'voice', 'setup'];
+const SPELL_KINDS = ['fingers', 'voice', 'setup', 'stage'];
 const IMAGE_KINDS = ['image', 'blend', 'blend_alpha', 'over', 'compose', 'scene'];
 
 // Ghép các ô thành đúng hai file mà sân khấu thật đọc.
@@ -134,6 +135,9 @@ export async function bootPython(onStatus) {
     new_image: (width, height) => blankGrid(width, height),
     // Lúc chấm, số ngón tay do bộ chấm đặt trước mỗi lượt thử.
     fingers_now: () => handHolds.count,
+    set_background: name => { log.push(['stage', 'background', String(name)]); return true; },
+    set_behind: name => { log.push(['stage', 'behind', String(name)]); return true; },
+    set_front: name => { log.push(['stage', 'front', String(name)]); return true; },
   });
   // Ô on_fingers/on_voice chỉ chứa đúng một hàm, không có dòng import ở đầu —
   // nên nhập sẵn hai lệnh đó vào namespace, đúng như file spells.py vẫn làm.
@@ -170,6 +174,7 @@ export function runCell({ py, log, printed }, cell, source, demo) {
 
   if (cell.kind === 'fingers' || cell.kind === 'voice') return runSpellCell(py, log, cell, printed);
   if (cell.kind === 'setup') return runSetupCell(py, log, printed);
+  if (cell.kind === 'stage') return runStageCell(py, log, printed);
 
   const verdict = py.runPython(`check_one(${JSON.stringify(cell.id)}, globals())`).toJs();
   const [ok, message] = verdict;
@@ -194,6 +199,31 @@ function runSetupCell(py, log, printed) {
              output: outputLines(log, printed) };
   }
   return { ok: true, message: 'setup', rows, output: outputLines(log, printed) };
+}
+
+// Ô stage: không có đáp án đúng. Chỉ đòi ít nhất một nền và một nút — sân
+// khấu thật sẽ hiện đúng những gì set_background/set_behind/set_front/
+// add_button vừa gọi (xem py-runtime.js, cùng lối gọi magic_stage này).
+function runStageCell(py, log, printed) {
+  log.length = 0;
+  try { py.runPython('stage()'); }
+  catch (err) { return { ok: false, message: pyError(err) }; }
+  const picks = {};
+  for (const entry of log) if (entry[0] === 'stage') picks[entry[1]] = entry[2];
+  const buttons = log.filter(entry => entry[0] === 'button');
+  const rows = Object.entries(picks).map(([role, name]) => ({ input: role, wanted: 'bạn chọn', hit: true, got: name }));
+  for (const button of buttons) rows.push({ input: 'nút', wanted: 'bạn chọn', hit: true, got: `${button[1]} → ${button[2]}` });
+  if (!picks.background) {
+    rows.push({ input: 'nền', wanted: 'set_background(...)', hit: false, got: 'chưa chọn' });
+    return { ok: false, message: 'stage: chưa chọn nền — sân khấu không có gì phía sau bạn', rows, picks,
+             output: outputLines(log, printed) };
+  }
+  if (!buttons.length) {
+    rows.push({ input: 'nút', wanted: 'add_button(...)', hit: false, got: 'chưa có nút nào' });
+    return { ok: false, message: 'stage: chưa gắn nút nào — thêm ít nhất một phép bạn thích', rows, picks,
+             output: outputLines(log, printed) };
+  }
+  return { ok: true, message: 'stage', rows, picks, output: outputLines(log, printed) };
 }
 
 

@@ -55,6 +55,13 @@ export const EFFECT_CLIPS = {
   magic: './lessons/assets/camera-effects/overlays/glyph-white.mp4',
 };
 
+// Nền cho sân khấu: học sinh chọn bằng set_background("rung") trong bài cuối.
+export const BACKDROPS = {
+  rung: './lessons/assets/camera-effects/overlays/bg-enchanted-forest.mp4',
+  cong_kotopia: './lessons/assets/storybook/portal-courtyard-v3.webp',
+  hai_dang: './lessons/assets/camera-effects/plates/bg-lighthouse.webp',
+};
+
 export const CELLS = [
   {
     id: 'flip', kind: 'image', title: 'flip — soi gương trái phải',
@@ -524,6 +531,48 @@ def setup():
     why: `\`setup()\` chạy một lần, khác hẳn \`on_fingers\` chạy mỗi lần bạn đổi số ngón
 tay. Chữ đầu là nhãn hiện trên nút, chữ sau là tên phép — hai thứ khác nhau,
 nên nhãn cứ đặt tiếng Việt có dấu thoải mái. Muốn thêm nút thì thêm một dòng.`,
+  },
+  {
+    id: 'stage', kind: 'stage', title: 'stage — tự dựng sân khấu của bạn', extra: true,
+    idea: `Bài cuối cùng, và là bài duy nhất không có đáp án đúng. Máy gọi \`stage()\` đúng
+một lần khi sân khấu mở ra, và mọi thứ trong đó là quyết định của bạn: đứng
+trước cảnh nào, hiệu ứng nào bay sau lưng, hiệu ứng nào phủ trước mặt, bảng nút
+gồm những phép gì.
+
+Máy chỉ đưa vật liệu. Sân khấu là của bạn.`,
+    input: 'Không có gì đưa vào — hàm chạy một lần lúc sân khấu mở.',
+    job: 'Gọi `set_background`, `set_behind`, `set_front` để chọn ba lớp, và `add_button` cho mấy phép bạn thích. Ít nhất một nền và một nút.',
+    output: 'Sân khấu mở ra đúng như bạn dựng, và bảng nút của bạn nằm sẵn bên trái.',
+    stub: `# Máy gọi stage() một lần khi sân khấu mở.
+#
+#     set_background("rung")        nền phía sau bạn
+#         chọn: rung · cong_kotopia · hai_dang
+#     set_behind("rain")            hiệu ứng bay SAU LƯNG bạn
+#     set_front("dragon")           hiệu ứng phủ TRƯỚC MẶT bạn
+#         chọn: dragon · phoenix · sakura · rain
+#         (và cả video bạn tự bỏ vào ở sân khấu)
+#     add_button("Rồng Lửa", "dragon")   thêm một nút bấm
+#
+# Không có đáp án đúng. Dựng cái bạn thấy đã mắt nhất.
+def stage():
+    # lượt của bạn
+    pass
+`,
+    answer: `def stage():
+    set_background("rung")
+    set_behind("rain")
+    set_front("dragon")
+
+    add_button("Rồng Lửa", "dragon")
+    add_button("Phượng Hoàng", "phoenix")
+    add_button("Hoa Anh Đào", "sakura")
+`,
+    why: `Đây là đáp án CỦA TÔI, không phải đáp án đúng — bạn đổi hết cũng được, miễn
+sân khấu mở ra đúng ý bạn.
+
+Để ý thứ tự ba lớp: nền ở sau cùng, rồi tới lớp \`behind\`, rồi tới bạn, rồi
+\`front\` phủ lên trên. Đúng cái thứ tự bạn đã tự tay dựng trong bài \`scene\` —
+lần này máy làm phần lắp ráp, còn bạn ra quyết định.`,
   },
   {
     id: 'on_fingers', kind: 'fingers', title: 'on_fingers — giơ mấy ngón thì ra phép gì',

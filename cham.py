@@ -49,6 +49,12 @@ def _record_button(label, effect):
     calls.append(("button", str(label), str(effect)))
 
 
+def _record_stage_pick(role):
+    def pick(name):
+        calls.append(("stage", role, str(name)))
+    return pick
+
+
 def _new_image(width, height):
     """Tấm ảnh trống cho học sinh chứa kết quả tạm ở bài scene."""
     image = []
@@ -73,6 +79,9 @@ def _load():
     fake_stage.add_button = _record_button
     fake_stage.new_image = _new_image
     fake_stage.fingers_now = _fingers_now
+    fake_stage.set_background = _record_stage_pick("background")
+    fake_stage.set_behind = _record_stage_pick("behind")
+    fake_stage.set_front = _record_stage_pick("front")
     sys.modules["magic_stage"] = fake_stage
 
     namespace = {"__name__": "student"}
@@ -114,6 +123,17 @@ def _check_spells(namespace):
         buttons = [entry for entry in calls if entry[0] == "button"]
         results.append((len(buttons) >= 3,
                         f"setup() gắn được {len(buttons)} nút (đề bài cần ít nhất 3)"))
+
+    # stage() không có đáp án đúng — chỉ đòi ít nhất một nền và một nút,
+    # y hệt runStageCell() bên trang làm bài.
+    stage = namespace.get("stage")
+    if stage is not None:
+        del calls[:]
+        stage()
+        picks = {entry[1]: entry[2] for entry in calls if entry[0] == "stage"}
+        buttons = [entry for entry in calls if entry[0] == "button"]
+        results.append(("background" in picks, "stage() đã set_background() chưa"))
+        results.append((len(buttons) >= 1, "stage() đã add_button() ít nhất một nút chưa"))
     return results
 
 
