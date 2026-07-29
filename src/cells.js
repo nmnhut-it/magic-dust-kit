@@ -18,6 +18,8 @@ export const LAYER = './lessons/assets/camera-effects/plates/fx-dragon.webp';
 // Nhân vật có nền trong suốt: kênh độ đục của chính file này thành MẶT NẠ, nên
 // bài ghép nền có đồ thật để chạy mà không cần chụp ảnh ai.
 export const PERSON = './lessons/assets/mirror-wraith.webp';
+// Bài cuối cần bốn lớp: nền, lớp sau lưng, người, hiệu ứng phủ trước.
+export const BEHIND = './lessons/assets/camera-effects/plates/fx-boss.webp';
 
 // Khối chú thích dán đầu mỗi bài ảnh, để học sinh không phải nhớ image là gì.
 const PIXEL_HEADER = `# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
@@ -113,43 +115,6 @@ SỰ cộng được: giữa ảnh 9, cạnh 6, góc 4. Chia cho \`count\` chứ
 là số nguyên.`,
   },
   {
-    id: 'blend', kind: 'blend', title: 'blend — ghép lớp hiệu ứng',
-    idea: `Ghép hai ảnh KHÔNG phải dán đè, mà là CỘNG ÁNH SÁNG. Chỗ nào của lớp hiệu ứng
-màu đen thì ba số gần 0, cộng vào nền gần như không đổi gì — nền hiện ra qua.
-Chỗ nào sáng thì đẩy nền sáng lên. Đó là lý do video hiệu ứng phải quay trên
-nền đen: nền đen tự biến mất, khỏi cần cắt.`,
-    input: 'Ảnh nền `image` và lớp hiệu ứng `layer`, cùng kích thước.',
-    job: 'Cộng từng màu của hai ô cùng vị trí. Tổng vượt quá 255 thì kẹp lại bằng `min(255, ...)`, kẹp riêng từng màu.',
-    output: 'Con rồng phát sáng nằm đè lên nền, nền vẫn nhìn thấy qua chỗ tối của lớp.',
-    stub: `${PIXEL_HEADER}
-#
-# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với image.
-# Số màu chỉ chạy từ 0 tới 255, cộng quá thì kẹp bằng min(255, ...).
-#
-# Gợi ý: đặt tên cho hai ô trước cho dễ đọc, rồi mới cộng.
-#     base = image[row][col]
-#     glow = layer[row][col]
-def blend(image, layer, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
-            out[row][col] = image[row][col]
-`,
-    answer: `def blend(image, layer, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            base = image[row][col]
-            glow = layer[row][col]
-            out[row][col] = [min(255, base[0] + glow[0]),
-                             min(255, base[1] + glow[1]),
-                             min(255, base[2] + glow[2])]
-`,
-    why: `\`base\` và \`glow\` chỉ là tên gọi cho hai ô cùng vị trí, đặt tên xong đọc dễ hơn
-hẳn. \`min(255, a + b)\` giữ kết quả trong khoảng cho phép. Phải kẹp RIÊNG từng
-màu: nếu tính một lần rồi dùng chung cho cả ba, ba màu bị cắt lệch nhau và điểm
-ảnh đổi màu chứ không chỉ sáng lên.`,
-  },
-  {
     id: 'compose', kind: 'compose', title: 'compose — ghép nền, người, rồi hiệu ứng',
     idea: `Phim trường xanh làm thế này: máy có một tấm MẶT NẠ nói rõ ô nào là người, ô
 nào không. Ghép ảnh chỉ là đi từng ô rồi hỏi một câu — ô này là người hay là
@@ -183,6 +148,116 @@ def compose(person, mask, background, out, width, height):
 ảnh. \`mask[row][col]\` chỉ có MỘT số nên không cần ngoặc thứ ba — nó không phải
 màu, nó là mức chắc chắn. Đổi 128 thành số khác là viền người dày mỏng khác
 nhau; thử 60 rồi thử 200 để thấy.`,
+  },
+  {
+    id: 'blend', kind: 'blend', title: 'blend — ghép lớp hiệu ứng',
+    idea: `Ghép hai ảnh KHÔNG phải dán đè, mà là CỘNG ÁNH SÁNG. Chỗ nào của lớp hiệu ứng
+màu đen thì ba số gần 0, cộng vào nền gần như không đổi gì — nền hiện ra qua.
+Chỗ nào sáng thì đẩy nền sáng lên. Đó là lý do video hiệu ứng phải quay trên
+nền đen: nền đen tự biến mất, khỏi cần cắt.`,
+    input: 'Ảnh nền `image` và lớp hiệu ứng `layer`, cùng kích thước.',
+    job: 'Cộng từng màu của hai ô cùng vị trí. Tổng vượt quá 255 thì kẹp lại bằng `min(255, ...)`, kẹp riêng từng màu.',
+    output: 'Con rồng phát sáng nằm đè lên nền, nền vẫn nhìn thấy qua chỗ tối của lớp.',
+    footnote: `Đây là bậc "đè hình A lên hình B". Ở sân khấu, \`layer\` chính là KHUNG HÌNH của
+một đoạn video đang chạy — code y hệt, chỉ khác là máy gọi lại hàm này vài chục
+lần mỗi giây, mỗi lần một khung khác.`,
+    stub: `${PIXEL_HEADER}
+#
+# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với image.
+# Số màu chỉ chạy từ 0 tới 255, cộng quá thì kẹp bằng min(255, ...).
+#
+# Gợi ý: đặt tên cho hai ô trước cho dễ đọc, rồi mới cộng.
+#     base = image[row][col]
+#     glow = layer[row][col]
+def blend(image, layer, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
+            out[row][col] = image[row][col]
+`,
+    answer: `def blend(image, layer, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            base = image[row][col]
+            glow = layer[row][col]
+            out[row][col] = [min(255, base[0] + glow[0]),
+                             min(255, base[1] + glow[1]),
+                             min(255, base[2] + glow[2])]
+`,
+    why: `\`base\` và \`glow\` chỉ là tên gọi cho hai ô cùng vị trí, đặt tên xong đọc dễ hơn
+hẳn. \`min(255, a + b)\` giữ kết quả trong khoảng cho phép. Phải kẹp RIÊNG từng
+màu: nếu tính một lần rồi dùng chung cho cả ba, ba màu bị cắt lệch nhau và điểm
+ảnh đổi màu chứ không chỉ sáng lên.`,
+  },
+  {
+    id: 'blur_background', kind: 'compose', title: 'blur_background — nền mờ, người vẫn nét',
+    idea: `Bạn đã thấy trong mấy buổi họp trực tuyến: người thì nét, còn phòng phía sau
+nhoè đi. Không có phép mới nào cả — chỉ là dùng lại \`blur\` và \`compose\` của
+chính bạn: làm mờ CẢ tấm ảnh ra một chỗ riêng, rồi lấy mặt nạ mà chọn — ô nào
+là người thì lấy ảnh gốc (nét), ô nào là nền thì lấy bản đã mờ.`,
+    input: '`image` (khung hình), `mask` (mặt nạ người).',
+    job: 'Gọi `blur` của bạn vào một tấm tạm (`new_image`), rồi `compose` để giữ người nét và lấy nền mờ.',
+    output: 'Bạn nét căng, phòng phía sau nhoè hẳn.',
+    stub: `# Hai hàm bạn đã viết, giờ đem ra dùng lại:
+#     blur(image, ket_qua, width, height)
+#     compose(person, mask, background, ket_qua, width, height)
+#     new_image(width, height)   -> tấm ảnh trống để chứa kết quả tạm
+#
+# Ý chính: "người" là ảnh GỐC, còn "nền" là bản ĐÃ LÀM MỜ.
+def blur_background(image, mask, out, width, height):
+    # lượt của bạn: làm mờ ra tấm tạm, rồi chọn theo mặt nạ
+    out[0][0] = image[0][0]
+`,
+    answer: `def blur_background(image, mask, out, width, height):
+    anh_mo = new_image(width, height)
+    blur(image, anh_mo, width, height)
+    compose(image, mask, anh_mo, out, width, height)
+`,
+    why: `Đọc \`compose(image, mask, anh_mo, out, ...)\` thành lời: "ô nào là người thì lấy
+\`image\` (nét), còn lại lấy \`anh_mo\`". Chỉ ba dòng, vì hai việc nặng đã nằm sẵn
+trong hai hàm bạn viết hôm trước. Muốn nền mờ hơn nữa thì gọi \`blur\` hai lần
+lên chính tấm tạm đó.`,
+  },
+  {
+    id: 'scene', kind: 'scene', title: 'scene — dựng cả cảnh phim: nền · lớp sau · người · hiệu ứng trước',
+    idea: `Đây là bài cuối, và nó KHÔNG có phép tính mới nào. Bạn chỉ gọi lại đúng hai
+hàm mình đã viết, theo thứ tự của một cảnh phim thật:
+
+  1. nền  +  lớp sau lưng   →  \`blend\`
+  2. dán người lên tấm vừa dựng  →  \`compose\`
+  3. phủ hiệu ứng ra phía trước  →  \`blend\` lần nữa
+
+Thứ tự là tất cả. Dán người trước rồi mới cộng lớp sau thì lớp sau nằm đè lên
+mặt bạn — sai hẳn cảnh.`,
+    input: '`person`, `mask`, `background` (nền), `behind` (lớp sau lưng), `front` (hiệu ứng phủ trước).',
+    job: 'Gọi `blend` và `compose` của chính bạn theo ba bước trên. Cần chỗ chứa kết quả tạm thì gọi `new_image(width, height)`.',
+    output: 'Một khung hình hoàn chỉnh: bạn đứng giữa cảnh, có lớp sau lưng và hiệu ứng bay phía trước.',
+    stub: `# Bài này không có phép tính mới — chỉ gọi lại hàm CỦA BẠN.
+#
+#     blend(anh, lop, ket_qua, width, height)
+#     compose(person, mask, background, ket_qua, width, height)
+#     new_image(width, height)   -> một tấm ảnh trống để chứa kết quả tạm
+#
+# Đừng ghi kết quả tạm vào chính tấm đang đọc: hàm sẽ vừa đọc vừa sửa một chỗ.
+def scene(person, mask, background, behind, front, out, width, height):
+    # lượt của bạn: ba bước — nền+behind, dán người, phủ front
+    compose(person, mask, background, out, width, height)
+`,
+    answer: `def scene(person, mask, background, behind, front, out, width, height):
+    phia_sau = new_image(width, height)
+    blend(background, behind, phia_sau, width, height)
+
+    co_nguoi = new_image(width, height)
+    compose(person, mask, phia_sau, co_nguoi, width, height)
+
+    blend(co_nguoi, front, out, width, height)
+`,
+    why: `Hai tấm tạm \`phia_sau\` và \`co_nguoi\` là chỗ chứa kết quả giữa chừng. Không có
+chúng thì bước sau phải vừa đọc vừa ghi lên cùng một tấm, và ô nào ghi trước sẽ
+làm hỏng ô đọc sau. Lần cuối ghi thẳng vào \`out\` vì không ai đọc \`out\` nữa.
+
+Để ý: bạn không viết thêm phép tính nào cả. Hàm mình viết tuần trước giờ thành
+đồ nghề để dựng cảnh — đó chính là cách người ta làm phần mềm.`,
   },
   {
     id: 'negative', kind: 'image', title: 'negative — âm bản', extra: true,

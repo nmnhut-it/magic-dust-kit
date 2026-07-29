@@ -39,6 +39,17 @@ def _record_button(label, effect):
     calls.append(("button", str(label), str(effect)))
 
 
+def _new_image(width, height):
+    """Tấm ảnh trống cho học sinh chứa kết quả tạm ở bài scene."""
+    image = []
+    for _ in range(height):
+        row = []
+        for _ in range(width):
+            row.append([0, 0, 0])
+        image.append(row)
+    return image
+
+
 def _load():
     """Chạy bộ chấm + hai file của học sinh trong CÙNG một namespace.
 
@@ -50,6 +61,7 @@ def _load():
     fake_stage.cast = _record_cast
     fake_stage.say = _record_say
     fake_stage.add_button = _record_button
+    fake_stage.new_image = _new_image
     sys.modules["magic_stage"] = fake_stage
 
     namespace = {"__name__": "student"}

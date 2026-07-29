@@ -12,7 +12,8 @@
 #   (row * width + col) * 4 — khó hiểu quá nên đã bỏ.)
 # ============================================================================
 
-TASKS = ("flip", "blur", "blend", "compose", "negative", "grayscale", "flip_vertical", "drop_blue")
+TASKS = ("flip", "blur", "blend", "compose", "blur_background", "scene",
+         "negative", "grayscale", "flip_vertical", "drop_blue")
 EXTRA_TASKS = ("negative", "grayscale", "flip_vertical", "drop_blue")
 
 
@@ -166,11 +167,59 @@ def _check_compose(fn):
     return True, "compose"
 
 
+def _check_scene(fn):
+    """Bài cuối: nền + lớp sau + người + hiệu ứng trước, xếp đúng thứ tự.
+
+    Dựng số sao cho mỗi bước sai một kiểu là kết quả lệch một kiểu, nhờ vậy
+    câu báo lỗi chỉ được đúng chỗ hỏng.
+    """
+    person = solid(2, 1, 200, 0, 0)          # người: đỏ
+    background = solid(2, 1, 10, 10, 10)     # nền: gần đen
+    behind = solid(2, 1, 0, 40, 0)           # lớp sau: xanh lá nhạt
+    front = solid(2, 1, 0, 0, 60)            # hiệu ứng trước: xanh dương nhạt
+    mask = [[255, 0]]                        # ô đầu là người, ô sau là nền
+    out = blank(2, 1)
+    fn(person, mask, background, behind, front, out, 2, 1)
+
+    # ô 0 (người): 200,0,0 rồi cộng front -> 200,0,60
+    if list(out[0][0]) != [200, 0, 60]:
+        if list(out[0][0]) == [200, 0, 0]:
+            return False, "scene: chỗ có người phải được phủ thêm lớp front ở bước cuối"
+        return False, "scene: ô có người phải lấy màu người rồi mới cộng front"
+    # ô 1 (nền): nền 10,10,10 + behind 0,40,0 = 10,50,10, rồi + front -> 10,50,70
+    if list(out[0][1]) != [10, 50, 70]:
+        if list(out[0][1]) == [10, 10, 70]:
+            return False, "scene: lớp behind chưa được cộng vào nền trước khi dán người"
+        return False, "scene: ô không có người phải là nền + behind, rồi mới + front"
+    return True, "scene"
+
+
+def _check_blur_background(fn):
+    """Nền mờ, người vẫn nét — đúng kiểu họp trực tuyến.
+
+    Ảnh vào có một ô sáng chói giữa vùng tối. Ô đó nằm trong vùng NGƯỜI nên
+    phải giữ nguyên; mấy ô nền quanh nó phải nhoè đi.
+    """
+    image = white_dot(3)
+    mask = [[0, 0, 0], [0, 255, 0], [0, 0, 0]]     # chỉ ô giữa là người
+    out = blank(3, 3)
+    fn(image, mask, out, 3, 3)
+    if out[1][1][0] != 255:
+        return False, "blur_background: ô có người phải giữ NGUYÊN, không được làm mờ"
+    if out[0][0][0] == 0:
+        return False, "blur_background: ô nền phải là ảnh đã làm mờ (ánh sáng lan sang)"
+    if out[0][0][0] == 255:
+        return False, "blur_background: ô nền đang lấy ảnh gốc — bạn quên dùng bản đã mờ?"
+    return True, "blur_background"
+
+
 CHECKERS = {
     "flip": _check_flip,
     "blur": _check_blur,
     "blend": _check_blend,
     "compose": _check_compose,
+    "blur_background": _check_blur_background,
+    "scene": _check_scene,
     "negative": _check_negative,
     "grayscale": _check_grayscale,
     "flip_vertical": _check_flip_vertical,

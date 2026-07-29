@@ -119,6 +119,8 @@ Khác mỗi chỗ: máy gọi hàm của bạn hàng chục lần mỗi giây tr
 | `blur` | mỗi ô lấy màu trung bình với hàng xóm | `B` |
 | `blend` | ghép lớp hiệu ứng lên khung hình, kẹp ở 255 | `N` |
 | `compose` | tách người khỏi phòng rồi dán lên nền khác | `O` |
+| `blur_background` | nền mờ, người vẫn nét (kiểu họp trực tuyến) | `Z` |
+| `scene` | cả cảnh phim: nền video · lớp sau · người · hiệu ứng trước | `S` |
 
 **Bấm `T` trước khi hỏi ai** — máy dựng một ảnh tí hon rồi chỉ đúng chỗ bạn
 sai, kiểu `✖ blur: ô góc vẫn đen — ánh sáng chưa lan sang hàng xóm`.
@@ -150,9 +152,27 @@ Nằm ngay dưới `blend` trong cùng file, cả bốn đều ngắn hơn `blur
 | `T` | máy tự chấm mọi hàm xử lý ảnh và nói bạn sai ở đâu |
 | `F` `B` `N` | chạy `flip` / `blur` / `blend` của bạn trên hình camera |
 | `O` | ghép nền: đứng trước cổng Kotopia thay vì bức tường lớp |
+| `Z` | làm mờ nền, giữ mình nét |
+| `S` | cả cảnh phim, nền là video khu rừng |
 | `A` `W` `V` `C` | bốn bài thêm |
 | `M` | bật/đổi kiểu tách nền — bấm trước khi dùng `O` |
 | `X` | tắt phép xử lý ảnh |
+
+## Đi từng bậc, tới cảnh phim hoàn chỉnh
+
+Sáu bài ảnh bắt buộc là một bậc thang, bài sau dùng lại hàm của bài trước:
+
+| Bậc | Học được gì |
+|---|---|
+| `flip` | ảnh là bảng ô, đổi chỗ ô là đổi ảnh |
+| `blur` | trộn một ô với hàng xóm |
+| `compose` | **tách nền** — mặt nạ nói ô nào là người |
+| `blend` | **đè hình A lên hình B** bằng phép cộng ánh sáng |
+| `blur_background` | gọi lại `blur` + `compose`: nền mờ, người nét |
+| `scene` | gọi lại `blend` + `compose`: **nền video · lớp sau · người · hiệu ứng trước** |
+
+Tới `scene` là các em dựng được đúng cái mà phần mềm dựng phim làm: bốn lớp
+xếp đúng thứ tự, chạy trên video thật ở 96×72, mỗi giây vài chục khung.
 
 ## Ba lớp: nền, người, hiệu ứng
 

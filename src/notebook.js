@@ -8,7 +8,7 @@
 //     thì mỗi lần bấm CHẠY phải đợi vài giây.
 //   · Bài lưu trong localStorage. Xong hết thì trang ghép lại thành hai file
 //     `student/*.py` để sân khấu thật đọc, rồi mới mở cổng sang đó.
-import { CELLS, SCENE, DARK_SCENE, LAYER, PERSON } from './cells.js?v=3';   // xem ghi chú ?v= trong index.html
+import { CELLS, SCENE, DARK_SCENE, LAYER, PERSON, BEHIND } from './cells.js?v=3';   // xem ghi chú ?v= trong index.html
 
 export { CELLS };
 
@@ -16,7 +16,7 @@ const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
 const KEY = 'magicdust.kit.';
 const CELL_KEY = 'magicdust.kit.cell.';
 const DEMO_W = 160, DEMO_H = 120;
-const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button\n\n';
+const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, new_image\n\n';
 
 
 const FINGER_TASKS = [[1, 'dragon'], [2, 'phoenix'], [3, 'sakura']];
@@ -28,7 +28,9 @@ const VOICE_TASKS = [['rồng', 'dragon'], ['hoa', 'sakura'], ['mưa', 'rain']];
 // thưởng thật chứ không phải trang trí.
 const PASS_KEY = 'magicdust.kit.passed';
 const NAME_KEY = 'magicdust.kit.name';
-export const POINT_REQUIRED = 1.4, POINT_EXTRA = 0.75;
+// 7 điểm chia đều cho phần bắt buộc, 3 điểm chia đều cho bài thêm. Chia theo
+// tỉ lệ chứ không gán cứng từng bài, để thêm bài mới không làm vỡ thang 10.
+export const REQUIRED_POINTS = 7, EXTRA_POINTS = 3;
 
 export function loadPassed() {
   try { return new Set(JSON.parse(localStorage.getItem(PASS_KEY) || '[]')); } catch { return new Set(); }
@@ -47,12 +49,14 @@ export function studentName(value) {
 }
 
 export function scoreOf(passed) {
+  const requiredCells = CELLS.filter(cell => !cell.extra).length;
+  const extraCells = CELLS.length - requiredCells;
   let required = 0, extra = 0;
   for (const cell of CELLS) {
     if (!passed.has(cell.id)) continue;
     if (cell.extra) extra += 1; else required += 1;
   }
-  const points = required * POINT_REQUIRED + extra * POINT_EXTRA;
+  const points = required * (REQUIRED_POINTS / requiredCells) + extra * (EXTRA_POINTS / extraCells);
   return { required, extra, points: Math.round(points * 10) / 10 };
 }
 
@@ -89,6 +93,7 @@ export async function bootPython(onStatus) {
     cast: name => { log.push(['fx', String(name)]); return true; },
     say: text => { log.push(['say', String(text)]); return true; },
     add_button: (label, effect) => { log.push(['button', String(label), String(effect)]); return true; },
+    new_image: (width, height) => blankGrid(width, height),
   });
   // Ô on_fingers/on_voice chỉ chứa đúng một hàm, không có dòng import ở đầu —
   // nên nhập sẵn hai lệnh đó vào namespace, đúng như file spells.py vẫn làm.
@@ -100,6 +105,16 @@ export async function bootPython(onStatus) {
 // ── chạy một ô ──────────────────────────────────────────────────────────────
 // Trả về {ok, message, extra} — `extra` là dữ liệu để vẽ ảnh hoặc in nhật ký.
 export function runCell({ py, log }, cell, source, demo) {
+  // Bài cuối gọi lại blend/compose của chính học sinh, nên nạp hai bài đó trước.
+  // Mấy bài "ghép lại" gọi hàm các em viết ở bài trước, nên nạp mấy bài đó trước.
+  const NEEDS = { scene: ['blend', 'compose'], blur_background: ['blur', 'compose'] };
+  if (NEEDS[cell.id]) {
+    for (const id of NEEDS[cell.id]) {
+      const needed = CELLS.find(item => item.id === id);
+      try { py.runPython(cellSource(needed)); }
+      catch (err) { return { ok: false, message: `${id} của bạn đang lỗi: ${pyError(err)}` }; }
+    }
+  }
   try { py.runPython(source); }
   catch (err) { return { ok: false, message: pyError(err) }; }
 
@@ -200,12 +215,19 @@ function runOnDemo(py, cell, demo) {
   const { width, height } = demo;
   let args = `_image, _out, ${width}, ${height}`;
   if (cell.kind === 'blend') args = `_image, _layer, _out, ${width}, ${height}`;
-  if (cell.kind === 'compose') args = `_image, _mask, _background, _out, ${width}, ${height}`;
+  if (cell.kind === 'compose') args = cell.id === 'blur_background'
+    ? `_image, _mask, _out, ${width}, ${height}`
+    : `_image, _mask, _background, _out, ${width}, ${height}`;
+  if (cell.kind === 'scene') args = `_image, _mask, _background, _behind, _layer, _out, ${width}, ${height}`;
   py.globals.set('_image', py.toPy(toGrid(baseFor(cell, demo), width, height)));
   if (cell.kind === 'blend') py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
-  if (cell.kind === 'compose') {
+  if (cell.kind === 'compose' || cell.kind === 'scene') {
     py.globals.set('_mask', py.toPy(demo.mask));
     py.globals.set('_background', py.toPy(toGrid(demo.base, width, height)));
+  }
+  if (cell.kind === 'scene') {
+    py.globals.set('_behind', py.toPy(toGrid(demo.behind, width, height)));
+    py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
   }
   py.globals.set('_out', py.toPy(blankGrid(width, height)));
   try {
@@ -217,7 +239,7 @@ function runOnDemo(py, cell, demo) {
 // Hai nền: cảnh sáng cho hầu hết các phép, nền tối riêng cho lend — cộng
 // một lớp sáng lên nền vốn đã sáng thì trắng xoá, học sinh không thấy gì.
 export async function loadDemo() {
-  const [base, dark, layer, person] = await Promise.all([grab(SCENE), grab(DARK_SCENE), grab(LAYER), grab(PERSON)]);
+  const [base, dark, layer, person, behind] = await Promise.all([grab(SCENE), grab(DARK_SCENE), grab(LAYER), grab(PERSON), grab(BEHIND)]);
   // Ảnh nhân vật có nền trong suốt, nên kênh độ đục của nó CHÍNH LÀ mặt nạ:
   // chỗ nào đục là người. Khỏi cần chụp ảnh ai hay tải model về.
   const mask = [];
@@ -226,13 +248,16 @@ export async function loadDemo() {
     for (let col = 0; col < DEMO_W; col++) line.push(person[(row * DEMO_W + col) * 4 + 3]);
     mask.push(line);
   }
-  return { base, dark, layer, person, mask, width: DEMO_W, height: DEMO_H };
+  return { base, dark, layer, person, behind, mask, width: DEMO_W, height: DEMO_H };
 }
 
 // Ảnh vào của một ô: lend lấy nền tối, còn lại lấy cảnh sáng.
 export function baseFor(cell, demo) {
   if (cell.kind === 'blend') return demo.dark;
-  if (cell.kind === 'compose') return demo.person;
+  // blur_background chạy trên CẢNH, không phải trên ảnh nhân vật: nền của tấm
+  // nhân vật vốn đã trống trơn nên làm mờ nó chẳng thấy khác gì.
+  if (cell.id === 'blur_background') return demo.base;
+  if (cell.kind === 'compose' || cell.kind === 'scene') return demo.person;
   return demo.base;
 }
 

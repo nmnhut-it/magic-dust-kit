@@ -1,8 +1,10 @@
 # ============================================================================
 #  BÀI TẬP 2 — CÁC PHÉP XỬ LÝ ẢNH, CHẠY TRÊN CHÍNH KHUÔN MẶT BẠN
-#  Cùng đề bài với trang làm bài (mở trang chủ). Sửa file này rồi quay ra sân
-#  khấu bấm R để nạp lại, bấm T để máy chấm.
+#  Cùng đề bài với trang làm bài. Sửa file này rồi quay ra sân khấu bấm R để
+#  nạp lại, bấm T để máy chấm.
 # ============================================================================
+
+from magic_stage import new_image
 
 
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
@@ -59,6 +61,20 @@ def blur(image, out, width, height):
             out[row][col] = image[row][col]
 
 
+# person     = ảnh người, dạng person[row][col] -> [đỏ, lá, dương]
+# background = ảnh nền, cùng kích thước
+# mask       = MẶT NẠ, mask[row][col] là MỘT SỐ chứ không phải ba:
+#              255 chắc chắn là người · 0 chắc chắn là nền · ở giữa thì lửng lơ
+# out        = ảnh bạn dựng ra
+#
+# Mốc chia là 128: lớn hơn thì coi là người.
+def compose(person, mask, background, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: hỏi mặt nạ rồi lấy màu từ đúng tấm ảnh
+            out[row][col] = background[row][col]
+
+
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
 # out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
 #
@@ -88,18 +104,27 @@ def blend(image, layer, out, width, height):
             out[row][col] = image[row][col]
 
 
-# person     = ảnh người, dạng person[row][col] -> [đỏ, lá, dương]
-# background = ảnh nền, cùng kích thước
-# mask       = MẶT NẠ, mask[row][col] là MỘT SỐ chứ không phải ba:
-#              255 chắc chắn là người · 0 chắc chắn là nền · ở giữa thì lửng lơ
-# out        = ảnh bạn dựng ra
+# Hai hàm bạn đã viết, giờ đem ra dùng lại:
+#     blur(image, ket_qua, width, height)
+#     compose(person, mask, background, ket_qua, width, height)
+#     new_image(width, height)   -> tấm ảnh trống để chứa kết quả tạm
 #
-# Mốc chia là 128: lớn hơn thì coi là người.
-def compose(person, mask, background, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            # lượt của bạn: hỏi mặt nạ rồi lấy màu từ đúng tấm ảnh
-            out[row][col] = background[row][col]
+# Ý chính: "người" là ảnh GỐC, còn "nền" là bản ĐÃ LÀM MỜ.
+def blur_background(image, mask, out, width, height):
+    # lượt của bạn: làm mờ ra tấm tạm, rồi chọn theo mặt nạ
+    out[0][0] = image[0][0]
+
+
+# Bài này không có phép tính mới — chỉ gọi lại hàm CỦA BẠN.
+#
+#     blend(anh, lop, ket_qua, width, height)
+#     compose(person, mask, background, ket_qua, width, height)
+#     new_image(width, height)   -> một tấm ảnh trống để chứa kết quả tạm
+#
+# Đừng ghi kết quả tạm vào chính tấm đang đọc: hàm sẽ vừa đọc vừa sửa một chỗ.
+def scene(person, mask, background, behind, front, out, width, height):
+    # lượt của bạn: ba bước — nền+behind, dán người, phủ front
+    compose(person, mask, background, out, width, height)
 
 
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.

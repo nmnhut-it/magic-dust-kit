@@ -27,8 +27,17 @@ const MODES = {
   f: 'flip', b: 'blur', n: 'blend',
   a: 'negative', w: 'grayscale', v: 'flip_vertical', c: 'drop_blue',
   o: 'compose',                    // ghép nền: cần mặt nạ người từ MediaPipe
+  z: 'blur_background',            // nền mờ, người nét — kiểu họp trực tuyến
+  s: 'scene',                      // bài cuối: nền video + lớp sau + người + hiệu ứng trước
 };
 const BACKDROP = './lessons/assets/storybook/portal-courtyard-v3.webp';
+// Bài `scene` chạy trên VIDEO thật, không phải ảnh tĩnh: nền là khu rừng, lớp
+// sau lưng là mưa, hiệu ứng phủ trước là rồng.
+const SCENE_CLIPS = {
+  background: './lessons/assets/camera-effects/overlays/bg-enchanted-forest.mp4',
+  behind: './lessons/assets/camera-effects/overlays/rain-storm.mp4',
+  front: './lessons/assets/camera-effects/overlays/dragon-strike.mp4',
+};
 
 export function mountPython({ video, playEffect, cast, onStatus, segmentation }) {
   const ui = buildPanel();
@@ -49,6 +58,8 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       play_effect: name => { state.acted = true; playEffect(String(name)); return true; },
       cast: name => { state.acted = true; cast(String(name)); return true; },
       say: text => { state.acted = true; say(`Python: ${text}`); return true; },
+      // Chỗ chứa kết quả tạm cho bài `scene`.
+      new_image: (width, height) => blankGrid(width, height),
       // Học sinh tự dựng bảng điều khiển của mình: mỗi lời gọi là một nút thật
       // trên màn hình. Gọi trong hàm setup() ở student/spells.py.
       add_button: (label, effect) => { addButton(String(label), String(effect)); return true; },
@@ -133,6 +144,24 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   };
   backdrop.src = BACKDROP;
 
+  // Ba clip cho bài `scene`. Mỗi khung hình lấy đúng ảnh đang chiếu của chúng,
+  // nên học sinh ghép VIDEO thật chứ không phải ba tấm ảnh chết.
+  const clips = {};
+  for (const [role, src] of Object.entries(SCENE_CLIPS)) {
+    const clip = document.createElement('video');
+    clip.src = src; clip.muted = true; clip.loop = true; clip.playsInline = true;
+    clip.play().catch(() => {});          // trình duyệt chặn autoplay: bấm một cái là chạy
+    clips[role] = clip;
+  }
+  const clipCv = document.createElement('canvas'); clipCv.width = W; clipCv.height = H;
+  const clipCtx = clipCv.getContext('2d', { willReadFrequently: true });
+  function clipGrid(role) {
+    const clip = clips[role];
+    if (!clip?.videoWidth) return null;
+    clipCtx.drawImage(clip, 0, 0, W, H);
+    return toGrid(Array.from(clipCtx.getImageData(0, 0, W, H).data), W, H);
+  }
+
   // Mặt nạ người, thu về đúng cỡ 96x72 rồi đọc kênh độ đục thành số 0..255.
   const maskCv = document.createElement('canvas'); maskCv.width = W; maskCv.height = H;
   const maskCtx = maskCv.getContext('2d', { willReadFrequently: true });
@@ -165,6 +194,16 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
     let result;
     if (state.mode === 'blend') {
       result = state.layer ? call('blend', image, state.layer, out, W, H) : (say('Đang tải lớp hiệu ứng…'), null);
+    } else if (state.mode === 'scene') {
+      const mask = personMask();
+      if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }
+      const background = clipGrid('background'), behind = clipGrid('behind'), front = clipGrid('front');
+      if (!background || !behind || !front) { say('Đang tải ba đoạn video…'); state.busy = false; return; }
+      result = call('scene', image, mask, background, behind, front, out, W, H);
+    } else if (state.mode === 'blur_background') {
+      const mask = personMask();
+      if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }
+      result = call('blur_background', image, mask, out, W, H);
     } else if (state.mode === 'compose') {
       const mask = personMask();
       if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }

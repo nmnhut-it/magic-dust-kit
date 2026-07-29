@@ -77,6 +77,7 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .brief dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0}
 .brief dt{font:700 10px/1.7 ui-monospace,monospace;letter-spacing:1px;color:#5f7f92}
 .brief dd{margin:0}
+.foot{margin:12px 0 0;padding-top:10px;border-top:1px dashed var(--line);font-size:13px}
 .answer:empty{display:none}
 .answer{margin:0 16px 14px;padding:14px;border-radius:10px;border:1px dashed rgba(200,162,74,.5);background:rgba(200,162,74,.07)}
 .ans-head{margin:0 0 10px;font:700 11px/1.5 ui-monospace,monospace;letter-spacing:.6px;color:#e2c072}
@@ -166,6 +167,12 @@ function build(cell) {
   el.querySelector('.in').innerHTML = prose(cell.input);
   el.querySelector('.job').innerHTML = prose(cell.job);
   el.querySelector('.out').innerHTML = prose(cell.output);
+  if (cell.footnote) {
+    const note = document.createElement('p');
+    note.className = 'foot';
+    note.innerHTML = prose(cell.footnote);
+    el.querySelector('.brief').appendChild(note);
+  }
   host.appendChild(el);
 
   const box = mountCodeBox(el.querySelector('.codebox'), cellSource(cell));
@@ -196,9 +203,16 @@ function build(cell) {
     shots.innerHTML = '';
     if (result.rows) return drawTable(result.rows);
     if (demo && result.pixels) {
-      frame(cell.kind === 'compose' ? 'NGƯỜI' : 'ẢNH VÀO', baseFor(cell, demo));
+      const firstLabel = cell.id === 'blur_background' ? 'KHUNG HÌNH'
+        : cell.kind === 'compose' || cell.kind === 'scene' ? 'NGƯỜI' : 'ẢNH VÀO';
+      frame(firstLabel, baseFor(cell, demo));
       if (cell.kind === 'blend') frame('LỚP HIỆU ỨNG', demo.layer);
-      if (cell.kind === 'compose') { frame('NỀN', demo.base); frame('MẶT NẠ', maskPixels(demo)); }
+      if (cell.id === 'blur_background') frame('MẶT NẠ', maskPixels(demo));
+      else if (cell.kind === 'compose') { frame('NỀN', demo.base); frame('MẶT NẠ', maskPixels(demo)); }
+      if (cell.kind === 'scene') {
+        frame('NỀN', demo.base); frame('LỚP SAU LƯNG', demo.behind);
+        frame('HIỆU ỨNG TRƯỚC', demo.layer); frame('MẶT NẠ', maskPixels(demo));
+      }
       frame('ẢNH RA — code của bạn dựng', result.pixels);
     }
     if (result.test?.length) drawTest(result.test);
@@ -394,7 +408,7 @@ function buildCard() {
     </div>
     <input id="who" placeholder="Gõ tên bạn vào đây" autocomplete="name">
     <ul class="card-list"></ul>
-    <p class="card-note">Mỗi bài bắt buộc 1,4 điểm · mỗi bài thêm 0,75 điểm.
+    <p class="card-note">Phần bắt buộc 7 điểm chia đều · bài thêm 3 điểm chia đều.
     Máy chấm bằng cách chạy thật đoạn code của bạn, không phải so chữ.</p>`;
   host.appendChild(el);
 
