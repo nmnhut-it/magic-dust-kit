@@ -120,6 +120,14 @@ hiệu ứng có sẵn · `G` thu gọn bảng thần chú · `M` đổi kiểu 
 Muốn thử mà không giơ tay: mở Console gõ `student.fingers(2)` hoặc
 `student.voice("mưa")`.
 
+## Bí quá thì có đáp án
+
+Nằm ở repo riêng: <https://github.com/nmnhut-it/magic-dust-kit-dap-an>. Tải về,
+kéo thư mục bộ đồ nghề này thả vào `CHEP-VAO.bat` là hai file đáp án vào đúng
+chỗ, bài cũ của bạn được cất sang `student/bai-cua-toi/`.
+
+Nhưng tự viết xong rồi hãy mở nhé — cái đáng học nằm ở lúc mình vật lộn với nó.
+
 ## Bộ này lấy từ đâu
 
 Cắt ra từ dự án Magic Dust của thầy Nhựt — <https://nmnhut.dev/magic-dust/>.

@@ -49,6 +49,11 @@ sẽ khựng theo. Vì vậy phần ảnh chạy cách khung (`FRAME_EVERY = 2`)
 
 ## Đáp án
 
+Bản chạy được nằm ở repo riêng <https://github.com/nmnhut-it/magic-dust-kit-dap-an>
+— học sinh tải về, thả vào `student/` là xong, và ở đó có `TU-CHAM.py` chấm
+offline (không cần camera, không cần trình duyệt) nếu thầy cô muốn kiểm nhanh
+trước buổi dạy. Bản chép dưới đây để tiện đọc trên giấy.
+
 ### `student/spells.py`
 
 ```python
