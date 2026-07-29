@@ -14,7 +14,10 @@ Trong này có hai thứ:
 
 ## Chạy nó lên
 
-Cần **Python 3** (tải ở python.org) và **Chrome** hoặc **Edge**.
+**Windows: bấm đúp vào `CHAY.bat`.** Hết. Máy chưa có Python thì nó tự cài
+giúp, rồi mở trình duyệt luôn.
+
+Máy Mac hoặc Linux, hoặc bạn thích gõ lệnh:
 
 ```bash
 python serve.py
@@ -24,6 +27,8 @@ Rồi mở:
 
 - đồ chơi → <http://localhost:8123/index.html>
 - đảo gương → <http://localhost:8123/lessons/islandFXFORGE.html>
+
+Dùng **Chrome** hoặc **Edge** nhé.
 
 > **Đừng nhấp đúp vào `index.html`.** Mở kiểu `file://` thì trình duyệt không
 > cho dùng camera. Cũng đừng dùng Live Server của VS Code — đảo gương cần hai
