@@ -38,6 +38,23 @@ const PIXEL_HEADER = `# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừn
 #
 # width = số cột · height = số hàng`;
 
+// Phép nào ra clip nào. Trang làm bài dùng bảng này để CHIẾU THẬT hiệu ứng mà
+// mã học sinh vừa gọi — gọi play_effect("dragon") mà chỉ thấy dòng chữ
+// play_effect("dragon") thì chán chết.
+export const EFFECT_CLIPS = {
+  koto: './lessons/assets/camera-effects/overlays/koto-stag.mp4',
+  dragon: './lessons/assets/camera-effects/overlays/dragon-strike.mp4',
+  rose: './lessons/assets/camera-effects/overlays/spirit-rose.mp4',
+  phoenix: './lessons/assets/camera-effects/overlays/spirit-phoenix.mp4',
+  butterfly: './lessons/assets/camera-effects/overlays/crystal-butterflies.mp4',
+  sakura: './lessons/assets/camera-effects/overlays/sakura-bloom.mp4',
+  smoke: './lessons/assets/camera-effects/overlays/smoke-blue.mp4',
+  lightning: './lessons/assets/camera-effects/overlays/lightning-ground.mp4',
+  rain: './lessons/assets/camera-effects/overlays/rain-storm.mp4',
+  flower: './lessons/assets/camera-effects/overlays/flower-pink.mp4',
+  magic: './lessons/assets/camera-effects/overlays/glyph-white.mp4',
+};
+
 export const CELLS = [
   {
     id: 'flip', kind: 'image', title: 'flip — soi gương trái phải',

@@ -105,6 +105,7 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .console.quiet{color:#5f7f92}
 .console::before{content:'MÁY IN RA';display:block;margin-bottom:6px;font:700 9.5px/1 ui-monospace,monospace;
   letter-spacing:1px;color:#5f7f92}
+.shot.fx video{width:200px;height:150px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000}
 </style>
 
 <header>
@@ -122,6 +123,7 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 // bộ nhớ đệm. Đã gặp thật: sau một lần cập nhật, trang chết trắng vì trình
 // duyệt giữ notebook.js cũ trong 4 tiếng. Sửa file trong src/ thì bump số này.
 import { mountCodeBox } from './src/highlight.js?v=4';
+import { EFFECT_CLIPS } from './src/cells.js?v=4';
 import { CELLS, cellSource, saveCell, publishFiles, bootPython, runCell, loadDemo, paintPixels,
          loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor, runChain } from './src/notebook.js?v=4';
 
@@ -208,6 +210,7 @@ function build(cell) {
   function draw(result) {
     shots.innerHTML = '';
     drawOutput(result.output);
+    drawEffects(result.output);
     if (result.rows) return drawTable(result.rows);
     if (demo && result.pixels) {
       const firstLabel = cell.id === 'blur_background' ? 'KHUNG HÌNH'
@@ -250,6 +253,33 @@ function build(cell) {
       : '(đoạn code này không in gì và không gọi phép nào)';
     if (!lines?.length) box.classList.add('quiet');
     shots.appendChild(box);
+  }
+
+
+  // Mã của học sinh gọi play_effect("dragon") thì phải THẤY con rồng, chứ không
+  // phải đọc dòng chữ "dragon". Mỗi phép được gọi hiện một khung video nhỏ.
+  function drawEffects(lines) {
+    const names = [];
+    for (const line of lines || []) {
+      const found = line.match(/^play_effect\("([^"]+)"\)$/);
+      if (found && !names.includes(found[1])) names.push(found[1]);
+    }
+    for (const name of names) {
+      const box = document.createElement('div');
+      box.className = 'shot fx';
+      const caption = document.createElement('span');
+      caption.textContent = `play_effect("${name}")`;
+      const video = document.createElement('video');
+      if (EFFECT_CLIPS[name]) {
+        video.src = EFFECT_CLIPS[name];
+        video.muted = true; video.loop = true; video.playsInline = true; video.autoplay = true;
+        video.play().catch(() => {});
+      } else {
+        caption.textContent += ' — chưa có clip cho tên này';
+      }
+      box.append(caption, video);
+      shots.appendChild(box);
+    }
   }
 
   function frame(label, pixels) {
