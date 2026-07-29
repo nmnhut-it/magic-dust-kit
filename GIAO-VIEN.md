@@ -162,6 +162,21 @@ kênh rồi thắc mắc sao ảnh ngả đỏ. Người chấm phân biệt hai
 khác nhau — "ba kênh phải bằng nhau" và "đã bằng nhau nhưng chưa phải trung
 bình cộng".
 
+## Đáp án ngay trong trang, khoá bằng mật khẩu
+
+Mỗi ô bài có nút **🔑 đáp án**. Bấm vào thì trang hỏi mật khẩu — mặc định là
+`kot0pi@2026<3` (đổi trong `src/notebook.js`, hằng `PASSWORD_HASH`; băm bằng
+djb2 nên mật khẩu không nằm nguyên văn trong mã nguồn). Mở một ô là mở luôn cả
+trang cho tới khi tải lại.
+
+Đáp án hiện kèm một đoạn **vì sao** — viết cho người lớn giảng lại, không phải
+để chép: nó chỉ ra chỗ hai công thức khác nhau, vì sao chia cho `count` chứ
+không phải 9, vì sao phải kẹp riêng từng kênh màu.
+
+Nói thẳng để thầy cô liệu: đây là **cái chốt cửa, không phải khoá két**. Học
+sinh nào chịu khó mở mã nguồn vẫn đọc được. Mục đích chỉ là để các em không lỡ
+tay bấm ra đáp án khi đang bí.
+
 ## Chấm tự động
 
 `python cham.py` chấm cả hai file, không cần trình duyệt lẫn camera: nó dựng
