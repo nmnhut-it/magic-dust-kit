@@ -3,7 +3,7 @@
 // Chọn một file .mp4 quay trên NỀN ĐEN, đặt tên, xong gọi từ Python:
 //     play_effect("ten_ban_dat")
 // Không cần chép file vào thư mục nào, không cần sửa my-spells.js.
-import { listClips, saveClip, removeClip, tidyName } from './my-fx-store.js?v=3';
+import { listClips, saveClip, removeClip, tidyName } from './my-fx-store.js?v=4';
 
 export async function mountFxPanel({ register, say }) {
   const ui = build();

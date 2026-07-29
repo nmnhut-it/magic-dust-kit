@@ -6,7 +6,6 @@
 
 from magic_stage import new_image
 
-
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
 # out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
 #

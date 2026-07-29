@@ -209,12 +209,12 @@ def blur_background(image, mask, out, width, height):
     out[0][0] = image[0][0]
 `,
     answer: `def blur_background(image, mask, out, width, height):
-    anh_mo = new_image(width, height)
-    blur(image, anh_mo, width, height)
-    compose(image, mask, anh_mo, out, width, height)
+    blurred = new_image(width, height)
+    blur(image, blurred, width, height)
+    compose(image, mask, blurred, out, width, height)
 `,
-    why: `Đọc \`compose(image, mask, anh_mo, out, ...)\` thành lời: "ô nào là người thì lấy
-\`image\` (nét), còn lại lấy \`anh_mo\`". Chỉ ba dòng, vì hai việc nặng đã nằm sẵn
+    why: `Đọc \`compose(image, mask, blurred, out, ...)\` thành lời: "ô nào là người thì lấy
+\`image\` (nét), còn lại lấy \`blurred\`". Chỉ ba dòng, vì hai việc nặng đã nằm sẵn
 trong hai hàm bạn viết hôm trước. Muốn nền mờ hơn nữa thì gọi \`blur\` hai lần
 lên chính tấm tạm đó.`,
   },
@@ -244,15 +244,15 @@ def scene(person, mask, background, behind, front, out, width, height):
     compose(person, mask, background, out, width, height)
 `,
     answer: `def scene(person, mask, background, behind, front, out, width, height):
-    phia_sau = new_image(width, height)
-    blend(background, behind, phia_sau, width, height)
+    back_layer = new_image(width, height)
+    blend(background, behind, back_layer, width, height)
 
-    co_nguoi = new_image(width, height)
-    compose(person, mask, phia_sau, co_nguoi, width, height)
+    with_person = new_image(width, height)
+    compose(person, mask, back_layer, with_person, width, height)
 
-    blend(co_nguoi, front, out, width, height)
+    blend(with_person, front, out, width, height)
 `,
-    why: `Hai tấm tạm \`phia_sau\` và \`co_nguoi\` là chỗ chứa kết quả giữa chừng. Không có
+    why: `Hai tấm tạm \`back_layer\` và \`with_person\` là chỗ chứa kết quả giữa chừng. Không có
 chúng thì bước sau phải vừa đọc vừa ghi lên cùng một tấm, và ô nào ghi trước sẽ
 làm hỏng ô đọc sau. Lần cuối ghi thẳng vào \`out\` vì không ai đọc \`out\` nữa.
 

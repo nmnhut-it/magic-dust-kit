@@ -1,4 +1,4 @@
-import { MY_FX_CLIPS } from './spells.js?v=3';
+import { MY_FX_CLIPS } from './spells.js?v=4';
 const TAU=Math.PI*2;
 const LOTUS_COLORS=[0xf8fcff,0xff76b8,0xff4f55,0xffc84f,0x62e58c,0x4ddfff,0xa978ff];
 

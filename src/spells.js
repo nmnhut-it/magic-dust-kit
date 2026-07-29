@@ -1,5 +1,5 @@
 // Bảng thần chú của học sinh nằm ở src/my-spells.js và được trộn vào cuối file này.
-import { MY_SPELLS, MY_FINGERS, MY_FX } from './my-spells.js?v=3';
+import { MY_SPELLS, MY_FINGERS, MY_FX } from './my-spells.js?v=4';
 
 const TAU=Math.PI*2,R=Math.random;
 function sph(rad){const t=R()*TAU,p=Math.acos(2*R()-1);return[rad*Math.sin(p)*Math.cos(t),rad*Math.sin(p)*Math.sin(t),rad*Math.cos(p)];}

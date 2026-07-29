@@ -99,6 +99,12 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .lab-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .lab-msg{font:400 12.5px/1.5 ui-monospace,monospace;color:var(--dim)}
 .lab-shots{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
+.console{width:calc(100% - 32px);margin:0 16px 12px;padding:10px 12px;border-radius:8px;background:#050810;
+  border:1px solid var(--line);font:400 12px/1.6 ui-monospace,Menlo,monospace;color:#9fe8d5;
+  white-space:pre-wrap;max-height:150px;overflow:auto}
+.console.quiet{color:#5f7f92}
+.console::before{content:'MÁY IN RA';display:block;margin-bottom:6px;font:700 9.5px/1 ui-monospace,monospace;
+  letter-spacing:1px;color:#5f7f92}
 </style>
 
 <header>
@@ -115,9 +121,9 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 // nên đổi số này là mọi máy nạp bản mới ngay — kể cả máy đang giữ bản cũ trong
 // bộ nhớ đệm. Đã gặp thật: sau một lần cập nhật, trang chết trắng vì trình
 // duyệt giữ notebook.js cũ trong 4 tiếng. Sửa file trong src/ thì bump số này.
-import { mountCodeBox } from './src/highlight.js?v=3';
+import { mountCodeBox } from './src/highlight.js?v=4';
 import { CELLS, cellSource, saveCell, publishFiles, bootPython, runCell, loadDemo, paintPixels,
-         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor, runChain } from './src/notebook.js?v=3';
+         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor, runChain } from './src/notebook.js?v=4';
 
 const statusEl = document.getElementById('status');
 const host = document.getElementById('cells');
@@ -201,6 +207,7 @@ function build(cell) {
 
   function draw(result) {
     shots.innerHTML = '';
+    drawOutput(result.output);
     if (result.rows) return drawTable(result.rows);
     if (demo && result.pixels) {
       const firstLabel = cell.id === 'blur_background' ? 'KHUNG HÌNH'
@@ -232,6 +239,17 @@ function build(cell) {
       tr.append(th, td); table.appendChild(tr);
     }
     shots.appendChild(table);
+  }
+
+
+  // Máy vừa làm gì: print() của học sinh và mọi lệnh gọi ra sân khấu.
+  function drawOutput(lines) {
+    const box = document.createElement('pre');
+    box.className = 'console';
+    box.textContent = lines?.length ? lines.join('\n')
+      : '(đoạn code này không in gì và không gọi phép nào)';
+    if (!lines?.length) box.classList.add('quiet');
+    shots.appendChild(box);
   }
 
   function frame(label, pixels) {
@@ -362,7 +380,7 @@ function buildLab() {
   const show = () => { msg.textContent = picks.length ? `chuỗi: ${picks.join(' → ')}` : 'chưa chọn phép nào'; };
 
   for (const cell of CELLS) {
-    if (!['image', 'blend', 'compose'].includes(cell.kind)) continue;
+    if (!['image', 'blend', 'compose', 'scene'].includes(cell.kind)) continue;
     const button = document.createElement('button');
     button.textContent = cell.id;
     button.onclick = () => { picks.push(cell.id); show(); };

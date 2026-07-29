@@ -8,7 +8,7 @@
 //     thì mỗi lần bấm CHẠY phải đợi vài giây.
 //   · Bài lưu trong localStorage. Xong hết thì trang ghép lại thành hai file
 //     `student/*.py` để sân khấu thật đọc, rồi mới mở cổng sang đó.
-import { CELLS, SCENE, DARK_SCENE, LAYER, PERSON, BEHIND } from './cells.js?v=3';   // xem ghi chú ?v= trong index.html
+import { CELLS, SCENE, DARK_SCENE, LAYER, PERSON, BEHIND } from './cells.js?v=4';   // xem ghi chú ?v= trong index.html
 
 export { CELLS };
 
@@ -83,7 +83,11 @@ export async function bootPython(onStatus) {
   if (!self.loadPyodide) await new Promise((ok, no) => {
     const s = document.createElement('script'); s.src = PYODIDE; s.onload = ok; s.onerror = no; document.head.appendChild(s);
   });
-  const py = await self.loadPyodide();
+  const printed = [];
+  const py = await self.loadPyodide({
+    stdout: line => printed.push(line),
+    stderr: line => printed.push(line),
+  });
   const grader = await fetch('./pygrade/grader.py').then(r => r.text());
   py.runPython(grader);
   // magic_stage giả: ghi lại lệnh để ô on_fingers/on_voice soi được kết quả.
@@ -99,27 +103,37 @@ export async function bootPython(onStatus) {
   // nên nhập sẵn hai lệnh đó vào namespace, đúng như file spells.py vẫn làm.
   py.runPython(SPELL_PREAMBLE);
   onStatus('Python sẵn sàng.');
-  return { py, log };
+  return { py, log, printed };
+}
+
+
+// Mấy bài "ghép lại" gọi hàm các em viết ở bài trước, nên phải nạp mấy bài đó
+// trước khi chạy — cả ở ô bài lẫn ở XƯỞNG THỬ.
+const NEEDS = { scene: ['blend', 'compose'], blur_background: ['blur', 'compose'] };
+
+function loadNeeded(py, id) {
+  for (const need of NEEDS[id] || []) {
+    const cell = CELLS.find(item => item.id === need);
+    if (!cell) continue;
+    try { py.runPython(cellSource(cell)); }
+    catch (err) { return `${need} của bạn đang lỗi: ${pyError(err)}`; }
+  }
+  return null;
 }
 
 // ── chạy một ô ──────────────────────────────────────────────────────────────
 // Trả về {ok, message, extra} — `extra` là dữ liệu để vẽ ảnh hoặc in nhật ký.
-export function runCell({ py, log }, cell, source, demo) {
+export function runCell({ py, log, printed }, cell, source, demo) {
+  printed.length = 0;
+  log.length = 0;
   // Bài cuối gọi lại blend/compose của chính học sinh, nên nạp hai bài đó trước.
-  // Mấy bài "ghép lại" gọi hàm các em viết ở bài trước, nên nạp mấy bài đó trước.
-  const NEEDS = { scene: ['blend', 'compose'], blur_background: ['blur', 'compose'] };
-  if (NEEDS[cell.id]) {
-    for (const id of NEEDS[cell.id]) {
-      const needed = CELLS.find(item => item.id === id);
-      try { py.runPython(cellSource(needed)); }
-      catch (err) { return { ok: false, message: `${id} của bạn đang lỗi: ${pyError(err)}` }; }
-    }
-  }
+  const missing = loadNeeded(py, cell.id);
+  if (missing) return { ok: false, message: missing };
   try { py.runPython(source); }
   catch (err) { return { ok: false, message: pyError(err) }; }
 
-  if (cell.kind === 'fingers' || cell.kind === 'voice') return runSpellCell(py, log, cell);
-  if (cell.kind === 'setup') return runSetupCell(py, log);
+  if (cell.kind === 'fingers' || cell.kind === 'voice') return runSpellCell(py, log, cell, printed);
+  if (cell.kind === 'setup') return runSetupCell(py, log, printed);
 
   const verdict = py.runPython(`check_one(${JSON.stringify(cell.id)}, globals())`).toJs();
   const [ok, message] = verdict;
@@ -127,12 +141,12 @@ export function runCell({ py, log }, cell, source, demo) {
   // Kể luôn bài test cho học sinh xem: máy đưa ảnh gì vào, chờ ra gì, và hàm
   // của em cho ra gì. Đúng/sai mà không thấy số thì chẳng học được gì.
   const test = py.runPython(`explain(${JSON.stringify(cell.id)}, globals())`).toJs();
-  return { ok, message, pixels, test };
+  return { ok, message, pixels, test, output: outputLines(log, printed) };
 }
 
 // Ô setup: gọi setup() rồi xem các em đã gắn được mấy nút. Ở trang làm bài
 // add_button chỉ ghi vào nhật ký, sân khấu mới dựng nút thật.
-function runSetupCell(py, log) {
+function runSetupCell(py, log, printed) {
   log.length = 0;
   try { py.runPython('setup()'); }
   catch (err) { return { ok: false, message: pyError(err) }; }
@@ -140,20 +154,25 @@ function runSetupCell(py, log) {
   const rows = buttons.map(entry => ({ input: entry[1], wanted: 'một nút', hit: true, got: `play_effect("${entry[2]}")` }));
   if (buttons.length < 3) {
     rows.push({ input: '(còn thiếu)', wanted: 'ít nhất 3 nút', hit: false, got: `mới có ${buttons.length}` });
-    return { ok: false, message: `setup: mới gắn ${buttons.length} nút, đề bài cần ít nhất 3`, rows };
+    return { ok: false, message: `setup: mới gắn ${buttons.length} nút, đề bài cần ít nhất 3`, rows,
+             output: outputLines(log, printed) };
   }
-  return { ok: true, message: 'setup', rows };
+  return { ok: true, message: 'setup', rows, output: outputLines(log, printed) };
 }
 
-function runSpellCell(py, log, cell) {
+function runSpellCell(py, log, cell, printed) {
   const tasks = cell.kind === 'fingers' ? FINGER_TASKS : VOICE_TASKS;
   const call = cell.kind === 'fingers' ? 'on_fingers' : 'on_voice';
   const rows = [];
+  // `log` bị xoá trước mỗi lần gọi để đọc riêng từng lượt, nên gom lại vào đây
+  // — nếu không, khung MÁY IN RA chỉ còn lệnh của lượt cuối cùng.
+  const everything = [];
   let ok = true;
   for (const [input, wanted] of tasks) {
     log.length = 0;
     try { py.runPython(`${call}(${JSON.stringify(input)})`); }
     catch (err) { return { ok: false, message: pyError(err) }; }
+    everything.push(...log);
     const fired = log.filter(entry => entry[0] === 'fx').map(entry => entry[1]);
     const said = log.filter(entry => entry[0] === 'say').map(entry => entry[1]);
     const hit = fired.includes(wanted);
@@ -164,12 +183,14 @@ function runSpellCell(py, log, cell) {
   log.length = 0;
   const spare = cell.kind === 'fingers' ? '9' : JSON.stringify('bâng quơ');
   try { py.runPython(`${call}(${spare})`); } catch (err) { return { ok: false, message: pyError(err) }; }
+  everything.push(...log);
   const answered = log.length > 0;
   if (!answered) ok = false;
   rows.push({ input: cell.kind === 'fingers' ? 9 : 'bâng quơ', wanted: 'nói ra điều gì đó', hit: answered,
               got: log.length ? log[0][1] : '(im lặng)' });
 
-  return { ok, message: ok ? cell.id : `${cell.id}: còn dòng ✖ ở bảng dưới`, rows };
+  return { ok, message: ok ? cell.id : `${cell.id}: còn dòng ✖ ở bảng dưới`, rows,
+           output: outputLines(everything, printed) };
 }
 
 // Canvas giữ ảnh dưới dạng một dãy số dài (đỏ,lá,dương,đục lặp lại); học sinh
@@ -311,6 +332,8 @@ export function runChain({ py }, names, demo) {
   // Nạp lại đúng bài học sinh đang giữ cho từng phép: mở trang mới thì Python
   // chưa biết hàm nào cả, và ta muốn chạy bản MỚI NHẤT các em vừa gõ.
   for (const name of names) {
+    const missing = loadNeeded(py, name);       // ví dụ scene cần blend + compose
+    if (missing) return { ok: false, message: missing };
     const cell = CELLS.find(item => item.id === name);
     if (!cell) continue;
     try { py.runPython(cellSource(cell)); }
@@ -321,15 +344,30 @@ export function runChain({ py }, names, demo) {
   py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
   py.globals.set('_mask', py.toPy(demo.mask));
   py.globals.set('_background', py.toPy(toGrid(demo.base, width, height)));
+  py.globals.set('_behind', py.toPy(toGrid(demo.behind, width, height)));
   try {
     for (const name of names) {
       py.globals.set('_out', py.toPy(blankGrid(width, height)));
       let args = `_image, _out, ${width}, ${height}`;
       if (name === 'blend') args = `_image, _layer, _out, ${width}, ${height}`;
       if (name === 'compose') args = `_image, _mask, _background, _out, ${width}, ${height}`;
+      if (name === 'blur_background') args = `_image, _mask, _out, ${width}, ${height}`;
+      if (name === 'scene') args = `_image, _mask, _background, _behind, _layer, _out, ${width}, ${height}`;
       py.runPython(`${name}(${args})`);
       py.runPython('_image = _out');       // kết quả bước này là ảnh vào của bước sau
     }
     return { ok: true, pixels: toFlat(py.globals.get('_image').toJs(), width, height) };
   } catch (err) { return { ok: false, message: pyError(err) }; }
+}
+
+// Máy đã làm gì trong lúc chạy: print() của học sinh, và mọi lệnh gọi ra sân
+// khấu. Không có phần này thì các em chỉ thấy đúng/sai mà không thấy việc.
+export function outputLines(log, printed) {
+  const lines = printed.slice();
+  for (const entry of log) {
+    if (entry[0] === 'fx') lines.push(`play_effect("${entry[1]}")`);
+    else if (entry[0] === 'say') lines.push(`say("${entry[1]}")`);
+    else if (entry[0] === 'button') lines.push(`add_button("${entry[1]}", "${entry[2]}")`);
+  }
+  return lines;
 }
