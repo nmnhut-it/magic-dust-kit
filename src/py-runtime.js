@@ -26,9 +26,11 @@ const PLATE = './lessons/assets/camera-effects/plates/fx-dragon.webp';
 const MODES = {
   f: 'flip', b: 'blur', n: 'blend',
   a: 'negative', w: 'grayscale', v: 'flip_vertical', c: 'drop_blue',
+  o: 'compose',                    // ghép nền: cần mặt nạ người từ MediaPipe
 };
+const BACKDROP = './lessons/assets/storybook/portal-courtyard-v3.webp';
 
-export function mountPython({ video, playEffect, cast, onStatus }) {
+export function mountPython({ video, playEffect, cast, onStatus, segmentation }) {
   const ui = buildPanel();
   const say = (text, bad = false) => { ui.log.textContent = text; ui.log.style.color = bad ? '#ffb4b4' : '#eaf4ff'; onStatus?.(text); };
 
@@ -121,6 +123,34 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
   };
   plate.src = PLATE;
 
+  // Nền cho phím O: học sinh đứng trước cổng Kotopia thay vì trước bức tường lớp.
+  const backdrop = new Image();
+  backdrop.onload = () => {
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(backdrop, 0, 0, W, H);
+    state.backdrop = toGrid(Array.from(cx.getImageData(0, 0, W, H).data), W, H);
+  };
+  backdrop.src = BACKDROP;
+
+  // Mặt nạ người, thu về đúng cỡ 96x72 rồi đọc kênh độ đục thành số 0..255.
+  const maskCv = document.createElement('canvas'); maskCv.width = W; maskCv.height = H;
+  const maskCtx = maskCv.getContext('2d', { willReadFrequently: true });
+  function personMask() {
+    const source = segmentation?.maskSource?.();
+    if (!source) return null;
+    maskCtx.clearRect(0, 0, W, H);
+    maskCtx.drawImage(source, 0, 0, W, H);
+    const data = maskCtx.getImageData(0, 0, W, H).data;
+    const mask = [];
+    for (let row = 0; row < H; row++) {
+      const line = [];
+      for (let col = 0; col < W; col++) line.push(data[(row * W + col) * 4 + 3]);
+      mask.push(line);
+    }
+    return mask;
+  }
+
   function tick() {
     requestAnimationFrame(tick);
     if (!state.mode || !state.py || !video?.videoWidth || state.busy) return;
@@ -132,9 +162,17 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     const image = toGrid(Array.from(src.data), W, H);
     const out = blankGrid(W, H);
     state.busy = true;
-    const result = state.mode === 'blend'
-      ? (state.layer ? call('blend', image, state.layer, out, W, H) : (say('Đang tải lớp hiệu ứng…'), null))
-      : call(state.mode, image, out, W, H);
+    let result;
+    if (state.mode === 'blend') {
+      result = state.layer ? call('blend', image, state.layer, out, W, H) : (say('Đang tải lớp hiệu ứng…'), null);
+    } else if (state.mode === 'compose') {
+      const mask = personMask();
+      if (!mask) { say('Chưa thấy mặt nạ người — bấm M để bật tách nền, rồi đứng vào khung.'); state.busy = false; return; }
+      if (!state.backdrop) { say('Đang tải ảnh nền…'); state.busy = false; return; }
+      result = call('compose', image, mask, state.backdrop, out, W, H);
+    } else {
+      result = call(state.mode, image, out, W, H);
+    }
     state.busy = false;
     if (result === null && !state.py) return;
     if (ui.log.style.color === 'rgb(255, 180, 180)') { setMode(null); return; }   // hàm lỗi: tắt luôn, đừng nhấp nháy

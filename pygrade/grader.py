@@ -12,7 +12,7 @@
 #   (row * width + col) * 4 — khó hiểu quá nên đã bỏ.)
 # ============================================================================
 
-TASKS = ("flip", "blur", "blend", "negative", "grayscale", "flip_vertical", "drop_blue")
+TASKS = ("flip", "blur", "blend", "compose", "negative", "grayscale", "flip_vertical", "drop_blue")
 EXTRA_TASKS = ("negative", "grayscale", "flip_vertical", "drop_blue")
 
 
@@ -150,10 +150,27 @@ def _check_drop_blue(fn):
     return False, "drop_blue: giữ nguyên đỏ và xanh lá, chỉ kênh xanh dương bằng 0"
 
 
+def _check_compose(fn):
+    """Ghép ba lớp: nền, người, và mặt nạ nói ô nào là người."""
+    person = solid(3, 1, 200, 40, 40)          # người: đỏ
+    background = solid(3, 1, 20, 20, 120)      # nền: xanh dương tối
+    mask = [[255, 0, 200]]                     # ô 0 chắc chắn người, ô 1 là nền, ô 2 vẫn là người
+    out = blank(3, 1)
+    fn(person, mask, background, out, 3, 1)
+    if list(out[0][0]) != [200, 40, 40]:
+        return False, "compose: ô có mặt nạ 255 phải lấy màu của NGƯỜI"
+    if list(out[0][1]) != [20, 20, 120]:
+        return False, "compose: ô có mặt nạ 0 phải lấy màu của NỀN"
+    if list(out[0][2]) != [200, 40, 40]:
+        return False, "compose: mặt nạ 200 vẫn tính là người — mốc chia là 128"
+    return True, "compose"
+
+
 CHECKERS = {
     "flip": _check_flip,
     "blur": _check_blur,
     "blend": _check_blend,
+    "compose": _check_compose,
     "negative": _check_negative,
     "grayscale": _check_grayscale,
     "flip_vertical": _check_flip_vertical,
@@ -210,6 +227,10 @@ def _run(fn, image, width, height, layer=None):
     out = blank(width, height)
     if layer is None:
         fn(image, out, width, height)
+    elif isinstance(layer, list) and len(layer) == 2 and isinstance(layer[1][0], list):
+        # compose: layer là [nền, mặt nạ]; mặt nạ là bảng SỐ chứ không phải bảng ô
+        background, mask = layer
+        fn(image, mask, background, out, width, height)
     else:
         fn(image, layer, out, width, height)
     return out
@@ -269,6 +290,15 @@ def _case_blur():
     return "ảnh 3x3 đen, riêng ô giữa trắng", white_dot(3), None, 3, 3, expected
 
 
+def _case_compose():
+    person = solid(3, 1, 200, 40, 40)
+    background = solid(3, 1, 20, 20, 120)
+    mask = [[255, 0, 200]]
+    expected = [[[200, 40, 40], [20, 20, 120], [200, 40, 40]]]
+    return ("người [200,40,40], nền [20,20,120], mặt nạ 255 · 0 · 200",
+            person, [background, mask], 3, 1, expected)
+
+
 CASES = {
     "flip": _case_flip,
     "flip_vertical": _case_flip_vertical,
@@ -276,6 +306,7 @@ CASES = {
     "grayscale": _case_grayscale,
     "drop_blue": _case_drop_blue,
     "blend": _case_blend,
+    "compose": _case_compose,
     "blur": _case_blur,
 }
 

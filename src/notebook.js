@@ -8,7 +8,7 @@
 //     thì mỗi lần bấm CHẠY phải đợi vài giây.
 //   · Bài lưu trong localStorage. Xong hết thì trang ghép lại thành hai file
 //     `student/*.py` để sân khấu thật đọc, rồi mới mở cổng sang đó.
-import { CELLS, SCENE, DARK_SCENE, LAYER } from './cells.js?v=3';   // xem ghi chú ?v= trong index.html
+import { CELLS, SCENE, DARK_SCENE, LAYER, PERSON } from './cells.js?v=3';   // xem ghi chú ?v= trong index.html
 
 export { CELLS };
 
@@ -198,11 +198,15 @@ export function blankGrid(width, height) {
 // Chạy hàm của học sinh trên ẢNH THẬT đã thu nhỏ, trả về dãy số để vẽ ra canvas.
 function runOnDemo(py, cell, demo) {
   const { width, height } = demo;
-  const args = cell.kind === 'blend'
-    ? `_image, _layer, _out, ${width}, ${height}`
-    : `_image, _out, ${width}, ${height}`;
+  let args = `_image, _out, ${width}, ${height}`;
+  if (cell.kind === 'blend') args = `_image, _layer, _out, ${width}, ${height}`;
+  if (cell.kind === 'compose') args = `_image, _mask, _background, _out, ${width}, ${height}`;
   py.globals.set('_image', py.toPy(toGrid(baseFor(cell, demo), width, height)));
   if (cell.kind === 'blend') py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
+  if (cell.kind === 'compose') {
+    py.globals.set('_mask', py.toPy(demo.mask));
+    py.globals.set('_background', py.toPy(toGrid(demo.base, width, height)));
+  }
   py.globals.set('_out', py.toPy(blankGrid(width, height)));
   try {
     py.runPython(`${cell.id}(${args})`);
@@ -213,13 +217,23 @@ function runOnDemo(py, cell, demo) {
 // Hai nền: cảnh sáng cho hầu hết các phép, nền tối riêng cho lend — cộng
 // một lớp sáng lên nền vốn đã sáng thì trắng xoá, học sinh không thấy gì.
 export async function loadDemo() {
-  const [base, dark, layer] = await Promise.all([grab(SCENE), grab(DARK_SCENE), grab(LAYER)]);
-  return { base, dark, layer, width: DEMO_W, height: DEMO_H };
+  const [base, dark, layer, person] = await Promise.all([grab(SCENE), grab(DARK_SCENE), grab(LAYER), grab(PERSON)]);
+  // Ảnh nhân vật có nền trong suốt, nên kênh độ đục của nó CHÍNH LÀ mặt nạ:
+  // chỗ nào đục là người. Khỏi cần chụp ảnh ai hay tải model về.
+  const mask = [];
+  for (let row = 0; row < DEMO_H; row++) {
+    const line = [];
+    for (let col = 0; col < DEMO_W; col++) line.push(person[(row * DEMO_W + col) * 4 + 3]);
+    mask.push(line);
+  }
+  return { base, dark, layer, person, mask, width: DEMO_W, height: DEMO_H };
 }
 
 // Ảnh vào của một ô: lend lấy nền tối, còn lại lấy cảnh sáng.
 export function baseFor(cell, demo) {
-  return cell.kind === 'blend' ? demo.dark : demo.base;
+  if (cell.kind === 'blend') return demo.dark;
+  if (cell.kind === 'compose') return demo.person;
+  return demo.base;
 }
 
 // Mật khẩu mở đáp án — băm bằng djb2 để không nằm chình ình trong mã nguồn.
@@ -277,12 +291,17 @@ export function runChain({ py }, names, demo) {
     try { py.runPython(cellSource(cell)); }
     catch (err) { return { ok: false, message: `${name}: ${pyError(err)}` }; }
   }
-  py.globals.set('_image', py.toPy(toGrid(demo.base, width, height)));
+  // Chuỗi bắt đầu từ ảnh NGƯỜI, để compose có cái mà ghép lên nền.
+  py.globals.set('_image', py.toPy(toGrid(demo.person, width, height)));
   py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
+  py.globals.set('_mask', py.toPy(demo.mask));
+  py.globals.set('_background', py.toPy(toGrid(demo.base, width, height)));
   try {
     for (const name of names) {
       py.globals.set('_out', py.toPy(blankGrid(width, height)));
-      const args = name === 'blend' ? `_image, _layer, _out, ${width}, ${height}` : `_image, _out, ${width}, ${height}`;
+      let args = `_image, _out, ${width}, ${height}`;
+      if (name === 'blend') args = `_image, _layer, _out, ${width}, ${height}`;
+      if (name === 'compose') args = `_image, _mask, _background, _out, ${width}, ${height}`;
       py.runPython(`${name}(${args})`);
       py.runPython('_image = _out');       // kết quả bước này là ảnh vào của bước sau
     }

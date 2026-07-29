@@ -119,6 +119,10 @@ export class Segmentation{
     x.globalAlpha=1;x.globalCompositeOperation='source-over';this.#have=true;
   }
 
+  // Mặt nạ người, để mã Python của học sinh tự ghép nền (xem py-runtime.js).
+  // Trả null khi model chưa kịp cho khung nào — người gọi phải chịu được điều đó.
+  maskSource(){return this.#have?this.#accum:null;}
+
   // spellColor: css color of the active spell · intensity: charge 0..1
   draw(spellColor,intensity){
     const oc=this.#occ,rc=this.#rimx,dm=this.#dim,W=this.#occCv.width,H=this.#occCv.height;

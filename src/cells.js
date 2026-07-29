@@ -15,6 +15,9 @@
 export const SCENE = './lessons/assets/storybook/portal-courtyard-v3.webp';
 export const DARK_SCENE = './lessons/assets/camera-effects/plates/fx-boss.webp';
 export const LAYER = './lessons/assets/camera-effects/plates/fx-dragon.webp';
+// Nhân vật có nền trong suốt: kênh độ đục của chính file này thành MẶT NẠ, nên
+// bài ghép nền có đồ thật để chạy mà không cần chụp ảnh ai.
+export const PERSON = './lessons/assets/mirror-wraith.webp';
 
 // Khối chú thích dán đầu mỗi bài ảnh, để học sinh không phải nhớ image là gì.
 const PIXEL_HEADER = `# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
@@ -145,6 +148,41 @@ def blend(image, layer, out, width, height):
 hẳn. \`min(255, a + b)\` giữ kết quả trong khoảng cho phép. Phải kẹp RIÊNG từng
 màu: nếu tính một lần rồi dùng chung cho cả ba, ba màu bị cắt lệch nhau và điểm
 ảnh đổi màu chứ không chỉ sáng lên.`,
+  },
+  {
+    id: 'compose', kind: 'compose', title: 'compose — ghép nền, người, rồi hiệu ứng',
+    idea: `Phim trường xanh làm thế này: máy có một tấm MẶT NẠ nói rõ ô nào là người, ô
+nào không. Ghép ảnh chỉ là đi từng ô rồi hỏi một câu — ô này là người hay là
+nền? — và lấy màu từ tấm tương ứng. Đúng \`if / else\` bạn đã viết ở bài chọn
+phép, lần này hỏi trên từng điểm ảnh.`,
+    input: '`person` (ảnh người), `mask` (mặt nạ: `mask[row][col]` là một SỐ 0..255, càng lớn càng chắc là người), `background` (ảnh nền).',
+    job: 'Ô nào mặt nạ lớn hơn 128 thì lấy màu của `person`, còn lại lấy màu của `background`.',
+    output: 'Người đứng trên nền mới. Ghép tiếp `blend` nữa là có cả hiệu ứng phía trước.',
+    stub: `# person     = ảnh người, dạng person[row][col] -> [đỏ, lá, dương]
+# background = ảnh nền, cùng kích thước
+# mask       = MẶT NẠ, mask[row][col] là MỘT SỐ chứ không phải ba:
+#              255 chắc chắn là người · 0 chắc chắn là nền · ở giữa thì lửng lơ
+# out        = ảnh bạn dựng ra
+#
+# Mốc chia là 128: lớn hơn thì coi là người.
+def compose(person, mask, background, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: hỏi mặt nạ rồi lấy màu từ đúng tấm ảnh
+            out[row][col] = background[row][col]
+`,
+    answer: `def compose(person, mask, background, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            if mask[row][col] > 128:
+                out[row][col] = person[row][col]
+            else:
+                out[row][col] = background[row][col]
+`,
+    why: `Vẫn là \`if / else\` của bài chọn phép, chỉ khác chỗ câu hỏi chạy trên từng ô
+ảnh. \`mask[row][col]\` chỉ có MỘT số nên không cần ngoặc thứ ba — nó không phải
+màu, nó là mức chắc chắn. Đổi 128 thành số khác là viền người dày mỏng khác
+nhau; thử 60 rồi thử 200 để thấy.`,
   },
   {
     id: 'negative', kind: 'image', title: 'negative — âm bản', extra: true,

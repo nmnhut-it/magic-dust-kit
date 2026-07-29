@@ -7,6 +7,8 @@ from magic_stage import play_effect, say, add_button
 
 
 # Máy gọi setup() một lần sau khi nạp mã của bạn.
+
+# Máy gọi setup() một lần sau khi nạp mã của bạn.
 #     add_button("Rồng Lửa", "dragon")   -> mọc một nút, bấm là ra rồng
 #
 # Tên phép dùng được: dragon · koto · rose · phoenix · butterfly · sakura

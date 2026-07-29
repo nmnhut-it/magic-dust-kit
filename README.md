@@ -118,6 +118,7 @@ Khác mỗi chỗ: máy gọi hàm của bạn hàng chục lần mỗi giây tr
 | `flip` | soi gương trái–phải | `F` |
 | `blur` | mỗi ô lấy màu trung bình với hàng xóm | `B` |
 | `blend` | ghép lớp hiệu ứng lên khung hình, kẹp ở 255 | `N` |
+| `compose` | tách người khỏi phòng rồi dán lên nền khác | `O` |
 
 **Bấm `T` trước khi hỏi ai** — máy dựng một ảnh tí hon rồi chỉ đúng chỗ bạn
 sai, kiểu `✖ blur: ô góc vẫn đen — ánh sáng chưa lan sang hàng xóm`.
@@ -148,8 +149,45 @@ Nằm ngay dưới `blend` trong cùng file, cả bốn đều ngắn hơn `blur
 | `R` | nạp lại `student/*.py` sau khi bạn sửa |
 | `T` | máy tự chấm mọi hàm xử lý ảnh và nói bạn sai ở đâu |
 | `F` `B` `N` | chạy `flip` / `blur` / `blend` của bạn trên hình camera |
+| `O` | ghép nền: đứng trước cổng Kotopia thay vì bức tường lớp |
 | `A` `W` `V` `C` | bốn bài thêm |
+| `M` | bật/đổi kiểu tách nền — bấm trước khi dùng `O` |
 | `X` | tắt phép xử lý ảnh |
+
+## Ba lớp: nền, người, hiệu ứng
+
+`compose` là bài đáng khoe nhất. Máy đưa cho bạn ba thứ: ảnh người, ảnh nền, và
+một tấm **mặt nạ** — `mask[row][col]` là MỘT số 0..255 nói ô đó chắc là người
+tới đâu. Việc của bạn là hỏi từng ô một câu và lấy màu từ đúng tấm:
+
+```python
+if mask[row][col] > 128:
+    out[row][col] = person[row][col]
+else:
+    out[row][col] = background[row][col]
+```
+
+Đúng `if / else` của bài chọn phép, lần này chạy trên từng điểm ảnh. Ở sân
+khấu, mặt nạ đó là **của chính bạn**, do MediaPipe cắt ra từ camera: bấm `M`
+để bật tách nền rồi bấm `O`.
+
+Ghép tiếp `blend` nữa là đủ ba lớp — nền, người, rồi hiệu ứng phủ lên trước.
+Ở trang làm bài có **XƯỞNG THỬ** cuối trang: bấm `compose` rồi `blend`, máy
+chạy nối tiếp hai hàm của bạn trên cùng một tấm ảnh.
+
+## Bảng nút của riêng bạn
+
+Hàm `setup()` chạy một lần lúc máy nạp mã. Trong đó gọi `add_button` bao nhiêu
+lần tuỳ thích:
+
+```python
+def setup():
+    add_button("Rồng Lửa", "dragon")
+    add_button("Mưa Giông", "rain")
+```
+
+Mỗi lời gọi mọc một nút thật ở góc phải sân khấu. Cạnh đó có ô gõ từ để thử
+`on_voice()` khi máy không có micro — gõ "mưa" rồi Enter là thấy hàm mình chạy.
 
 ## Máy chấm giúp ngay lúc bật máy chủ
 

@@ -507,7 +507,10 @@ const videoEl=document.querySelector('.input_video'),ocv=$('ocv'),ctx2d=ocv.getC
 const student=mountPython({video:videoEl,
   playEffect:name=>runVoiceSpell(name,true),
   cast:name=>runVoiceSpell(name,true),
-  onStatus:text=>{voiceStatEl.textContent=text;}});
+  onStatus:text=>{voiceStatEl.textContent=text;},
+  // phím O: compose() của học sinh ghép nền bằng mặt nạ người. Đưa vào một cái
+  // hộp chứ không đưa thẳng `segmentation` — biến đó khai báo mãi phía dưới.
+  segmentation:{maskSource:()=>segmentation.maskSource()}});
 window.student=student;   // console: student.fingers(2) · student.voice('mưa')
 const studio=new StudioEffects({THREE,scene,camera:cam3,renderer,video:videoEl,handCanvas:ocv,statusEl:ptxtEl});
 const lotus3d=new Lotus3DEngine(document.body);

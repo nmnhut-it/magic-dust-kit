@@ -196,8 +196,9 @@ function build(cell) {
     shots.innerHTML = '';
     if (result.rows) return drawTable(result.rows);
     if (demo && result.pixels) {
-      frame('ẢNH VÀO', baseFor(cell, demo));
+      frame(cell.kind === 'compose' ? 'NGƯỜI' : 'ẢNH VÀO', baseFor(cell, demo));
       if (cell.kind === 'blend') frame('LỚP HIỆU ỨNG', demo.layer);
+      if (cell.kind === 'compose') { frame('NỀN', demo.base); frame('MẶT NẠ', maskPixels(demo)); }
       frame('ẢNH RA — code của bạn dựng', result.pixels);
     }
     if (result.test?.length) drawTest(result.test);
@@ -306,6 +307,20 @@ function askPassword(host, done) {
 }
 
 
+
+// Mặt nạ là bảng SỐ, không phải bảng màu — vẽ nó ra thành ảnh xám để nhìn.
+function maskPixels(demo) {
+  const flat = new Array(demo.width * demo.height * 4).fill(255);
+  for (let row = 0; row < demo.height; row++) {
+    for (let col = 0; col < demo.width; col++) {
+      const value = demo.mask[row][col];
+      const at = (row * demo.width + col) * 4;
+      flat[at] = value; flat[at + 1] = value; flat[at + 2] = value;
+    }
+  }
+  return flat;
+}
+
 // XƯỞNG THỬ — bấm mấy phép mình đã viết rồi xem chúng chồng lên nhau. Đây là
 // lần đầu học sinh dùng lại chính đồ mình vừa làm, thay vì chỉ nộp bài.
 function buildLab() {
@@ -333,7 +348,7 @@ function buildLab() {
   const show = () => { msg.textContent = picks.length ? `chuỗi: ${picks.join(' → ')}` : 'chưa chọn phép nào'; };
 
   for (const cell of CELLS) {
-    if (cell.kind !== 'image' && cell.kind !== 'blend') continue;
+    if (!['image', 'blend', 'compose'].includes(cell.kind)) continue;
     const button = document.createElement('button');
     button.textContent = cell.id;
     button.onclick = () => { picks.push(cell.id); show(); };
@@ -350,7 +365,7 @@ function buildLab() {
       shots.textContent = '';
       if (!result.ok) { msg.textContent = `✖ ${result.message}`; return; }
       msg.textContent = `✓ ${picks.join(' → ')}`;
-      for (const [label, pixels] of [['ẢNH GỐC', demo.base], [picks.join(' → '), result.pixels]]) {
+      for (const [label, pixels] of [['ẢNH BAN ĐẦU (người)', demo.person], [picks.join(' → '), result.pixels]]) {
         const box = document.createElement('div');
         box.className = 'shot';
         const caption = document.createElement('span'); caption.textContent = label;

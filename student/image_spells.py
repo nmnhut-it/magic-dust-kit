@@ -4,6 +4,7 @@
 #  khấu bấm R để nạp lại, bấm T để máy chấm.
 # ============================================================================
 
+
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
 # out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
 #
@@ -85,6 +86,20 @@ def blend(image, layer, out, width, height):
         for col in range(width):
             # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
             out[row][col] = image[row][col]
+
+
+# person     = ảnh người, dạng person[row][col] -> [đỏ, lá, dương]
+# background = ảnh nền, cùng kích thước
+# mask       = MẶT NẠ, mask[row][col] là MỘT SỐ chứ không phải ba:
+#              255 chắc chắn là người · 0 chắc chắn là nền · ở giữa thì lửng lơ
+# out        = ảnh bạn dựng ra
+#
+# Mốc chia là 128: lớn hơn thì coi là người.
+def compose(person, mask, background, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: hỏi mặt nạ rồi lấy màu từ đúng tấm ảnh
+            out[row][col] = background[row][col]
 
 
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
