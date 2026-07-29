@@ -1,0 +1,1555 @@
+@import "palette.css";
+@import "fonts.css";  /* self-hosted Be Vietnam Pro — Vietnamese-clean bold */
+/* Node shell styles (markup rendered by node.js). Acts: splash → bundle reveal
+   → notebook (NPC bubbles + Jupyter-style code cells) → ritual overlay.
+   Same palette as lesson.css/saga.css. */
+:root{ --c:var(--mint-line); --c2:var(--mint-line); --bg:var(--ink); --panel:var(--ink); --panel2:var(--ink); --line:var(--ink);
+       --txt:var(--mint-mid); --dim:var(--ink-muted); --ok:var(--mint-mid); --warm:var(--honey-line); --err:var(--honey-line); --term:var(--mint-mid); }
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(1200px 700px at 70% -10%,var(--ink) 0%,var(--bg) 60%) fixed;
+     color:var(--txt);font:14px/1.5 "Be Vietnam Pro","Segoe UI",system-ui,sans-serif}
+.mono{font-family:"Cascadia Code",Consolas,ui-monospace,monospace}
+
+.hdr{position:fixed;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:18px;padding:0 18px;
+     z-index:10;background:color-mix(in srgb,var(--ink) 75%,transparent);backdrop-filter:blur(4px);border-bottom:1px solid var(--line)}
+.logo{font-weight:800;letter-spacing:2px;color:var(--c);text-shadow:0 0 14px color-mix(in srgb,var(--c) 60%,transparent);text-decoration:none}
+.logo small{color:var(--dim);font-weight:600;letter-spacing:1px}
+.crumb{font-size:13px;font-weight:700;letter-spacing:.5px}
+.pystat{margin-left:auto;padding:5px 12px;border:1px solid var(--line);border-radius:20px;color:var(--dim);font-size:11.5px;letter-spacing:1px;transition:.3s}
+.pystat.ok{color:var(--ink);background:var(--c);border-color:var(--c);font-weight:700;box-shadow:0 0 14px color-mix(in srgb,var(--c) 50%,transparent)}
+.pystat.retrying{color:var(--honey-ink);background:var(--honey-soft);border-color:var(--honey-line);font-weight:800}
+.pystat.error{color:var(--paper-raised);background:var(--danger-ink);border-color:var(--danger-ink);font-weight:900;cursor:pointer;box-shadow:0 5px 18px color-mix(in srgb,var(--danger-ink) 35%,transparent)}
+.pystat.error:focus-visible{outline:3px solid var(--honey);outline-offset:3px}
+
+/* ── full-screen acts (splash / bundle / ritual) ── */
+.act{position:fixed;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;text-align:center;
+     background:radial-gradient(900px 620px at 50% 42%,var(--ink) 0%,var(--bg) 75%);transition:opacity .45s}
+.act.gone,.gone{opacity:0;pointer-events:none}
+main.gone{display:none}
+.got.gone,.gifthint.gone,.giftwrap.gone,.holdbtn.gone,#holdBtn.gone,.rdone.gone{display:none}
+.actin{max-width:640px;padding:24px}
+/* .nodenum/h1/.actsub also render over a fullscreen camera during #splash's
+   and #bundleAct's high-five/hold entry gesture (their .bcam is promoted
+   fullscreen — see the "small-chip cameras promoted to FULLSCREEN
+   BACKGROUND" block below) — same legible-over-camera pill as everywhere
+   else that happens (owner: "vẫn thấy chữ mờ lúc vào node và lúc high five"). */
+.nodenum{color:var(--dim);letter-spacing:6px;font-size:13px;display:inline-block;
+        padding:3px 12px;border-radius:12px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.act h1{margin:10px 0 6px;font-size:42px;letter-spacing:1px;color:var(--paper-raised);text-shadow:0 0 34px color-mix(in srgb,var(--c) 55%,transparent);display:inline-block;
+       padding:6px 22px;border-radius:20px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.actsub{color:var(--dim);letter-spacing:1px;margin-bottom:26px;display:inline-block;
+       padding:4px 16px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.cta{margin-top:8px;padding:12px 34px;border:none;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;letter-spacing:1.5px;
+     color:var(--ink);background:linear-gradient(180deg,color-mix(in srgb,var(--c) 55%,var(--paper-raised)),var(--c));
+     /* --gc = ☝ hold progress on the splash: the button charges up */
+     box-shadow:0 0 calc(26px + var(--gc,0)*34px) color-mix(in srgb,var(--c) 55%,transparent);filter:brightness(calc(1 + var(--gc,0)*.35))}
+.ghint{margin-top:16px;color:var(--dim);font-size:11.5px;letter-spacing:1px;display:inline-block;
+      padding:3px 12px;border-radius:12px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.cta:hover{filter:brightness(1.08)}
+.cta.big{font-size:16px;padding:15px 42px}
+
+/* bundle reveal */
+.giftwrap{width:230px;height:230px;margin:6px auto;cursor:pointer;position:relative;animation:wiggle 2.6s ease-in-out infinite}
+/* --bc (0→1) = high-five hold progress: the bundle flares as the vortex charges */
+.giftwrap img{width:100%;height:100%;object-fit:contain;border-radius:22px;
+              transform:scale(calc(1 + var(--bc,0)*.13));transition:transform .12s linear;
+              filter:drop-shadow(0 0 calc(26px + var(--bc,0)*40px) color-mix(in srgb,var(--c) 60%,transparent)) brightness(calc(1 + var(--bc,0)*.45))}
+@keyframes wiggle{0%,100%{transform:rotate(-2deg) translateY(0)}25%{transform:rotate(2deg) translateY(-5px)}75%{transform:rotate(-1deg) translateY(3px)}}
+/* the hold makes the bundle QUAVER — fast jitter replaces the lazy wiggle while charging */
+.giftwrap.charging{animation:quaver .13s linear infinite}
+@keyframes quaver{0%{transform:rotate(-2.2deg) translate(-2px,1px)}25%{transform:rotate(1.8deg) translate(2px,-2px)}
+                  50%{transform:rotate(-1.6deg) translate(-1px,-1px)}75%{transform:rotate(2.4deg) translate(1px,2px)}100%{transform:rotate(-2.2deg) translate(-2px,1px)}}
+/* high-five chip: a small live camera + hold gauge under the bundle */
+.bcam{width:126px;height:94px;margin:14px auto 0;border-radius:12px;overflow:hidden;position:relative;
+      border:1px solid var(--line);opacity:.9;display:none}
+.bcam.on{display:block}
+.bcam video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:saturate(.75)}
+.bgauge{position:absolute;left:6px;right:6px;bottom:6px;height:5px;border-radius:4px;background:color-mix(in srgb,var(--ink) 65%,transparent);overflow:hidden}
+.bgauge i{display:block;height:100%;width:0;background:var(--c);box-shadow:0 0 8px var(--c)}
+/* fingertip-fx: glowing landmark dots layered over a chip's mirrored video —
+   see gesture-ui.js#armFingertipFx. pointer-events:none so it never blocks
+   the video/tap-fallback beneath it. */
+.bcam canvas.fxdots{position:absolute;inset:0;pointer-events:none;z-index:2}
+/* the SAME dots, but for track questions chasing full-screen targets — one
+   shared fixed canvas, see gesture-ui.js#armScreenFingertipDot. Sits above
+   the fullscreen track camera (25) but below toast/cheat (30/60). */
+canvas.fxscreendot{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:26}
+/* fullscreen mirrored camera layer behind drifting .qtarget track chips —
+   see quiz-cell.js's armTrackQuestion. Dimmed so the chips/dot read clearly. */
+.trackcam{position:fixed;inset:0;z-index:25;display:none;background:var(--ink)}
+.trackcam.on{display:block}
+.trackcam video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:saturate(.75) brightness(.85)}
+
+/* ── small-chip cameras promoted to FULLSCREEN BACKGROUND (2026-07 bugfix —
+   owner playtest: a question/content stacked above a 126×94 .bcam chip
+   pushed the camera off/downscreen once text ran long). Same trick as
+   .bosscell .bcam / .trackcam above: the SAME .bcam markup each of these
+   cells already toggles .on/off through its own gate (armActHoldGate/
+   armTimedCatchGate/armShakaHoldGate/quiz-cell's hold gate/enterNode's
+   splash+bundle gate) becomes a fixed fullscreen dimmed layer; the cell's
+   own text/options are lifted onto z-index 2 above it. Pure CSS — no new
+   mount mechanism, no JS touched; each cell's chip element is unchanged. */
+.checkpointcell .bcam,.giftcell .bcam,.anatomy .bcam,.quizcell .bcam,.ritualcell .bcam,
+#splash .bcam,#bundleAct .bcam,.forgecell .bcam{
+  width:100vw;height:100vh;margin:0;border:none;border-radius:0;position:fixed;inset:0;z-index:1}
+.checkpointcell .bcam video,.giftcell .bcam video,.anatomy .bcam video,.quizcell .bcam video,.ritualcell .bcam video,
+#splash .bcam video,#bundleAct .bcam video,.forgecell .bcam video{filter:saturate(.7) brightness(.7)}
+.checkpointcell .bgauge,.giftcell .bgauge,.anatomy .bgauge,.quizcell .bgauge,.ritualcell .bgauge,
+#splash .bgauge,#bundleAct .bgauge,.forgecell .bgauge{position:fixed;left:50%;right:auto;bottom:5vh;width:min(50vw,320px);transform:translateX(-50%);z-index:2}
+/* lift each cell's own content above the new fullscreen cam (z-index 1) */
+.giftcell>*:not(.bcam),.anatomy>*:not(.bcam),.ritualcell>*:not(.bcam),.forgecell>*:not(.bcam),
+.quizcell>*:not(.bcam){position:relative;z-index:2}
+/* .remember/.bubble render as PLAIN notebook cells (no .bcam of their own) but
+   sit in the SAME scrolling #bookEl as checkpoint/quiz/gift cells — when a
+   neighboring cell's .bcam goes fullscreen (position:fixed;inset:0 above),
+   it still covers the whole viewport and paints over these too since they're
+   non-positioned (owner: "camera sáng quá che mất chữ" on remember cells).
+   Same lift as the rule above. */
+.remember,.bubble,.cameo{position:relative;z-index:2}
+.checkpointcell .ckavatar,.checkpointcell .ckbubble,.checkpointcell .ckhint,.checkpointcell .ckholdbtn{position:relative;z-index:2}
+#splash .actin,#bundleAct .actin{position:relative;z-index:2}
+/* BUG FIX (owner: "vẫn bị lỗi trên live" — text over camera still invisible):
+   #splash/#bundleAct's own .actin WAS lifted above (line above), but .actin's
+   CHILDREN were not — and .bcam (POSITIONED, z-index:1) always paints ABOVE
+   its static (non-positioned) siblings within the SAME stacking context
+   regardless of that context's own z-index vs its OUTSIDE siblings. So every
+   bare text node here (.nodenum/h1/.actsub/.cta/.ghint/.giftwrap/.gifthint/
+   .got) was rendering UNDER the fullscreen camera even after it got a
+   background — same root cause the .quizcell>* rule above already fixed for
+   quiz cells, just missed here. */
+#splash .actin>*:not(.bcam),#bundleAct .actin>*:not(.bcam){position:relative;z-index:2}
+
+/* mid-notebook gift cell ({gift:…}) + the booth's polaroid */
+.giftcell{text-align:center;padding:22px 12px}
+.giftmini{width:150px;height:150px;margin:0 auto;cursor:pointer;animation:wiggle 2.6s ease-in-out infinite}
+/* --gc (0→1) = ✋ hold progress: the package flares + swells as the hold charges */
+.giftmini img{width:100%;height:100%;object-fit:contain;transform:scale(calc(1 + var(--gc,0)*.13));transition:transform .12s linear;
+              filter:drop-shadow(0 0 calc(22px + var(--gc,0)*38px) color-mix(in srgb,var(--c) 50%,transparent)) brightness(calc(1 + var(--gc,0)*.45))}
+/* glyph-faced gifts (no art asset yet — e.g. spell scrolls ☀ / 🌙) */
+.gglyph{display:grid;place-items:center;width:100%;height:100%;font-size:84px;line-height:1;
+        transform:scale(calc(1 + var(--gc,0)*.13));transition:transform .12s linear;
+        filter:drop-shadow(0 0 calc(20px + var(--gc,0)*36px) color-mix(in srgb,var(--c) 55%,transparent)) brightness(calc(1 + var(--gc,0)*.45))}
+.gotcard .gglyph{font-size:120px}
+.giftcell.opened .giftmini{animation:burstopen .9s ease forwards}
+/* margin-bottom clears .giftring's max scale (var(--gr) up to 1.6× the 150px
+   box = ~45px of overhang below the wrap) so the shrinking ring never sits on
+   top of .gifthint's text underneath (owner: "vòng tròn đang overlap với chữ") */
+.giftwrap{position:relative;width:150px;height:150px;margin:0 auto 48px}
+.giftwrap .giftmini{position:absolute;inset:0}
+.giftwrap.gone{display:none}
+/* --gr (1.6→1.0, looping): the ring shrinks toward the package — high-five
+   the instant it meets the edge for PERFECT. Always claims the gift either
+   way (camera timing is too noisy to hard-fail on). */
+.giftring{position:absolute;inset:0;margin:auto;width:100%;height:100%;border-radius:50%;
+          border:3px solid color-mix(in srgb,var(--c) 70%,transparent);
+          transform:scale(var(--gr,1.6));box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent);pointer-events:none}
+.giftcell .gotcard{width:170px;height:170px}
+.giftcell .gotname{font-size:20px}
+.got.perfect .gotlabel{color:var(--honey);text-shadow:0 0 20px var(--honey)}
+.polaroid{margin:14px auto 8px;padding:10px 10px 8px;max-width:340px;background:var(--mint-soft);border-radius:6px;
+          transform:rotate(-1.6deg);box-shadow:0 10px 34px color-mix(in srgb,var(--ink) 50%,transparent),0 0 24px color-mix(in srgb,var(--c) 30%,transparent);
+          animation:cardin .7s cubic-bezier(.2,.9,.3,1.2)}
+.polaroid img{display:block;width:100%;border-radius:3px}
+.polaroid .pbar{display:flex;align-items:center;justify-content:space-between;padding:7px 4px 2px;
+                color:var(--honey-ink);font-weight:700;letter-spacing:2px;font-size:11px}
+.polaroid .pbar a{color:var(--ink);text-decoration:none;letter-spacing:1px;font-weight:800}
+.polaroid .pbar a:hover{text-decoration:underline}
+
+/* quiz cell ({quiz:…}): one question at a time, dots track progress */
+.quizcell{text-align:center;padding:26px 18px;background:var(--panel2);border:1px solid var(--line);border-radius:14px}
+.qhead{color:var(--warm);letter-spacing:5px;font-size:12px;font-weight:800;display:inline-block;
+      padding:4px 14px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.qdots{display:flex;gap:8px;justify-content:center;margin:14px 0 18px}
+.qdots i{width:10px;height:10px;border-radius:50%;background:var(--ink);transition:.3s}
+.qdots i.cur{background:color-mix(in srgb,var(--c) 45%,var(--ink));box-shadow:0 0 10px color-mix(in srgb,var(--c) 45%,transparent)}
+.qdots i.hit{background:var(--ok);box-shadow:0 0 10px color-mix(in srgb,var(--ok) 55%,transparent)}
+.qq{font-size:19px;font-weight:700;color:var(--paper-raised);min-height:28px;margin-bottom:18px;display:inline-block;max-width:100%;
+   padding:10px 20px;border-radius:16px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.qopts{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative;z-index:2}
+.qopt{position:relative;overflow:hidden;padding:11px 26px 11px 16px;border-radius:24px;cursor:pointer;font-weight:800;font-size:14px;letter-spacing:1px;
+      color:var(--txt);background:var(--panel);border:1px solid var(--line);transition:.2s}
+.qopt .qn{display:inline-block;width:22px;height:22px;line-height:22px;margin-right:9px;border-radius:50%;font-style:normal;font-size:12px;
+          background:var(--ink);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.qopt .qfill{position:absolute;left:0;bottom:0;top:auto;height:3px;width:0;background:var(--c);box-shadow:0 0 10px var(--c)}
+.qopt:hover,.qopt.arm{border-color:color-mix(in srgb,var(--c) 55%,transparent);color:var(--paper-raised);
+            box-shadow:0 0 14px color-mix(in srgb,var(--c) 25%,transparent)}
+/* --qp (0→1, set by the finger gate) = hold charge: the armed button itself
+   swells and brightens — the fx lives on the choice, not over the quiz */
+.qopt.arm{transform:scale(calc(1 + var(--qp,0)*.08));
+          box-shadow:0 0 calc(14px + var(--qp,0)*26px) color-mix(in srgb,var(--c) 55%,transparent);
+          filter:brightness(calc(1 + var(--qp,0)*.35))}
+.qopt.yes{background:color-mix(in srgb,var(--ok) 28%,var(--panel));border-color:var(--ok);color:var(--paper-raised);
+          box-shadow:0 0 18px color-mix(in srgb,var(--ok) 45%,transparent)}
+.qopt.nope{animation:shake .45s ease;border-color:var(--err);color:var(--err)}
+.qhint{margin-top:12px;color:var(--dim);font-size:11.5px;letter-spacing:1px;position:relative;z-index:2}
+/* swipe-choice round: two big zones, left/right — no finger-count badge (◀/▶
+   arrows instead), since the answer is picked by swipe DIRECTION not a hold count */
+.qopts.swipe{gap:20px;flex-wrap:nowrap}
+.qopts.swipe .qopt{flex:1;max-width:220px;padding:16px 14px;text-align:center;font-size:15px}
+.qopts.swipe .swipeleft .qn,.qopts.swipe .swiperight .qn{display:block;width:auto;height:auto;background:none;border:none;font-size:20px;margin:0 0 4px}
+/* track-choice question: options DRIFT across the whole viewport (position:fixed,
+   left/top driven every frame by quiz-cell.js's trackPos()) — catch the right
+   one by resting your fingertip on it, see gesture-dispatcher.js#armMultiTrackGate */
+.qtarget{position:fixed;transform:translate(-50%,-50%);padding:12px 20px;border-radius:24px;cursor:pointer;
+         font-weight:800;font-size:14px;letter-spacing:.5px;color:var(--txt);background:var(--panel);
+         border:1px solid var(--line);box-shadow:0 0 14px color-mix(in srgb,var(--ink) 35%,transparent);z-index:60;transition:box-shadow .2s}
+.qtarget.yes{background:color-mix(in srgb,var(--ok) 28%,var(--panel));border-color:var(--ok);color:var(--paper-raised);
+             box-shadow:0 0 18px color-mix(in srgb,var(--ok) 45%,transparent)}
+.qtarget.nope{animation:shake .45s ease;border-color:var(--err);color:var(--err)}
+.quizcell{position:relative}
+.quizcell .qq,.quizcell .qhead,.quizcell .qdots,.quizcell .qdone{position:relative;z-index:2}
+/* right-answer sparks: fly out from the answered button (spawned by optBurst) */
+.qburst{position:absolute;width:0;height:0;z-index:3;pointer-events:none}
+.qburst i{position:absolute;left:0;top:0;width:5px;height:5px;border-radius:50%;background:var(--ok);
+          box-shadow:0 0 9px var(--ok);animation:qspark .7s ease-out forwards}
+@keyframes qspark{0%{transform:translate(-50%,-50%);opacity:1}
+                  100%{transform:translate(calc(var(--dx) - 50%),calc(var(--dy) - 50%));opacity:0}}
+/* .smoke variant of qburst — bigger, blurred, ash-grey puffs drifting slower
+   than the golden qspark particles; layered together for the boss-detonation
+   moment (victory()) so it reads as "burst of embers + billowing smoke". */
+.qburst.smoke i{width:26px;height:26px;background:radial-gradient(circle,color-mix(in srgb,var(--mint-mid) 85%,transparent),color-mix(in srgb,var(--ink-muted) 0%,transparent) 70%);
+          box-shadow:none;filter:blur(2px);animation:qsmoke 1.3s ease-out forwards}
+@keyframes qsmoke{0%{transform:translate(-50%,-50%) scale(.4);opacity:.9}
+                   100%{transform:translate(calc(var(--dx) - 50%),calc(var(--dy) - 50%)) scale(2.2);opacity:0}}
+.qdone{font-size:22px;font-weight:900;letter-spacing:3px;color:var(--paper-raised);text-shadow:0 0 26px var(--c);animation:cardin .6s cubic-bezier(.2,.9,.3,1.2)}
+.qdone.gone{display:none}
+.qdone small{display:block;margin-top:10px;font-size:13px;font-weight:600;letter-spacing:.3px;color:var(--c);text-shadow:none;opacity:.9}
+@keyframes shake{0%,100%{translate:0}20%{translate:-7px 0}40%{translate:7px 0}60%{translate:-5px 0}80%{translate:5px 0}}
+.giftwrap.opening{animation:burstopen .9s ease forwards}
+@keyframes burstopen{0%{transform:scale(1) rotate(0)}45%{transform:scale(1.12) rotate(-7deg)}70%{transform:scale(1.22) rotate(6deg);filter:brightness(2.2)}100%{transform:scale(1.7);opacity:0;filter:brightness(4)}}
+.gifthint{color:var(--warm);font-size:13px;letter-spacing:1px;animation:hintpulse 1.8s ease-in-out infinite;display:inline-block;
+         padding:4px 14px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+@keyframes hintpulse{0%,100%{opacity:.55}50%{opacity:1}}
+.got{animation:cardin .7s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes cardin{0%{transform:scale(.4) rotateY(90deg);opacity:0}100%{transform:scale(1) rotateY(0);opacity:1}}
+.gotlabel{color:var(--warm);letter-spacing:6px;font-size:12px;font-weight:700;display:inline-block;
+         padding:3px 12px;border-radius:12px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.gotcard{width:210px;height:210px;margin:14px auto;border-radius:20px;border:2px solid color-mix(in srgb,var(--c) 55%,transparent);
+         overflow:hidden;box-shadow:0 0 44px color-mix(in srgb,var(--c) 40%,transparent);animation:gotglow 2.4s ease-in-out infinite}
+@keyframes gotglow{0%,100%{box-shadow:0 0 30px color-mix(in srgb,var(--c) 30%,transparent)}50%{box-shadow:0 0 60px color-mix(in srgb,var(--c) 65%,transparent)}}
+.gotcard img{width:100%;height:100%;object-fit:cover}
+.gotname{font-size:24px;font-weight:900;letter-spacing:2px;color:var(--paper-raised);text-shadow:0 0 24px var(--c);display:inline-block;
+        padding:6px 20px;border-radius:18px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.gotblurb{color:var(--dim);margin:4px 0 10px;letter-spacing:1px;display:inline-block;
+         padding:3px 14px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+
+/* Remember callout ({remember:…}) — a short takeaway the eye can find again */
+.remember{display:flex;gap:14px;align-items:center;max-width:620px;margin:2px auto;padding:14px 20px;border-radius:14px;
+  border:1px solid color-mix(in srgb,var(--warm) 45%,transparent);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--warm) 10%,var(--panel2)),var(--panel2));
+  box-shadow:0 0 22px color-mix(in srgb,var(--warm) 12%,transparent)}
+.remember i{font-size:26px;color:var(--warm);text-shadow:0 0 14px var(--warm);font-style:normal;animation:hintpulse 2.2s ease-in-out infinite}
+.remember b{display:block;color:var(--warm);letter-spacing:4px;font-size:10.5px;margin-bottom:3px}
+.remember span{display:block;color:var(--paper-raised);font-weight:700;font-size:15px;letter-spacing:.3px;line-height:1.55}
+
+/* ══ checkpoint cell ({checkpoint:{text,sign}}) — high-five stamp after a
+   practice arc. --ckc (0→1) = camera hold-charge, drives the fill bar; a
+   plain tap on .ckholdbtn completes it instantly (no camera required). ══ */
+.checkpointcell{position:relative;text-align:center;padding:22px 16px;border-radius:16px;max-width:560px;margin:2px auto;
+  border:1px solid color-mix(in srgb,var(--ok) 40%,var(--line));
+  background:radial-gradient(520px 300px at 50% 0%,color-mix(in srgb,var(--ok) 10%,var(--panel2)),var(--panel2))}
+.ckavatar i{font-size:30px;color:var(--ok);text-shadow:0 0 16px var(--ok);font-style:normal}
+.ckbubble{margin:6px 0 12px}
+.ckbubble b{display:block;color:var(--ok);letter-spacing:4px;font-size:10.5px;margin-bottom:4px}
+.ckbubble span{display:block;color:var(--paper-raised);font-weight:700;font-size:15px;line-height:1.5}
+.ckhint{color:var(--warm);font-size:13px;letter-spacing:.5px;margin-bottom:10px}
+.ckholdbtn{position:relative;overflow:hidden;padding:12px 26px;border-radius:12px;border:1px solid var(--ok);
+  background:var(--panel2);color:var(--paper-raised);font-weight:800;letter-spacing:1px;cursor:pointer}
+.ckfill{position:absolute;inset:0;width:calc(var(--ckc,0)*100%);background:color-mix(in srgb,var(--ok) 35%,transparent);
+  transition:width .05s linear;z-index:0}
+.ckholdbtn span{position:relative;z-index:1}
+.checkpointcell.stamped .ckholdbtn{border-color:var(--ok);box-shadow:0 0 18px color-mix(in srgb,var(--ok) 55%,transparent)}
+.ckflash{position:absolute;inset:0;background:var(--paper-raised);opacity:0;pointer-events:none;border-radius:16px}
+.ckflash.go{animation:flash .8s ease}
+/* ══ end checkpoint cell ══ */
+
+/* ══ side-island finish card (island.js's finishFactory — the bonus-island
+   stand-in for the main arc's vortex/seal RITUAL) ══ */
+.islandfinish{position:relative;text-align:center;padding:26px 18px;border-radius:16px;max-width:560px;margin:2px auto;
+  border:1px solid color-mix(in srgb,var(--c) 40%,var(--line));
+  background:radial-gradient(520px 300px at 50% 0%,color-mix(in srgb,var(--c) 10%,var(--panel2)),var(--panel2))}
+.iftitle{font-size:22px;font-weight:900;color:var(--paper-raised);text-shadow:0 0 20px var(--c);margin-bottom:8px}
+.ifsub{color:var(--dim);font-size:13.5px;margin-bottom:16px}
+.ifbtn{position:relative;overflow:hidden;padding:12px 26px;border-radius:12px;border:1px solid var(--c);
+  background:var(--panel2);color:var(--paper-raised);font-weight:800;letter-spacing:1px;cursor:pointer}
+.iffill{position:absolute;inset:0;width:calc(var(--ifc,0)*100%);background:color-mix(in srgb,var(--c) 35%,transparent);
+  transition:width .05s linear;z-index:0}
+.ifbtn span{position:relative;z-index:1}
+.islandfinish .bcam{width:110px;height:82px;margin:12px auto 0}
+/* ══ end side-island finish card ══ */
+
+/* ── boss fight ({boss:…}): FULLSCREEN ARENA (owner playtest: "cần đưa ra màn
+   hình riêng" — it must take over the screen like the ritual, not sit
+   squeezed in the notebook column). `.bosscell` (the cell `el` itself, see
+   boss-fight.js#buildDom) IS the arena — same "position:fixed overlay div
+   already in the DOM" trick ritual-controller.js's #ritualOverlay uses, so
+   no second mount/suspend mechanism is needed: reveal (remove .veiled) opens
+   it, .done (set on victory) reverts it back to an in-flow summary card so
+   the notebook scrolls normally underneath afterward. ── */
+.bosscell{position:fixed;inset:0;z-index:20;display:block;padding:0;border:none;border-radius:0;
+          text-align:center;overflow-y:auto;
+          background:radial-gradient(1400px 900px at 50% 0%,color-mix(in srgb,var(--honey-line) 9%,var(--panel2)),var(--panel2))}
+.bosscell.done{position:static;padding:24px 16px;border-radius:16px;overflow:visible;min-height:0;
+          border:1px solid color-mix(in srgb,var(--honey-line) 40%,var(--line));
+          background:radial-gradient(620px 340px at 50% 0%,color-mix(in srgb,var(--honey-line) 9%,var(--panel2)),var(--panel2))}
+/* fullscreen dimmed mirrored camera, BEHIND the readable content (owner:
+   "camera một nơi, chữ một nơi" — hand + answer chips now share one visual
+   space, same idea as quiz-cell.js's .trackcam) — first child of .bosscell
+   so it paints under `.barenain`'s z-index:2 (mirrors #ritualOverlay's
+   #rcam/.actin split in node.js). */
+.bosscell .bcam{display:none;position:fixed;inset:0;z-index:1;width:100vw;height:100vh;
+          margin:0;border-radius:0;border:none;opacity:1}
+.bosscell .bcam.on{display:block}
+.bosscell .bcam video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:saturate(.7) brightness(.7)}
+.bosscell .bgauge{left:50%;right:auto;bottom:5vh;width:min(50vw,320px);transform:translateX(-50%)}
+.barenain{position:relative;z-index:2;min-height:100vh;display:flex;flex-direction:column}
+.btop{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;
+      padding:66px 20px 8px}     /* 66px clears the fixed .hdr */
+.bhpwrap{display:flex;flex-direction:column;align-items:stretch;width:280px}
+/* .bhp's own `margin:8px auto` (horizontal auto) is meant for its OLD
+   block-in-notebook context; inside a stretched flex column, auto margins
+   absorb the stretch instead of letting the bar fill the wrapper — kill the
+   horizontal auto here so the HP bar actually gets .bhpwrap's width. */
+.bhpwrap .bhp{margin:8px 0}
+.bosscell .bround{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:10px 16px 40px;overflow-y:auto}
+/* code round (typing mode, no camera): slim the header down so the editor
+   below gets the vertical + horizontal room ("code dài thì màn hình ngang
+   hiển thị không đủ") — see boss-fight.js#nextRound's .coderound toggle. */
+.bosscell.coderound .btop{padding:54px 16px 4px;gap:10px}
+.bosscell.coderound .bossface{width:56px;height:56px;margin:0}
+/* code rounds shrink the face to a chip — hold it still (no idle transforms) */
+.bosscell.coderound .bossface img,.bosscell.coderound .bossface .gglyph,.bosscell.coderound .bossface .bsheet{animation:none;translate:none;scale:none;rotate:none}
+.bosscell.coderound .bhpwrap{width:200px}
+.bosscell.coderound .bhp{height:10px;margin:2px auto}
+.bosscell.coderound .bmeta{margin:2px 0;min-height:0;font-size:11px}
+.bosscell.coderound .qhint{display:none}
+.bhead{color:var(--honey-line);letter-spacing:5px;font-size:12px;font-weight:800;display:inline-block;
+      padding:4px 14px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.bwands{margin-top:8px;font-size:13px;font-weight:700;color:var(--c);text-shadow:0 0 12px var(--c);display:inline-block;
+       padding:4px 14px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.bwands.gone{display:none}
+.bwands small{display:block;margin-top:2px;font-size:10px;font-weight:500;letter-spacing:.2px;color:var(--mint-mid);text-shadow:none;opacity:.8}
+.bossface{position:relative;width:190px;height:190px;margin:14px auto 4px;cursor:pointer;
+  /* TEMP bg-removal (owner: "ảnh boss chưa bỏ nền, nằm trơ như cái hộp"). The
+     generated art has a dark rounded-card background baked in that mix-blend
+     screen can't fully melt on a dark arena, so a hard box shows. Feather the
+     edges with a radial mask → the box corners fade out and the boss melts into
+     the scene. Proper per-frame cutout (transparent PNG) comes with the new
+     spritesheets — this is the stopgap until then. */
+  -webkit-mask:radial-gradient(circle at 50% 47%,var(--ink) 56%,color-mix(in srgb,var(--ink) 35%,transparent) 70%,transparent 82%);
+  mask:radial-gradient(circle at 50% 47%,var(--ink) 56%,color-mix(in srgb,var(--ink) 35%,transparent) 70%,transparent 82%)}
+/* ── Boss IDLE = SMOOTH interpolated motion (owner: "animation xịn mượt, đừng
+   giật" — NOT a stepped sprite frame). Layer four looping transforms on the ART
+   itself, each animating a SEPARATE composable property (translate/scale/rotate/
+   filter) at a DIFFERENT period so they never lock-step → an organic float +
+   breathe + sway + glow-pulse. mix-blend-mode:screen still melts the baked navy
+   plate into the page. Reactions ride on .bossface (parent) transform, which
+   COMPOSES with this child idle, so the boss keeps breathing while it recoils. */
+.bossface img,.bossface .gglyph,.bossface .bsheet{
+  animation:bfFloat 5s ease-in-out infinite,bfBreathe 3.7s ease-in-out infinite,bfSway 6.3s ease-in-out infinite,bfGlow 4.3s ease-in-out infinite}
+.bossface img{width:100%;height:100%;object-fit:contain;mix-blend-mode:screen}
+.bossface .gglyph{height:100%;display:grid;place-items:center;font-size:96px}
+/* 4-frame sheet as TWO stacked layers: .base always shows the idle frame
+   (--bf 0); .pose carries a state frame (--bf set by JS) and CROSS-DISSOLVES in
+   via opacity — never a hard --bf swap, which read as choppy ("giật"). */
+.bossface .bsheet{position:absolute;inset:0;background-size:400% 100%;background-repeat:no-repeat;
+  background-position:calc(var(--bf,0)*100%/3) 0;mix-blend-mode:screen}
+.bossface .bsheet.pose{opacity:0;transition:opacity .24s ease}
+.bossface .bsheet.pose.show{opacity:1}
+@keyframes bfFloat{0%,100%{translate:0 3px}50%{translate:0 -9px}}
+@keyframes bfBreathe{0%,100%{scale:1}50%{scale:1.045}}
+@keyframes bfSway{0%,100%{rotate:-2deg}50%{rotate:2deg}}
+@keyframes bfGlow{0%,100%{filter:drop-shadow(0 0 20px color-mix(in srgb,var(--honey-line) 42%,transparent))}
+  50%{filter:drop-shadow(0 0 34px color-mix(in srgb,var(--honey-line) 68%,transparent)) brightness(1.08)}}
+/* HIT = a smooth recoil PUNCH that eases back to rest (back-out cubic overshoot)
+   + a bright flash — no frame snap. .hit is TRANSIENT (JS strips it after the
+   beat) so it never freezes the child idle it briefly overrides. */
+.bossface.hit{animation:bosshit .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes bosshit{0%{transform:none;filter:brightness(1)}
+  18%{transform:translateX(-12px) scale(.93);filter:brightness(2.2)}
+  55%{transform:translateX(6px) scale(1.02);filter:brightness(1.3)}
+  100%{transform:none;filter:brightness(1)}}
+/* HEAL = a smooth green wash; the .pose layer also cross-dissolves to the green
+   frame (JS #pulsePose). Transient. */
+.bossface.heal{animation:bossheal .8s ease}
+@keyframes bossheal{0%,100%{filter:none}45%{filter:drop-shadow(0 0 36px var(--ok)) brightness(1.5) hue-rotate(70deg)}}
+.bossface.stagger{animation:stagger 1s ease-in-out infinite}
+@keyframes stagger{0%,100%{transform:rotate(-5deg) translateY(3px);filter:brightness(.82)}50%{transform:rotate(5deg) translateY(-4px)}}
+.bossface.slain{animation:bossdissolve 1.1s ease forwards}
+/* freeze the idle transforms during the death dissolve so the kill read is clean */
+.bossface.slain img,.bossface.slain .gglyph,.bossface.slain .bsheet{animation:none}
+/* the boss doesn't just fade — it flashes, drains to ash-grey, then billows
+   apart into blur (reads as "dissolves into smoke"), distinct from the
+   gift-reveal's burstopen (kept separate on purpose: different moment, and
+   editing burstopen would also retune every gift-opening in the game). */
+@keyframes bossdissolve{
+  0%{transform:scale(1);filter:brightness(1) saturate(1) blur(0)}
+  35%{transform:scale(1.08) rotate(-3deg);filter:brightness(2) saturate(.5) blur(1px)}
+  70%{transform:scale(1.22) rotate(3deg);filter:brightness(2.6) saturate(0) blur(5px);opacity:.55}
+  100%{transform:scale(1.45);filter:brightness(3) saturate(0) blur(14px);opacity:0}
+}
+.bfloat{position:absolute;left:50%;top:4%;transform:translateX(-50%);font-size:27px;font-weight:900;pointer-events:none;animation:bfloat 1.05s ease forwards;z-index:3}
+.bfloat.dmg{color:var(--honey);text-shadow:0 0 16px var(--honey-line)}
+.bfloat.heal{color:var(--ok);text-shadow:0 0 16px var(--ok)}
+.bfloat.quizbonus{top:14%;font-size:18px;color:var(--c);text-shadow:0 0 16px var(--c)}
+@keyframes bfloat{0%{opacity:0;margin-top:8px}18%{opacity:1}100%{opacity:0;margin-top:-36px}}
+.bhp{position:relative;height:16px;max-width:420px;margin:8px auto;border-radius:9px;background:var(--ink);overflow:hidden;border:1px solid var(--ink)}
+.bhp i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--honey-line),var(--honey));box-shadow:0 0 14px color-mix(in srgb,var(--honey-line) 70%,transparent);transition:width .5s cubic-bezier(.2,.9,.3,1)}
+.bhp span{position:absolute;inset:0;display:grid;place-items:center;font-size:10.5px;font-weight:800;letter-spacing:1px;color:var(--paper-raised);text-shadow:0 1px 3px var(--ink)}
+.bmeta{display:flex;gap:18px;justify-content:center;margin:6px auto 14px;font-size:12.5px;letter-spacing:1px;min-height:18px;width:fit-content;
+      padding:4px 16px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.bhearts{color:var(--honey-line);letter-spacing:3px}.bstreak{color:var(--honey);font-weight:800}.bscore{color:var(--dim)}
+.bround .codecell{text-align:left;margin:10px auto;width:min(78vw,1100px);max-width:none}
+.bround .codecell .cout{font-size:15px}
+/* gesture rounds (hold/swipe): big floating chips in the SAME visual space as
+   the fullscreen camera behind them (owner: "camera một nơi, chữ một nơi"). */
+.bosscell .bround .qopts:not(.swipe){gap:20px}
+.bosscell .bround .qopts:not(.swipe) .qopt{padding:20px 34px 20px 22px;font-size:19px;border-radius:30px;
+      background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.bosscell .bround .qopts:not(.swipe) .qopt .qn{width:30px;height:30px;line-height:30px;font-size:15px}
+/* swipe round: anchor the two options LEFT/RIGHT of the whole screen — swipe
+   toward the one you mean, physically ("swipe left/right"), not just
+   side-by-side buttons in the notebook column. */
+.bosscell .qopts.swipe{position:fixed;inset:0;z-index:3;pointer-events:none;
+      display:flex;align-items:center;justify-content:space-between;padding:0 6vw;gap:0}
+.bosscell .qopts.swipe .qopt{pointer-events:auto;max-width:260px;padding:22px 18px;font-size:18px;
+      background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.btaunt,.bfinish{font-size:17px;font-weight:900;letter-spacing:2px;color:var(--paper-raised);margin:12px 0;animation:hintpulse 1.2s ease-in-out infinite;display:inline-block;
+      padding:8px 20px;border-radius:16px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.bfinish{text-shadow:0 0 22px var(--honey-line)}
+.btaunt{color:var(--honey-line);text-shadow:0 0 18px var(--honey-line)}
+.btaunt small,.bfinish small{display:block;margin-top:6px;color:var(--dim);font-size:11px;letter-spacing:1px;font-weight:600}
+.bwin{font-size:20px;font-weight:900;letter-spacing:3px;color:var(--paper-raised);text-shadow:0 0 26px var(--honey);animation:cardin .6s cubic-bezier(.2,.9,.3,1.2);display:inline-block;
+     padding:10px 24px;border-radius:18px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.bwin small{display:block;margin-top:6px;color:var(--warm);font-size:12px;letter-spacing:2px}
+.bwin.gone{display:none}
+
+/* ── notebook ── */
+#book{max-width:880px;margin:0 auto;padding:84px 22px 140px;display:flex;flex-direction:column;gap:18px}
+.cell{transition:opacity .5s,transform .5s}
+.cell.veiled{display:none}
+.cell:not(.veiled){animation:cellin .5s ease}
+@keyframes cellin{0%{opacity:0;transform:translateY(18px)}100%{opacity:1;transform:none}}
+
+/* NPC speech */
+.npc{display:flex;gap:14px;align-items:flex-start}
+.avatar{width:52px;height:52px;flex:0 0 52px;border-radius:50%;position:relative;
+        /* Pip's generated portrait (--pip, from theme.js) over the old CSS orb — the orb shows through if the art is missing */
+        background:var(--pip,none) center/cover no-repeat,
+                   radial-gradient(circle at 38% 34%,var(--mint-soft) 0%,var(--c) 38%,var(--success-ink) 78%,transparent 100%);
+        box-shadow:0 0 22px color-mix(in srgb,var(--c) 65%,transparent);animation:npcbob 3.4s ease-in-out infinite}
+.avatar i{position:absolute;right:-3px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--paper-raised);
+          box-shadow:0 0 10px var(--paper-raised);animation:hintpulse 1.6s ease-in-out infinite}
+@keyframes npcbob{0%,100%{transform:translateY(-2px)}50%{transform:translateY(3px)}}
+.bubble{background:var(--panel);border:1px solid var(--line);border-radius:4px 16px 16px 16px;padding:12px 16px;max-width:640px}
+.bubble b{display:block;color:var(--c);font-size:11px;letter-spacing:2px;margin-bottom:3px}
+.bubble .txt{white-space:pre-wrap}
+
+/* anatomy widget */
+/* cameo cell ({cameo:{art,caption}}): a static story-beat panel, tap or wait to continue */
+.cameo{text-align:center;padding:22px;cursor:pointer;animation:cardin .6s cubic-bezier(.2,.9,.3,1.2)}
+.cameoart{width:170px;height:170px;margin:0 auto 14px;animation:bob 3s ease-in-out infinite}
+.cameoart img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 30px color-mix(in srgb,var(--c) 45%,transparent))}
+.cameocap{color:var(--warm);font-size:13px;letter-spacing:.5px;max-width:420px;margin:0 auto}
+
+/* Intro cell ({intro:{title,hook,art?}}) — the node's opening title card
+   (owner: "giới thiệu ngay đầu bài học để tạo cảm giác hứng thú"), NOT a
+   boss-intro. Tap or auto-advance, same non-blocking contract as .cameo. */
+.introcell{text-align:center;padding:min(8vh,60px) 22px;cursor:pointer;animation:cardin .6s cubic-bezier(.2,.9,.3,1.2)}
+.introart{width:170px;height:170px;margin:0 auto 14px;animation:bob 3s ease-in-out infinite}
+.introart img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 30px color-mix(in srgb,var(--c) 45%,transparent))}
+.introtitle{font-size:26px;font-weight:900;letter-spacing:1px;color:var(--paper-raised);text-shadow:0 0 24px var(--c);margin-bottom:10px}
+.introhook{color:var(--warm);font-size:15px;letter-spacing:.3px;max-width:520px;margin:0 auto;line-height:1.55}
+.introtap{margin-top:22px;color:var(--dim);font-size:12px;letter-spacing:1px;animation:hintpulse 1.8s ease-in-out infinite}
+
+/* boss round art ({rounds:[{art,...}]}): a small image above a code round, e.g. the cipher bomb during the decode round */
+.rart{width:96px;height:96px;margin:0 auto 8px;animation:bob 2.4s ease-in-out infinite}
+.rart img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 22px color-mix(in srgb,var(--c) 50%,transparent))}
+
+.anatomy{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;padding:18px;
+         background:var(--panel2);border:1px solid var(--line);border-radius:16px}
+.anatomy .part{width:150px;cursor:pointer;text-align:center;border-radius:14px;padding:10px;border:1px solid transparent;transition:.25s}
+.anatomy .part img{width:100%;border-radius:10px}
+.anatomy .part .pname{font-size:11px;font-weight:800;letter-spacing:2px;color:var(--dim);margin-top:6px}
+.anatomy .part:hover{border-color:var(--line);transform:translateY(-3px)}
+/* --qp (0→1) = finger-hold charge on the part being selected (like quiz options) */
+.anatomy .part.arm{border-color:color-mix(in srgb,var(--c) 55%,transparent);
+                   transform:translateY(-3px) scale(calc(1 + var(--qp,0)*.06));
+                   box-shadow:0 0 calc(10px + var(--qp,0)*26px) color-mix(in srgb,var(--c) 45%,transparent)}
+.anatomy .part.lit{border-color:var(--c);box-shadow:0 0 20px color-mix(in srgb,var(--c) 35%,transparent)}
+.anatomy .part.lit .pname{color:var(--c)}
+.anatomy .arrow{font-size:26px;color:var(--c);text-shadow:0 0 12px var(--c)}
+.anatomy .caption{flex-basis:100%;text-align:center;color:var(--warm);min-height:22px;margin-top:6px;letter-spacing:.3px}
+
+.pinhole-model{padding:18px;border:1px solid var(--mint-line);border-radius:18px;background:var(--paper);box-shadow:0 12px 30px color-mix(in srgb,var(--ink) 14%,transparent)}
+.pinhole-model svg{display:block;width:100%;height:auto;max-height:360px}
+.ph-axis{stroke:var(--mint-line);stroke-width:2;stroke-dasharray:7 7}.ph-wall,.ph-screen{stroke:var(--ink);stroke-width:9;stroke-linecap:round}.ph-screen{stroke:var(--honey-line)}
+.ph-hole{fill:var(--honey);stroke:var(--honey-ink);stroke-width:3}.ph-object{stroke:var(--success-ink);stroke-width:12;stroke-linecap:round}.ph-image{stroke:var(--danger-ink);stroke-width:12;stroke-linecap:round}
+.ph-ray{fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.ray-top{stroke:var(--danger-ink)}.ray-bottom{stroke:var(--success-ink)}
+.ph-label{fill:var(--ink);font:900 13px/1 "Be Vietnam Pro",system-ui,sans-serif;text-anchor:middle}
+.pinhole-controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:8px}.pinhole-controls button{min-width:96px;min-height:48px;padding:8px 16px;border:2px solid var(--honey-line);border-radius:999px;color:var(--honey-ink);background:var(--paper-raised);cursor:pointer;font-weight:900;transition:transform .18s ease,background .18s ease}.pinhole-controls button:hover{transform:translateY(-2px);background:var(--honey-soft)}.pinhole-controls button.seen{border-color:var(--success-ink)}.pinhole-controls button.active{color:var(--honey-ink);background:var(--honey);box-shadow:0 5px 0 var(--honey-ink)}
+.pinhole-caption{min-height:44px;margin:13px 0 0;padding:10px 14px;border-radius:12px;color:var(--ink);background:var(--mint-soft);font-weight:800;text-align:center}
+.vision-lab-deck{padding:0;overflow:hidden}.vision-slide-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--mint-line)}.vision-slide-tabs button{min-height:54px;padding:10px 8px;border:0;color:var(--ink-muted);background:var(--paper-warm);font-weight:900;cursor:pointer}.vision-slide-tabs button.seen{color:var(--success-ink)}.vision-slide-tabs button.active{color:var(--honey-ink);background:var(--honey);box-shadow:inset 0 -5px 0 var(--honey-line)}
+.vision-lab-slide{padding:clamp(18px,4vw,34px)}.vision-lab-slide[hidden]{display:none}.vision-lab-slide header{max-width:760px;margin:0 auto 18px;text-align:left}.vision-lab-slide header small{font-size:10px;font-weight:1000;letter-spacing:.14em;color:var(--honey-ink)}.vision-lab-slide header h3{margin:4px 0 7px;color:var(--ink);font-size:clamp(21px,4vw,30px);line-height:1.15}.vision-lab-slide header p{margin:0;color:var(--ink-muted);font-weight:700;line-height:1.55}
+.vision-ratio-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(220px,.75fr);gap:18px;align-items:center}.ph-triangle{stroke-width:4;stroke-linejoin:round}.object-triangle{fill:color-mix(in srgb,var(--success-soft) 72%,transparent);stroke:var(--success-ink)}.image-triangle{fill:color-mix(in srgb,var(--danger-soft) 72%,transparent);stroke:var(--danger-ink)}.ph-symbol{fill:var(--ink);stroke:var(--paper);stroke-width:8px;paint-order:stroke;font:1000 22px/1 "Be Vietnam Pro",system-ui,sans-serif;text-anchor:middle}.vision-formula-card{display:grid;gap:7px;padding:18px;border:2px solid var(--mint-line);border-radius:16px;background:var(--mint-soft)}.vision-formula-card span{color:var(--ink-muted);font-size:10px;font-weight:1000;letter-spacing:.1em}.vision-formula-card>code{display:block;padding:9px 10px;border-radius:9px;color:var(--ink);background:var(--paper-raised);font-size:clamp(17px,3vw,23px);font-weight:900}.vision-formula-card p{margin:5px 0 0;color:var(--ink-muted);font-size:12px;font-weight:700;line-height:1.5}
+.vision-design-brief{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 18px}.vision-design-brief div{padding:14px;border:2px solid var(--mint-line);border-radius:13px;background:var(--mint-soft)}.vision-design-brief small,.vision-design-brief strong{display:block}.vision-design-brief small{margin-bottom:5px;color:var(--ink-muted);font-size:9px;font-weight:1000;letter-spacing:.1em}.vision-design-brief strong{color:var(--ink);font-size:13px}.vision-design-table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:2px solid var(--mint-line);border-radius:14px;color:var(--ink);background:var(--paper-raised);font-size:12px}.vision-design-table th,.vision-design-table td{padding:11px 9px;border-right:1px solid var(--mint-line);border-bottom:1px solid var(--mint-line);text-align:center}.vision-design-table th{color:var(--honey-ink);background:var(--honey-soft);font-weight:1000}.vision-design-table th:last-child,.vision-design-table td:last-child{border-right:0}.vision-design-table tbody tr:last-child td{border-bottom:0}.vision-design-question{margin:14px 0 0;padding:12px 14px;border-left:5px solid var(--honey-line);color:var(--ink);background:var(--paper-warm);font-weight:800;line-height:1.5}
+@media(max-width:680px){.vision-slide-tabs button{min-height:50px;padding:7px 3px;font-size:10px}.vision-lab-slide{padding:18px 13px}.vision-ratio-layout{grid-template-columns:1fr}.vision-design-brief{grid-template-columns:1fr}.vision-design-table{font-size:10px}.vision-design-table th,.vision-design-table td{padding:9px 4px}.pinhole-controls button{min-width:82px;padding:8px 10px;font-size:10px}}
+
+.vision-lab-visual{color:var(--ink)}
+.vl-two,.vl-grid-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:center}.vl-grid-row{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}.vl-matrix{margin:0;padding:14px;border:2px solid var(--mint-line);border-radius:14px;background:var(--paper-raised)}.vl-matrix figcaption{margin-bottom:10px;color:var(--ink-muted);font-size:10px;font-weight:1000;letter-spacing:.1em;text-align:center}.vl-matrix>div{display:grid;grid-template-columns:repeat(var(--vl-cols),minmax(30px,1fr));gap:4px}.vl-matrix span{display:grid;place-items:center;min-height:38px;border:1px solid var(--mint-line);border-radius:7px;background:var(--mint-soft);font:900 12px/1 ui-monospace,SFMono-Regular,Consolas,monospace}.vl-matrix span.marked{color:var(--honey-ink);background:var(--honey);box-shadow:inset 0 0 0 2px var(--honey-line)}
+.vl-svg{display:block;width:100%;max-height:350px}.vl-svg text{fill:var(--ink);font:900 13px/1 "Be Vietnam Pro",system-ui,sans-serif;text-anchor:middle}.vl-axis{stroke:var(--mint-line);stroke-width:3;stroke-dasharray:8 7}.vl-plane,.vl-quad{fill:color-mix(in srgb,var(--mint-soft) 68%,transparent);stroke:var(--success-ink);stroke-width:4}.vl-ray,.vl-track{fill:none;stroke:var(--danger-ink);stroke-width:4;stroke-linecap:round;stroke-dasharray:8 6}.vl-point{stroke:var(--paper-raised);stroke-width:4}.vl-point.camera{fill:var(--ink)}.vl-point.world{fill:var(--success-ink)}.vl-point.image{fill:var(--danger-ink)}.vl-scene,.vl-frames rect{fill:var(--paper-warm);stroke:var(--mint-line);stroke-width:3}.vl-target,.vl-moving circle{fill:var(--honey-soft);stroke:var(--honey-ink);stroke-width:3}.vl-box{fill:none;stroke-width:5}.vl-box.weak{stroke:var(--danger-ink);stroke-dasharray:9 7;opacity:.65}.vl-box.strong{stroke:var(--success-ink)}.vl-map-arrow{fill:none;stroke:var(--honey-ink);stroke-width:8;stroke-linecap:round}.vl-arrow-head{fill:var(--honey-ink)}.vl-rectified{fill:var(--paper-raised);stroke:var(--honey-ink);stroke-width:5}.vl-corners circle{fill:var(--danger-ink);stroke:var(--paper-raised);stroke-width:3}.vl-frame-labels text{font-size:16px}.vl-moving circle{stroke:var(--danger-ink)}
+.vl-flow{display:flex;align-items:stretch;justify-content:center;gap:8px;flex-wrap:wrap;padding:18px;border:2px solid var(--mint-line);border-radius:16px;background:var(--mint-soft)}.vl-flow strong{display:grid;place-items:center;min-height:58px;padding:10px 14px;border:2px solid var(--honey-line);border-radius:12px;background:var(--paper-raised);font-size:12px;text-align:center}.vl-flow i{display:grid;place-items:center;color:var(--honey-ink);font-size:22px;font-style:normal}.vl-compare{display:grid;gap:16px}.vl-signal{display:flex;align-items:flex-end;justify-content:center;gap:8px;min-height:250px;padding:22px;border:2px solid var(--mint-line);border-radius:16px;background:var(--mint-soft)}.vl-signal span{display:flex;align-items:flex-start;justify-content:center;width:min(68px,12vw);height:var(--vl-h);min-height:40px;padding-top:8px;border-radius:9px 9px 3px 3px;color:var(--paper);background:var(--success-ink);font-weight:900}
+@media(max-width:680px){.vl-two{grid-template-columns:1fr}.vl-matrix{padding:9px}.vl-matrix span{min-height:31px;font-size:10px}.vl-flow{padding:11px}.vl-flow strong{min-height:48px;padding:8px;font-size:10px}.vl-flow i{font-size:16px}.vl-svg{max-height:290px}.vl-signal{min-height:190px;padding:14px}}
+
+/* code cells (Jupyter-style) */
+.codecell{border:1px solid var(--line);border-left:3px solid color-mix(in srgb,var(--c) 45%,transparent);
+          border-radius:12px;background:var(--panel2);overflow:hidden}
+.codecell.done{border-left-color:var(--ok)}
+
+/* Node 0 ("Old Computer") only: code cells get a retro CRT-bezel frame —
+   a 9-slice border-image (fixed ornamented corners, plain stretchable
+   edges) generated to match the OLD COMPUTER prop art. */
+.node-0 .codecell{
+  border-style:solid; border-width:26px; border-radius:0;
+  border-image-source:url('assets/crt-frame.webp');
+  border-image-slice:150; border-image-width:26px; border-image-repeat:stretch;
+  background:var(--panel2);
+}
+.node-0 .codecell.done{box-shadow:0 0 0 2px color-mix(in srgb,var(--ok) 55%,transparent) inset}
+.chead{display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid var(--line);background:var(--panel)}
+.inlbl{color:var(--c);font-size:12px;min-width:52px}
+.codecell.done .inlbl{color:var(--ok)}
+.clabel{font-size:12px;color:var(--txt)}
+.cnote{display:block;font-size:12px;line-height:1.5;color:var(--warm);white-space:pre-wrap;padding:8px 14px;border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--warm) 6%,transparent)}
+.chead-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.creset{background:transparent;border:1px solid var(--line);border-radius:8px;color:var(--dim);cursor:pointer;padding:4px 10px}
+.creset:hover{color:var(--c);border-color:var(--c)}
+.csolution{background:transparent;border:1px solid var(--warm);border-radius:8px;color:var(--warm);cursor:pointer;padding:4px 10px;font-size:12px;white-space:nowrap}
+.csolution:hover{color:var(--ink);background:var(--warm)}
+.csolution.shown{color:var(--ink);background:var(--warm)}
+.cexplain{background:transparent;border:1px solid var(--mint-line);border-radius:8px;color:var(--success-ink);cursor:pointer;padding:4px 10px;font-size:12px;white-space:nowrap}
+.cexplain:hover,.cexplain.shown{color:var(--ink);background:var(--mint-soft)}
+.csolution-explanation{margin:0 12px 10px;padding:12px 14px;border:1px solid var(--mint-line);border-radius:10px;background:var(--mint-soft);color:var(--ink)}
+.csolution-explanation ol{margin:0;padding-left:28px;display:grid;gap:9px}
+.csolution-explanation li{padding-left:4px}
+.csolution-explanation li b{display:inline-block;min-width:58px;color:var(--success-ink);font:800 11px/1.5 ui-monospace,monospace}
+.csolution-explanation li span{font-size:13px;line-height:1.55}
+.ced-fallback-note{padding:6px 12px;color:var(--honey-ink);background:var(--honey-soft);font-size:11px;font-weight:800}
+.ced-fallback{display:block;width:100%;height:calc(100% - 30px);min-height:66px;padding:10px 12px;resize:none;border:0;outline:0;color:var(--mint-soft);background:var(--ink);font-size:13.5px;line-height:22px;tab-size:4}
+.ced-fallback:focus{box-shadow:inset 0 0 0 2px var(--honey-line)}
+.crun{display:flex;align-items:center;gap:7px;padding:6px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:800;letter-spacing:.5px;
+      color:var(--ink);background:linear-gradient(180deg,color-mix(in srgb,var(--c) 55%,var(--paper-raised)),var(--c));box-shadow:0 0 14px color-mix(in srgb,var(--c) 45%,transparent)}
+.crun.is-stop{color:var(--paper-raised);background:linear-gradient(180deg,var(--honey-line),var(--danger-ink));box-shadow:0 0 16px color-mix(in srgb,var(--honey-line) 55%,transparent)}
+.crun.is-stopping{cursor:wait;filter:grayscale(.25) brightness(.85)}
+.crun[disabled]{filter:grayscale(.7) brightness(.7);cursor:default;box-shadow:none}
+.crun.is-stopping[disabled]{cursor:wait;filter:grayscale(.25) brightness(.85)}
+/* Inline in the notebook a cell stays compact: editor beside output, so the
+   page still reads as a lesson. The roomy writing shape is a MODE — see
+   .codecell.cell-full below — not something every cell pays for. */
+.cworkspace{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);align-items:stretch}
+.ced{min-width:0;border-right:1px solid var(--line)}
+.coutput{display:flex;min-width:0;min-height:180px;max-height:380px;flex-direction:column;background:var(--paper-warm)}
+.coutput-label{flex:0 0 auto;padding:8px 12px;border-bottom:1px solid var(--line);color:var(--dim);font-size:10px;font-weight:900;letter-spacing:1.4px}
+.cout{position:relative;flex:1;min-height:0;padding:10px 14px;overflow:auto;font-size:13px;white-space:pre-wrap;word-break:break-word}
+.cout:not(.live)::before{content:'Kết quả và hình ảnh sẽ xuất hiện ở đây sau khi bạn bấm RUN.';position:absolute;inset:0;display:grid;place-items:center;padding:24px;color:var(--dim);font:600 12px/1.55 system-ui,sans-serif;text-align:center}
+.cout.live{border-top:0}
+.cout .r{padding:1px 0}
+@media(min-width:761px){
+  #book>.codecell{width:min(1120px,calc(100vw - 44px));max-width:none;align-self:center}
+  .coutput #scenepanel{width:min(100%,360px)}
+}
+.t-sys{color:var(--dim)}.t-prompt{color:var(--c)}.t-echo{color:var(--mint-mid)}.t-err{color:var(--err)}
+.t-out{color:var(--term);font-weight:800;font-size:19px;letter-spacing:.5px;padding:4px 0;
+       text-shadow:0 0 16px color-mix(in srgb,var(--term) 60%,transparent);animation:outpop .5s cubic-bezier(.2,.9,.3,1.25)}
+.t-out::before{content:'» ';color:color-mix(in srgb,var(--term) 45%,transparent)}
+@keyframes outpop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.07)}100%{transform:scale(1)}}
+.t-askline{display:flex;align-items:center}
+.tin{flex:1;background:transparent;border:none;outline:none;color:var(--paper-raised);font:inherit;caret-color:var(--c)}
+
+/* camera panel inside a cell's output — 4:3 like the camera feed itself, so
+   the full frame shows (no crop); centered, polaroid-ish width */
+#scenepanel{position:relative;aspect-ratio:4/3;height:auto;max-width:480px;margin:10px auto;border-radius:12px;overflow:hidden;border:1px solid var(--line);
+            background:radial-gradient(500px 340px at 50% 46%,var(--ink) 0%,var(--ink) 70%)}
+/* idle: the camera must be CLEARLY visible so the student sees their own hand
+   (owner: "cần thấy tay, không phải qua lớp mờ"). The cast wind-up (.casting)
+   and result freeze (.frozen) darken it via their own rules below, so this
+   bright base only applies while watching. */
+#scenepanel #cam,#scenepanel #camstill{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:.96;filter:none}
+/* a clean cyan/violet frame instead of a murk over the feed */
+#scenepanel::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;border-radius:12px;
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--c) 42%,transparent),inset 0 0 26px color-mix(in srgb,var(--c) 14%,transparent)}
+#scenepanel .vortex{position:absolute;left:50%;top:50%;width:240px;height:240px;transform:translate(-50%,-50%);transition:opacity .4s}
+/* the decorative rings are a FAINT ambient frame now, not a swirl covering the
+   hand — the wanted magic-circle FX is the separate fingertip canvas.fxdots */
+#scenepanel .ring{position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent,color-mix(in srgb,var(--c) 16%,transparent),transparent 40%,color-mix(in srgb,var(--c2) 13%,transparent) 60%,transparent 78%);
+  -webkit-mask:radial-gradient(circle,transparent 30%,var(--ink) 34%,var(--ink) 60%,transparent 72%);
+  mask:radial-gradient(circle,transparent 30%,var(--ink) 34%,var(--ink) 60%,transparent 72%);animation:spin 7s linear infinite}
+#scenepanel .ring.b{inset:32px;opacity:.42;animation-duration:4.5s;animation-direction:reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+#scenepanel .result{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none;opacity:0;transition:opacity .2s;z-index:3;max-width:88%;
+        padding:10px 22px;border-radius:18px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+#scenepanel .result.show{opacity:1;animation:punch .55s cubic-bezier(.2,1.4,.3,1)}
+@keyframes punch{0%{transform:translate(-50%,-50%) scale(.25)}55%{transform:translate(-50%,-50%) scale(1.22)}100%{transform:translate(-50%,-50%) scale(1)}}
+/* display()/cast labels are short AR values (a number or word) — keep them on
+   one clean line, sized to fit the 480px panel; ellipsize anything pathological
+   rather than wrapping into a giant multi-line block. */
+#scenepanel .result .big{font-size:50px;font-weight:900;letter-spacing:1px;color:var(--paper-raised);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+#scenepanel .result .sub{margin-top:2px;color:var(--dim);letter-spacing:3px;font-size:12px}
+/* pixel_display(grid): the .big slot switches to a small monospace block so
+   each '\n'-separated row of the bitmap lines up as a tiny picture instead
+   of one giant ellipsized word. */
+#scenepanel .result.pixels .big{font-size:20px;font-weight:400;letter-spacing:2px;line-height:1.15;font-family:monospace;white-space:pre;overflow:visible;text-overflow:clip;color:var(--paper-raised)}
+
+/* camera_charm.aim_cell(rows, cols): a temporary AR grid over the live camera
+   while Python is waiting for the student to point at one cell. */
+.scgrid{position:absolute;inset:0;z-index:3;display:grid;pointer-events:none;padding:8px;gap:4px}
+.scgrid i{display:grid;place-items:center;min-width:0;min-height:0;border:1px solid color-mix(in srgb,var(--c) 34%,transparent);
+  border-radius:8px;background:color-mix(in srgb,var(--ink) 24%,transparent);color:color-mix(in srgb,var(--paper-raised) 72%,transparent);
+  font-size:13px;font-weight:900;text-shadow:0 0 10px color-mix(in srgb,var(--c) 42%,transparent)}
+.scgrid i.hot{background:color-mix(in srgb,var(--c) 32%,transparent);border-color:var(--c);color:var(--paper-raised);
+  box-shadow:0 0 18px color-mix(in srgb,var(--c) 58%,transparent),inset 0 0 18px color-mix(in srgb,var(--c) 22%,transparent)}
+.scgrid i.locked{background:color-mix(in srgb,var(--ok) 34%,transparent);border-color:var(--ok)}
+
+/* lighten()/darken(): a persisting light wash over the panel (screenFx) */
+#sclight{position:absolute;inset:0;pointer-events:none;z-index:1;background:transparent;transition:background .9s ease}
+#sclight.up{background:radial-gradient(ellipse at 50% 42%,color-mix(in srgb,var(--paper) 55%,transparent),color-mix(in srgb,var(--paper-warm) 32%,transparent) 70%)}
+#sclight.down{background:radial-gradient(ellipse at 50% 42%,color-mix(in srgb,var(--ink) 55%,transparent),color-mix(in srgb,var(--ink) 85%,transparent) 78%)}
+
+/* sepia()/invert()/grayscale()/mirror(): pure-CSS "webcam filter" screenFx
+   modes — a class toggle on #scenepanel driving #cam's filter/transform,
+   same persist-until-next-screenFx-or-RUN contract as lighten()/darken()
+   above (see casting.js's screenFx). Mutually exclusive with each other. */
+#scenepanel.fx-sepia #cam,#scenepanel.fx-sepia #camstill{filter:sepia(.85) saturate(1.5) brightness(1.05)}
+#scenepanel.fx-invert #cam,#scenepanel.fx-invert #camstill{filter:invert(1) hue-rotate(180deg)}
+#scenepanel.fx-gray #cam,#scenepanel.fx-gray #camstill{filter:grayscale(1) contrast(1.1)}
+#scenepanel.fx-mirror #cam,#scenepanel.fx-mirror #camstill{transform:scaleX(1)}  /* baseline #cam/#camstill are pre-mirrored for selfie view; this UN-mirrors them */
+#scenepanel.fx-blur #cam,#scenepanel.fx-blur #camstill{filter:blur(5px)}
+#scenepanel.fx-sharpen #cam,#scenepanel.fx-sharpen #camstill{filter:url(#camera-sharpen-filter)}
+#scenepanel.fx-rotate #cam,#scenepanel.fx-rotate #camstill{transform:scaleX(-1) rotate(var(--hand-angle,0deg)) scale(1.18)}
+/* shake_screen(): one-shot, reuses the existing `shake` keyframe (line 214) */
+#scenepanel.fx-shake{animation:shake .5s ease}
+
+/* cast wind-up: the camera plate darkens so the additive dust reads (root app
+   darkens the scene as charge builds) */
+#scenepanel.casting #cam{opacity:.2;filter:saturate(.55) brightness(.7)}
+/* fx freeze: the camera stops (paused + dimmed, HUD gone); the spell owns the frame */
+#scenepanel.frozen{animation:panelkick .45s ease}
+@keyframes panelkick{0%{transform:translate(0,0) scale(1)}15%{transform:translate(-6px,3px) scale(1.02)}
+  35%{transform:translate(5px,-4px) scale(1.02)}55%{transform:translate(-4px,-2px) scale(1.01)}
+  75%{transform:translate(3px,2px) scale(1.005)}100%{transform:translate(0,0) scale(1)}}
+#scenepanel #cam{transition:opacity .6s,filter .6s}
+#scenepanel.frozen #cam{opacity:.08;filter:saturate(.15) brightness(.5)}
+#scenepanel.frozen .schud{opacity:0;transition:opacity .3s}
+#scenepanel.frozen::before{content:'';position:absolute;inset:0;z-index:1;
+  background:radial-gradient(440px 300px at 50% 50%,color-mix(in srgb,var(--c) 24%,transparent),transparent 72%)}
+.burst{position:absolute;inset:0;pointer-events:none;z-index:2}
+.bflash{position:absolute;inset:0;opacity:0;animation:bflash .7s ease;
+        background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--c) 80%,var(--paper-raised)) 0%,transparent 62%)}
+@keyframes bflash{0%{opacity:0}12%{opacity:.95}100%{opacity:0}}
+.bwave{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;
+       border:3px solid var(--c);opacity:.9;animation:bwave .8s ease-out forwards}
+@keyframes bwave{to{transform:scale(9);opacity:0;border-width:1px}}
+.bspark{position:absolute;left:50%;top:50%;border-radius:50%;background:var(--c);
+        box-shadow:0 0 12px var(--c);animation:bspark .95s ease-out forwards}
+@keyframes bspark{0%{transform:translate(0,0);opacity:1}100%{transform:translate(var(--dx),var(--dy));opacity:0}}
+.schud{position:absolute;top:10px;right:12px;display:flex;flex-direction:column;gap:7px;align-items:flex-end}
+#scstat{padding:5px 11px;border-radius:20px;font-size:11px;letter-spacing:1px;color:var(--ink);background:var(--c);font-weight:700;
+        box-shadow:0 0 14px color-mix(in srgb,var(--c) 55%,transparent)}
+#sccount{font-size:34px;font-weight:900;color:var(--paper-raised);text-shadow:0 0 18px var(--c);line-height:1;
+        padding:2px 12px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+#scgate{width:130px;height:6px;border-radius:6px;background:var(--ink);overflow:hidden}
+#scgate i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--c),var(--paper-raised));box-shadow:0 0 10px var(--c);transition:width .05s linear}
+#scask{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--ink) 85%,transparent)}
+#scask span{color:var(--warm);font-size:12px}
+#scask input{width:60px;background:var(--ink);border:1px solid var(--line);border-radius:8px;color:var(--paper-raised);padding:5px 8px;font:inherit;text-align:center}
+
+/* ritual */
+.ritualcell{text-align:center;padding:26px;border:1px dashed color-mix(in srgb,var(--c) 35%,transparent);border-radius:16px}
+.rlead{color:var(--dim);letter-spacing:1px;margin-bottom:6px;display:inline-block;
+       padding:3px 12px;border-radius:12px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+/* --rc (0→1) is the ritual charge: it lights the camera, glow, rings and glyph */
+#ritualOverlay{z-index:20;--rc:0}
+#rcam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);
+      opacity:calc(.16 + var(--rc)*.3);filter:saturate(.7)}
+#rglow{position:absolute;inset:0;pointer-events:none;opacity:var(--rc);
+       background:radial-gradient(680px 520px at 50% 46%,color-mix(in srgb,var(--c) 38%,transparent),transparent 72%)}
+#ritualOverlay .actin{position:relative;z-index:2}
+/* the real particle vortex (ritual-vortex.js); .pvx retires the CSS ring placeholders */
+#rvortex{position:absolute;inset:0;pointer-events:none;z-index:1}
+/* the REAL WebGL cast engine (spell-vfx.js) — layered like #rvortex; embers ride above the frozen frame */
+#svfx{position:absolute;inset:0;width:100%!important;height:100%!important;pointer-events:none;z-index:2}
+#ritualOverlay.pvx .rrings{display:none}
+#scenepanel.pvx .vortex{display:none}
+#scenepanel #rvortex{z-index:2}
+#scenepanel .schud{z-index:4}
+/* camera_charm studio: tracked stickers share coverMap() with the mirrored
+   camera, particles remain below them, and status/gift copy stays compact. */
+#scenepanel .ar-sticker{position:absolute;z-index:3;transform:translate(-50%,-50%);pointer-events:none;line-height:1;
+  max-width:96px;overflow:hidden;text-overflow:ellipsis;filter:drop-shadow(0 0 8px var(--c));transition:left .05s linear,top .05s linear}
+#scenepanel .studio-static-sticker{position:absolute;z-index:3;transform:translate(-50%,-50%);pointer-events:none;line-height:1;
+  max-width:96px;overflow:hidden;text-overflow:ellipsis;filter:drop-shadow(0 0 8px var(--c))}
+#scenepanel .studio-particle-frame{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}.studio-particle-frame i{position:absolute;
+  transform:translate(-50%,-50%);font-style:normal;line-height:1;text-shadow:0 0 8px currentColor}
+#scenepanel .studio-particle-frame.guided{background:
+  linear-gradient(color-mix(in srgb,var(--ink) 18%,transparent),color-mix(in srgb,var(--ink) 52%,transparent)),
+  repeating-linear-gradient(0deg,transparent 0 9.8%,color-mix(in srgb,var(--mint-line) 13%,transparent) 10%),
+  repeating-linear-gradient(90deg,transparent 0 9.8%,color-mix(in srgb,var(--mint-line) 13%,transparent) 10%),
+  radial-gradient(circle at 72% 28%,color-mix(in srgb,var(--c) 20%,transparent),transparent 36%),var(--ink)}
+#scenepanel .studio-particle-frame.guided i{z-index:2;filter:drop-shadow(0 0 8px currentColor);transition:left .28s ease,top .28s ease,font-size .28s ease,opacity .28s ease}
+#scenepanel .studio-particle-guide{position:absolute;z-index:3;left:12px;bottom:12px;width:min(74%,360px);padding:10px 12px;border:1px solid color-mix(in srgb,var(--mint-line) 45%,transparent);border-radius:12px;color:var(--paper-raised);background:color-mix(in srgb,var(--ink) 86%,transparent);box-shadow:0 12px 30px color-mix(in srgb,var(--ink) 50%,transparent);backdrop-filter:blur(8px)}
+#scenepanel .studio-particle-guide>b{display:inline-block;padding:3px 7px;border-radius:999px;color:var(--ink);background:var(--honey);font:900 9px/1.2 ui-monospace,monospace;letter-spacing:.8px}
+#scenepanel .studio-particle-guide>strong{display:block;margin-top:6px;font-size:13px;line-height:1.25}
+#scenepanel .studio-particle-guide>code{display:block;margin-top:5px;color:var(--mint-mid);font:800 11px/1.35 ui-monospace,monospace}
+#scenepanel .studio-particle-state{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}.studio-particle-state span{padding:3px 6px;border:1px solid color-mix(in srgb,var(--mint-line) 36%,transparent);border-radius:7px;color:var(--paper-raised);background:color-mix(in srgb,var(--mint-line) 9%,transparent);font:800 10px/1.2 ui-monospace,monospace}
+#scenepanel .studio-particle-guide>p{margin:7px 0 0;color:var(--mint-mid);font-size:10px;line-height:1.35}
+@media(max-width:560px){#scenepanel .studio-particle-guide{left:8px;bottom:8px;width:calc(100% - 16px);padding:7px 9px}.studio-particle-guide>p{display:none}}
+#scenepanel .studio-title{position:absolute;z-index:5;left:10px;top:10px;max-width:48%;padding:6px 10px;border-radius:6px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--paper-raised);background:color-mix(in srgb,var(--ink) 76%,transparent);font-size:12px;font-weight:800}
+#scenepanel .studio-gift{position:absolute;z-index:5;left:10px;bottom:12px;display:flex;align-items:center;gap:9px;max-width:calc(100% - 20px);
+  padding:8px 11px;border-radius:8px;color:var(--paper-raised);background:color-mix(in srgb,var(--ink) 82%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--c) 34%,transparent);animation:giftin .3s ease}
+#scenepanel .studio-gift b{flex:0 0 auto;font-size:24px;line-height:1}.studio-gift span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+@keyframes giftin{from{transform:translateX(-24px);opacity:0}to{transform:translateX(0);opacity:1}}
+#scenepanel .studio-particles{position:absolute;z-index:3;pointer-events:none}.studio-particles i{position:absolute;left:0;top:0;font-style:normal;
+  animation:studioOrbit 1.15s ease-out var(--delay) forwards}.studio-particles.motion-rain i{animation-name:studioRain}.studio-particles.motion-pulse i{animation-name:studioPulse}
+.studio-particles.motion-comet i{animation-name:studioComet}.studio-particles.motion-spiral-in i{animation-name:studioSpiral}
+@keyframes studioOrbit{from{transform:translate(-50%,-50%) scale(.4);opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(150deg);opacity:0}}
+@keyframes studioRain{from{transform:translate(calc(-50% + var(--dx)),calc(-50% - 44px));opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + 92px));opacity:0}}
+@keyframes studioPulse{0%{transform:translate(-50%,-50%) scale(.2);opacity:1}55%{transform:translate(-50%,-50%) scale(1.5);opacity:.9}100%{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.5);opacity:0}}
+@keyframes studioComet{from{transform:translate(calc(-50% - 70px),calc(-50% + var(--dy)));opacity:1}to{transform:translate(calc(-50% + 90px),calc(-50% + var(--dy)));opacity:0}}
+@keyframes studioSpiral{from{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(0);opacity:0}35%{opacity:1}to{transform:translate(-50%,-50%) rotate(300deg) scale(.2);opacity:0}}
+/* Upload-photo project: the image stays local in the browser; Python only
+   sends the learner's color list, animation mode, and current loop step. */
+#scenepanel .photo-light-project{position:absolute;inset:0;z-index:3;overflow:hidden;pointer-events:none;
+  background:radial-gradient(circle at 50% 42%,var(--ink) 0,var(--ink) 58%,var(--ink) 100%);transition:background .15s ease,filter .15s ease}
+#scenepanel .photo-light-project.is-lit{background:radial-gradient(circle at 50% 42%,var(--ink-muted) 0,var(--ink) 58%,var(--ink) 100%)}
+#scenepanel .photo-light-project.is-off{filter:brightness(.72)}
+#scenepanel.photo-lights-live{max-width:680px;box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 55%,transparent),0 18px 55px color-mix(in srgb,var(--ink) 73%,transparent)}
+#scenepanel.photo-lights-live .schud{top:auto;right:auto;left:50%;bottom:16px;transform:translateX(-50%);align-items:center;z-index:6}
+#scenepanel.photo-lights-live #scstat{font-size:13px;letter-spacing:1.4px;white-space:nowrap;padding:8px 14px;box-shadow:0 0 18px color-mix(in srgb,var(--c) 60%,transparent)}
+#scenepanel.photo-lights-live #sccount{font-size:24px}
+#scenepanel .photo-light-picture,#scenepanel .photo-light-placeholder{position:absolute;inset:11% 13%;width:74%;height:78%;
+  box-sizing:border-box;border:7px solid var(--honey-ink);border-radius:10px;box-shadow:inset 0 0 0 3px var(--honey-line),0 12px 28px color-mix(in srgb,var(--ink) 60%,transparent)}
+#scenepanel .photo-light-picture{object-fit:contain;background:var(--ink)}
+#scenepanel .photo-light-placeholder{background:linear-gradient(135deg,var(--ink),var(--danger-ink) 48%,var(--honey-line))}
+#scenepanel .photo-light-placeholder:after{content:'✦';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  color:color-mix(in srgb,var(--paper-raised) 60%,transparent);font-size:70px;text-shadow:0 0 24px var(--mint-line)}
+#scenepanel .photo-light-start{position:absolute;inset:0;z-index:7;display:grid;place-items:center;pointer-events:auto;
+  background:radial-gradient(circle at center,color-mix(in srgb,var(--ink) 18%,transparent),color-mix(in srgb,var(--ink) 72%,transparent))}
+#scenepanel .photo-light-start button{padding:15px 30px;border:2px solid var(--paper-raised);border-radius:999px;cursor:pointer;color:var(--ink);
+  background:linear-gradient(180deg,var(--paper-warm),var(--honey));box-shadow:0 0 16px var(--paper-raised),0 0 34px var(--honey);font:900 15px/1 system-ui,sans-serif;letter-spacing:2px}
+#scenepanel .photo-light-start button:hover{transform:scale(1.06);filter:brightness(1.08)}
+#scenepanel .photo-light-ring{position:absolute;inset:0;z-index:4}
+#scenepanel .photo-light-ring i{position:absolute;width:17px;height:17px;transform:translate(-50%,-50%);border:2px solid color-mix(in srgb,var(--paper-raised) 53%,transparent);
+  border-radius:50%;background:var(--lamp);box-shadow:0 0 5px var(--paper-raised),0 0 15px var(--lamp),0 0 28px var(--lamp);transition:opacity .12s ease,filter .12s ease}
+#scenepanel .photo-light-ring i.off{opacity:.16;filter:saturate(.15);box-shadow:none}
+@media(max-width:560px){#scenepanel .photo-light-ring i{width:13px;height:13px;border-width:1px}}
+/* Camera-free electronic board project. The generated art is fixed; Python
+   places bulbs and grid pixels in the black display area above it. */
+#scenepanel.light-board-live{max-width:720px;box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 55%,transparent),0 18px 55px color-mix(in srgb,var(--ink) 73%,transparent)}
+#scenepanel .light-board-project{position:absolute;inset:0;z-index:3;overflow:hidden;background:var(--ink)}
+#scenepanel .light-board-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#scenepanel .light-board-bulbs,#scenepanel .light-board-grid{position:absolute;left:14%;top:23%;width:72%;height:56%;z-index:4;pointer-events:none}
+#scenepanel .light-board-bulb,#scenepanel .light-board-grid i{position:absolute;width:18px;height:18px;transform:translate(-50%,-50%);border-radius:50%;
+  background:var(--lamp);box-shadow:0 0 5px var(--paper-raised),0 0 14px var(--lamp),0 0 28px var(--lamp)}
+#scenepanel .light-board-grid i{width:12px;height:12px}
+#scenepanel .light-board-start{position:absolute;left:14%;top:23%;width:72%;height:56%;z-index:7;display:grid;place-items:center;pointer-events:auto;background:color-mix(in srgb,var(--ink) 72%,transparent)}
+#scenepanel .light-board-start button{padding:16px 32px;border:2px solid var(--paper-raised);border-radius:999px;cursor:pointer;color:var(--ink);background:linear-gradient(180deg,var(--paper-warm),var(--honey));
+  box-shadow:0 0 16px var(--paper-raised),0 0 34px var(--honey);font:900 16px/1 system-ui,sans-serif;letter-spacing:2px}
+#scenepanel.light-board-live .schud{top:12px;right:14px;z-index:8}
+#scenepanel.light-board-live #sccount{display:none}
+@media(max-width:560px){#scenepanel .light-board-bulb{width:13px;height:13px}#scenepanel .light-board-grid i{width:8px;height:8px}}
+
+/* Guided line-by-line code cell: code and the observable machine stay side by side. */
+.walkthrough{align-self:center;display:flex;flex-direction:column;width:min(1120px,calc(100vw - 32px));max-height:calc(100dvh - 78px);margin-top:10px;scroll-margin-top:64px;border:1px solid color-mix(in srgb,var(--c) 45%,var(--line));border-radius:18px;overflow:hidden;background:var(--ink);box-shadow:0 18px 50px color-mix(in srgb,var(--ink) 47%,transparent)}
+.wthead{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.wthead strong{color:var(--paper-raised);letter-spacing:.8px}.wthead span{color:var(--c);font:700 12px ui-monospace,monospace}
+.wtlayout{display:grid;grid-template-columns:minmax(280px,.82fr) minmax(390px,1.18fr);min-height:0;overflow:hidden;flex:1 1 auto}
+.wtcode,.wtobserve-shell{min-width:0;min-height:0;overflow:auto}.wtcode{border-right:1px solid var(--line);background:var(--ink)}
+.wtobserve-shell{--wt-observe-scale:1;overflow:hidden;background:var(--ink)}
+.wtobserve{display:flex;flex-direction:column;width:calc(100% / var(--wt-observe-scale));height:calc(100% / var(--wt-observe-scale));overflow:auto;background:var(--ink);transform:scale(var(--wt-observe-scale));transform-origin:top left}
+.wtside-title{padding:9px 13px;color:var(--dim);background:var(--ink);border-bottom:1px solid var(--line);font-size:11px;font-weight:800;letter-spacing:1px}
+.wtlines{padding:12px 0}.wtline{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:start;min-height:37px;padding:7px 14px 7px 0;border-left:4px solid transparent;opacity:.34;transition:.25s}
+.wtline b{color:var(--ink-muted);text-align:center;font-weight:500}.wtline code{color:var(--mint-mid);white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.55}
+.wtline.active{opacity:1;border-left-color:var(--honey);background:linear-gradient(90deg,color-mix(in srgb,var(--honey) 13%,transparent),transparent);box-shadow:inset 0 0 22px color-mix(in srgb,var(--honey) 5%,transparent)}
+.wtline.active b{color:var(--honey)}.wtline.active code{color:var(--paper-raised);text-shadow:0 0 12px color-mix(in srgb,var(--paper-raised) 20%,transparent)}
+.wtline-status{display:none;align-self:center;margin-left:8px;color:var(--ok);font:800 9px ui-monospace,monospace;white-space:nowrap}.wtline.executed:not(.active){opacity:.62}.wtline.executed:not(.active) .wtline-status{display:block}.wtline.executed:not(.active) code{color:var(--mint-line)}
+.wtside-title small{display:block;margin-top:3px;color:var(--ok);font-size:9px;letter-spacing:.3px;text-transform:none}
+.wtscene{position:relative;height:clamp(250px,42dvh,340px);min-height:250px;display:grid;place-items:center;background:var(--ink);overflow:hidden}
+.wtscene>img{width:100%;height:100%;min-height:0;object-fit:cover;filter:brightness(.72)}
+.wtscene #scenepanel{width:100%;height:100%;max-width:none;margin:0;border:0;border-radius:0;aspect-ratio:auto}
+.wtpip{display:flex;gap:10px;align-items:flex-start;padding:12px}.wtpip .avatar{width:42px;height:42px;flex-basis:42px}.wtpip .bubble{max-width:none;flex:1;padding:10px 12px}.wtexplain{display:block;line-height:1.55}
+.wtmemory{margin:0 12px 12px;padding:9px 12px;border:1px solid color-mix(in srgb,var(--honey) 33%,transparent);border-radius:10px;color:var(--honey-soft);background:color-mix(in srgb,var(--honey) 5%,transparent);font-size:13px}
+.wtcontrols{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.wtcontrols span{color:var(--dim);font-size:12px}.wtcontrols button{flex:0 0 auto;border:0;border-radius:10px;padding:10px 17px;cursor:pointer;font-weight:900;color:var(--ink);background:linear-gradient(180deg,var(--honey-soft),var(--honey));box-shadow:0 0 18px color-mix(in srgb,var(--honey) 33%,transparent)}
+.wtcontrols button[disabled]{cursor:wait;filter:grayscale(.7);box-shadow:none}.wtcontrols.finished button{color:var(--ink);background:var(--ok)}
+@media(max-height:650px) and (min-width:641px){.wtscene{height:160px;min-height:160px}}
+@media(max-width:640px){
+  #book{padding-left:10px;padding-right:10px}
+  .walkthrough{width:100%;max-width:calc(100vw - 20px);scroll-margin-top:66px;border-radius:14px}
+  .wthead{padding:8px 11px;gap:8px}.wthead strong{min-width:0;font-size:13px;line-height:1.25}.wthead span{flex:0 0 auto;font-size:11px}
+  .wtlayout{grid-template-columns:minmax(0,1fr);min-height:0}.wtcode{border-right:0;border-bottom:1px solid var(--line)}.wtobserve-shell{--wt-observe-scale:1!important;overflow:visible}.wtobserve{width:100%;height:auto;transform:none;overflow:visible}
+  .wtside-title{padding:6px 10px;font-size:9px}.wtlines{padding:5px 0}.wtline{grid-template-columns:32px minmax(0,1fr);min-height:29px;padding:4px 9px 4px 0}.wtline code{font-size:12px;line-height:1.4}.wtline-status{grid-column:2;margin:2px 0 0;font-size:8px}
+  .wtscene{min-height:190px;height:190px}.wtscene>img{height:190px;min-height:0}.wtscene #scenepanel{height:190px;min-height:190px;aspect-ratio:auto}
+  .wtpip{padding:8px;gap:7px}.wtpip .avatar{width:34px;height:34px;flex-basis:34px}.wtpip .bubble{padding:7px 9px;font-size:12px}.wtpip .bubble b{font-size:9px}.wtexplain{line-height:1.4}
+  .wtmemory{margin:0 8px 8px;padding:6px 9px;font-size:11px;line-height:1.35}
+  .wtcontrols{position:sticky;bottom:0;z-index:9;align-items:stretch;flex-direction:column;gap:6px;padding:8px 10px}.wtcontrols span{font-size:10px}.wtcontrols button{width:100%;padding:9px 12px;font-size:12px}
+}
+
+/* Deterministic Python code trace: full source on the left, authored state
+   snapshots on the right. The outer shell is sized by code-trace-cell.js. */
+.code-trace{align-self:center;position:relative;width:min(1080px,calc(100vw - 20px));height:auto;margin-top:10px;scroll-margin-top:64px;overflow:visible}
+.ctfit{display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--c) 50%,var(--line));border-radius:18px;overflow:hidden;background:var(--ink);box-shadow:0 18px 50px color-mix(in srgb,var(--ink) 53%,transparent);will-change:transform}
+.cthead{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}.cthead strong{color:var(--paper-raised);letter-spacing:.8px}.cthead span{color:var(--c);font:700 12px ui-monospace,monospace}
+.ctintro{padding:9px 16px;color:var(--txt);background:var(--ink);border-bottom:1px solid var(--line);font-size:13px}
+.ctlayout{display:grid;grid-template-columns:minmax(340px,.95fr) minmax(390px,1.05fr);min-height:0}.ctcode{min-width:0;border-right:1px solid var(--line);background:var(--ink)}.ctobserve{min-width:0;background:var(--ink)}
+.cttitle{padding:8px 12px;color:var(--dim);background:var(--ink);border-bottom:1px solid var(--line);font-size:10px;font-weight:800;letter-spacing:1px}
+.ctpredict{padding:14px 16px}.ctpredict>b{display:block;margin-bottom:8px;color:var(--honey);font:900 10px ui-monospace,monospace;letter-spacing:1px}.ctpredict-q{color:var(--paper-raised);font-weight:800;line-height:1.45}.ctpredict-options{display:grid;gap:7px;margin-top:10px}.ctpredict-option{border:1px solid var(--ink-muted);border-radius:9px;padding:9px 11px;color:var(--mint-mid);background:var(--ink);text-align:left;cursor:pointer;font:700 12px ui-monospace,monospace}.ctpredict-option:hover{border-color:var(--mint-line)}.ctpredict-option.chosen{border-color:var(--honey);background:color-mix(in srgb,var(--honey) 10%,transparent);color:var(--paper-raised)}.ctpredict-option[disabled]:not(.chosen){opacity:.45}
+@media(min-width:641px){.ctpredict-options{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.ctlines{padding:9px 0}.ctline{display:grid;grid-template-columns:36px minmax(0,1fr) auto;align-items:start;min-height:32px;padding:5px 11px 5px 0;border-left:4px solid transparent;opacity:.35}.ctline>b{color:var(--ink-muted);text-align:center;font-weight:500}.ctline>code{color:var(--mint-mid);white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.5}.ctline.active{opacity:1;border-left-color:var(--honey);background:linear-gradient(90deg,color-mix(in srgb,var(--honey) 13%,transparent),transparent)}.ctline.active>b{color:var(--honey)}.ctline-status{display:none;color:var(--ok);font:800 8px ui-monospace,monospace;white-space:nowrap}.ctline.executed:not(.active){opacity:.62}.ctline.executed:not(.active) .ctline-status{display:block}
+.ctvisual{padding:10px 12px}.ctvisual>b{display:block;margin-bottom:7px;color:var(--dim);font:800 9px ui-monospace,monospace;letter-spacing:1px}.ctvalues{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.ctvalue{display:grid;grid-template-columns:1fr auto;gap:4px 8px;padding:9px 10px;border:1px solid var(--ink);border-radius:10px;background:var(--ink);opacity:.5}.ctvalue span{grid-column:1/-1;color:var(--dim);font:800 9px ui-monospace,monospace}.ctvalue strong{color:var(--paper-raised);font:900 18px ui-monospace,monospace}.ctvalue code{align-self:center;padding:3px 7px;border-radius:999px;color:var(--ink);background:var(--mint-line);font:900 10px ui-monospace,monospace}.ctvalue.active{opacity:1;border-color:var(--honey);box-shadow:0 0 18px color-mix(in srgb,var(--honey) 18%,transparent)}.ctvalue.active code{background:var(--honey)}
+.ctvariables{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;padding:0 12px 9px}.ctvariables>div{display:flex;justify-content:space-between;gap:8px;padding:6px 9px;border:1px solid color-mix(in srgb,var(--mint-line) 33%,transparent);border-radius:8px;background:color-mix(in srgb,var(--mint-line) 6%,transparent)}.ctvariables code{color:var(--mint-mid)}.ctvariables strong{color:var(--paper-raised);font-family:ui-monospace,monospace}
+.ctoutput{margin:0 12px 9px;padding:7px 10px;border:1px solid var(--ink);border-radius:9px;background:var(--ink)}.ctoutput b{display:block;color:var(--dim);font:800 9px ui-monospace,monospace}.ctoutput span{display:block;margin-top:3px;color:var(--paper-raised);font:700 12px ui-monospace,monospace}
+.ctpip{display:flex;gap:8px;align-items:flex-start;padding:0 12px 10px}.ctpip .avatar{width:38px;height:38px;flex-basis:38px}.ctpip .bubble{max-width:none;flex:1;padding:8px 10px}.ctpip .bubble span{display:block;line-height:1.45}
+.ctcontrols{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 14px;border-top:1px solid var(--line);background:var(--panel)}.ctcontrols>span{color:var(--dim);font-size:11px}.ctcontrols button{flex:0 0 auto;border:0;border-radius:10px;padding:9px 15px;cursor:pointer;font-weight:900;color:var(--ink);background:linear-gradient(180deg,var(--honey-soft),var(--honey));box-shadow:0 0 18px color-mix(in srgb,var(--honey) 33%,transparent)}.ctcontrols button[disabled]{cursor:wait;filter:grayscale(.7);box-shadow:none}.ctcontrols.finished button{background:var(--ok)}
+@media(max-width:640px){.code-trace{width:100%;max-width:calc(100vw - 20px);scroll-margin-top:66px}.ctfit{border-radius:14px}.cthead{padding:6px 9px}.cthead strong{font-size:12px}.ctintro{padding:4px 8px;font-size:10px}.ctlayout{grid-template-columns:minmax(0,1fr)}.ctcode{border-right:0;border-bottom:1px solid var(--line)}.cttitle{padding:4px 8px;font-size:8px}.ctpredict{padding:6px 8px}.ctpredict>b{margin-bottom:3px;font-size:8px}.ctpredict-q{font-size:10px}.ctpredict-options{gap:3px;margin-top:4px}.ctpredict-option{padding:5px 8px;font-size:10px}.ctlines{padding:3px 0}.ctline{grid-template-columns:27px minmax(0,1fr);min-height:21px;padding:2px 7px 2px 0}.ctline.empty{min-height:4px;padding-top:0;padding-bottom:0}.ctline.empty>b,.ctline.empty code{visibility:hidden}.ctline>code{font-size:10px;line-height:1.3}.ctline-status{grid-column:2;font-size:7px}.ctvisual{padding:5px 8px}.ctvisual>b{margin-bottom:4px}.ctvalues{grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:4px}.ctvalue{padding:5px 7px}.ctvalue strong{font-size:14px}.ctvariables{display:none}.ctoutput{margin:0 8px 4px;padding:4px 7px}.ctpip{padding:0 8px 5px}.ctpip .avatar{width:28px;height:28px;flex-basis:28px}.ctpip .bubble{padding:5px 7px;font-size:10px}.ctcontrols{padding:5px 8px;gap:5px}.ctcontrols>span{font-size:8px}.ctcontrols button{padding:7px 9px;font-size:10px}}
+
+/* Program-counter machine. Unlike walkthrough, this does not pretend to run
+   Python source line by line: each click advances one real card-machine step. */
+.program-counter{align-self:center;position:relative;width:min(1040px,calc(100vw - 20px));height:auto;margin-top:10px;scroll-margin-top:64px;overflow:visible}
+.pcfit{display:flex;flex-direction:column;border:1px solid color-mix(in srgb,var(--c) 50%,var(--line));border-radius:18px;overflow:hidden;background:var(--ink);box-shadow:0 18px 50px color-mix(in srgb,var(--ink) 53%,transparent);will-change:transform}
+.program-counter [hidden]{display:none!important}
+.pchead{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.pchead strong{color:var(--paper-raised);letter-spacing:.8px}.pchead span{color:var(--c);font:700 12px ui-monospace,monospace}
+.pcintro{padding:10px 16px;color:var(--txt);background:var(--ink);border-bottom:1px solid var(--line);font-size:13px}
+.pchistory{display:grid;grid-template-columns:minmax(310px,.85fr) minmax(380px,1.15fr);gap:14px;padding:12px 16px;border-bottom:1px solid var(--line);background:linear-gradient(135deg,var(--ink),var(--ink))}
+.pchistory-art{display:flex;align-items:center;justify-content:center;gap:12px;min-width:0}.punch-card-sample{position:relative;width:min(270px,100%);padding:12px 14px 9px;border-radius:7px 7px 13px 7px;color:var(--honey-ink);background:var(--honey);box-shadow:0 7px 18px color-mix(in srgb,var(--ink) 47%,transparent),inset 0 0 0 1px var(--honey-soft);transform:rotate(-1.5deg)}
+.punch-card-sample:after{content:"";position:absolute;right:0;bottom:0;border-style:solid;border-width:0 0 17px 17px;border-color:transparent transparent var(--ink-muted) transparent}.punch-card-sample>b{display:block;margin-bottom:7px;font:900 10px ui-monospace,monospace;letter-spacing:1px}.punch-card-sample small{display:block;margin-top:5px;font:700 8px ui-monospace,monospace;text-transform:uppercase;letter-spacing:.8px;opacity:.65}
+.punch-holes{display:grid;grid-template-columns:repeat(10,1fr);gap:4px}.punch-holes i,.pccard-holes i{display:block;aspect-ratio:1;border:1px solid var(--ink-muted);border-radius:2px;background:var(--honey-line)}.punch-holes i.punched,.pccard-holes i.punched{border-color:var(--ink);background:var(--ink);box-shadow:inset 0 1px 2px var(--ink),0 1px var(--paper-warm)}.punch-feed{flex:0 0 auto;color:var(--honey);font:900 10px ui-monospace,monospace;letter-spacing:1px}
+.pchistory-copy{display:flex;flex-direction:column;justify-content:center;gap:5px}.pchistory-copy>b{color:var(--honey);font-size:13px}.pchistory-copy>span{color:var(--txt);font-size:12px;line-height:1.45}.pchistory-copy>em{color:var(--mint-line);font-size:10px;line-height:1.4}
+.pclayout{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(390px,1.1fr);min-height:0;overflow:visible;flex:0 0 auto}
+.pcprogram,.pcmachine{min-width:0;min-height:0;overflow:visible}.pcprogram{border-right:1px solid var(--line);background:var(--ink)}.pcmachine{background:var(--ink)}
+.pctitle{padding:9px 13px;color:var(--dim);background:var(--ink);border-bottom:1px solid var(--line);font-size:11px;font-weight:800;letter-spacing:1px}
+.pcpredict{padding:14px 16px}.pcpredict>b{display:block;margin-bottom:8px;color:var(--honey);font:900 10px ui-monospace,monospace;letter-spacing:1px}.pcpredict-q{color:var(--paper-raised);font-weight:800;line-height:1.45}.pcpredict-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px}.pcpredict-option{border:1px solid var(--ink-muted);border-radius:9px;padding:9px 11px;color:var(--mint-mid);background:var(--ink);text-align:left;cursor:pointer;font:700 12px ui-monospace,monospace}.pcpredict-option:hover{border-color:var(--mint-line)}.pcpredict-option.chosen{border-color:var(--honey);background:color-mix(in srgb,var(--honey) 10%,transparent);color:var(--paper-raised)}.pcpredict-option[disabled]:not(.chosen){opacity:.45}
+.pccards{display:grid;gap:10px;padding:14px}.pccard{position:relative;overflow:hidden;border:1px solid var(--ink-muted);border-radius:8px 8px 14px 8px;color:var(--honey-ink);background:var(--honey);opacity:.48;transition:.25s;box-shadow:0 5px 14px color-mix(in srgb,var(--ink) 33%,transparent)}
+.pccard:after{content:"";position:absolute;right:0;bottom:0;border-style:solid;border-width:0 0 15px 15px;border-color:transparent transparent var(--ink-muted) transparent}.pccard-holes{display:grid!important;grid-template-columns:repeat(12,1fr)!important;gap:3px;padding:6px 9px!important;border:0!important;background:var(--honey)}.pccard-holes i{min-width:0}.pccard-holes i.punched{background:var(--ink);border-color:var(--ink)}
+.pccard>b{display:block;padding:7px 11px;color:var(--honey-ink);background:var(--honey);border-top:1px dashed var(--ink-muted);border-bottom:1px solid var(--honey-line);font-size:12px;letter-spacing:1px}
+.pccard>div{display:grid;grid-template-columns:72px minmax(0,1fr);align-items:center;padding:7px 11px}.pccard>div+div{border-top:1px dashed var(--ink)}
+.pccard span{color:var(--honey-ink);font:800 10px ui-monospace,monospace}.pccard code{color:var(--ink);font:800 14px ui-monospace,monospace}
+.pccard.active{opacity:1;border-color:var(--honey-soft);transform:translateX(4px);box-shadow:0 0 0 2px var(--honey),0 0 28px color-mix(in srgb,var(--honey) 27%,transparent)}.pccard.active>b{color:var(--ink);background:var(--honey)}
+.pccard.test-card>b{background:var(--mint-mid)}.pccard.action-card>b{background:var(--mint-mid)}.pccard.test-card.active>b,.pccard.action-card.active>b{background:var(--honey)}
+.pccycle{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:12px}.pccycle span{padding:7px 4px;border:1px solid var(--ink);border-radius:8px;color:var(--ink-muted);text-align:center;font:800 9px ui-monospace,monospace}
+.pccycle span.next{border-color:var(--ink-muted);color:var(--mint-mid)}.pccycle span.active{border-color:var(--honey);color:var(--ink);background:var(--honey);box-shadow:0 0 16px color-mix(in srgb,var(--honey) 33%,transparent)}
+.pcstate{margin:0 12px 10px;padding:12px;border:1px solid color-mix(in srgb,var(--mint-line) 40%,transparent);border-radius:12px;background:color-mix(in srgb,var(--mint-line) 5%,transparent);text-align:center}.pcstate span,.pcoutput>span{display:block;color:var(--dim);font:800 9px ui-monospace,monospace;letter-spacing:1px}.pcstate strong{display:block;margin-top:4px;color:var(--mint-line);font:900 28px ui-monospace,monospace}.pcstate.end{border-color:var(--mint-line)}.pcstate.end strong{color:var(--mint-line)}
+.pcmemory{margin:-3px 12px 10px;padding:7px 10px;border:1px solid color-mix(in srgb,var(--mint-line) 40%,transparent);border-radius:9px;color:var(--mint-mid);background:color-mix(in srgb,var(--mint-line) 7%,transparent);font:800 11px ui-monospace,monospace}
+.pcoutput{margin:0 12px 10px;padding:10px 12px;border:1px solid var(--ink);border-radius:10px;background:var(--ink)}.pcoutput>div{min-height:20px;margin-top:5px;color:var(--paper-raised);font:700 14px ui-monospace,monospace}
+.pcpip{display:flex;gap:9px;align-items:flex-start;padding:0 12px 12px}.pcpip .avatar{width:40px;height:40px;flex-basis:40px}.pcpip .bubble{max-width:none;flex:1;padding:9px 11px}.pcpip .bubble span{display:block;line-height:1.45}
+.pccontrols{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.pccontrols>span{color:var(--dim);font-size:12px}.pccontrols button{flex:0 0 auto;border:0;border-radius:10px;padding:10px 17px;cursor:pointer;font-weight:900;color:var(--ink);background:linear-gradient(180deg,var(--honey-soft),var(--honey));box-shadow:0 0 18px color-mix(in srgb,var(--honey) 33%,transparent)}.pccontrols button[disabled]{cursor:wait;filter:grayscale(.7);box-shadow:none}.pccontrols.finished button{color:var(--ink);background:var(--ok)}
+@media(max-height:650px) and (min-width:641px){.pccards{grid-template-columns:repeat(2,minmax(0,1fr));padding:9px}.pccard>div{padding:5px 8px}.pcpip{padding-bottom:8px}}
+@media(max-width:640px){
+  .program-counter{width:100%;max-width:calc(100vw - 20px);scroll-margin-top:66px}.pcfit{border-radius:14px}.pchead{padding:8px 11px}.pchead strong{font-size:13px}.pcintro{padding:7px 10px;font-size:11px}
+  .pchistory{grid-template-columns:minmax(0,1fr);gap:8px;padding:9px 10px}.pchistory-art{gap:7px}.punch-card-sample{width:min(245px,82%);padding:9px 10px 7px}.pchistory-copy>b{font-size:12px}.pchistory-copy>span{font-size:11px}.pchistory-copy>em{font-size:9px}
+  .pclayout{grid-template-columns:minmax(0,1fr);overflow:visible}.pcprogram{border-right:0;border-bottom:1px solid var(--line);overflow:visible}.pcmachine{overflow:visible}.pctitle{padding:6px 10px;font-size:9px}
+  .pcpredict{padding:7px 9px}.pcpredict>b{margin-bottom:4px;font-size:8px}.pcpredict-q{font-size:10px}.pcpredict-options{grid-template-columns:minmax(0,1fr);gap:3px;margin-top:5px}.pcpredict-option{padding:5px 8px;font-size:10px}
+  .pccards{grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px;padding:8px}.pccard>div{grid-template-columns:57px minmax(0,1fr);padding:5px 8px}.pccard>b{padding:5px 8px}.pccard code{font-size:12px}
+  .pccycle{gap:3px;padding:8px}.pccycle span{padding:5px 2px;font-size:7px}.pcstate{margin:0 8px 7px;padding:7px}.pcstate strong{font-size:22px}.pcoutput{margin:0 8px 7px;padding:7px 9px}.pcoutput>div{font-size:12px}
+  .pcmemory{margin:-1px 8px 7px;padding:5px 7px;font-size:9px}
+  .pcpip{padding:0 8px 5px;gap:6px}.pcpip .avatar{width:28px;height:28px;flex-basis:28px}.pcpip .bubble{padding:5px 8px;font-size:10px}.pcpip .bubble b{font-size:8px}
+  .pccontrols{position:sticky;bottom:0;z-index:9;align-items:stretch;flex-direction:column;gap:4px;padding:6px 9px}.pccontrols>span{font-size:9px}.pccontrols button{width:100%;padding:8px 11px;font-size:11px}
+}
+/* fx-pixel theme (BLOOM): the DOM burst goes chunky too — square sparks, hard wave */
+:root.fx-pixel .bspark{border-radius:0}
+:root.fx-pixel .bwave{border-radius:6px}
+#rstat{color:var(--warm);letter-spacing:2px;font-size:12px;min-height:18px;margin-bottom:12px}
+#rgate{width:250px;height:8px;margin:0 auto 24px;border-radius:8px;background:var(--ink);overflow:hidden}
+#rgate i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--c),var(--paper-raised));box-shadow:0 0 12px var(--c)}
+#rgate.gone{display:none}
+#ritualOverlay.sealing .actin{animation:rshake .55s ease}
+@keyframes rshake{0%,100%{transform:none}20%{transform:translate(-10px,5px)}40%{transform:translate(9px,-7px)}
+                  60%{transform:translate(-7px,-4px)}80%{transform:translate(6px,3px)}}
+.rrings{position:absolute;left:50%;top:50%;width:420px;height:420px;transform:translate(-50%,-50%);pointer-events:none;
+        opacity:calc(.45 + var(--rc)*.55);filter:brightness(calc(1 + var(--rc)*2))}
+.rring{position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg,transparent,color-mix(in srgb,var(--c) 40%,transparent),transparent 40%,color-mix(in srgb,var(--c2) 30%,transparent) 60%,transparent 78%);
+  -webkit-mask:radial-gradient(circle,transparent 30%,var(--ink) 34%,var(--ink) 60%,transparent 72%);
+  mask:radial-gradient(circle,transparent 30%,var(--ink) 34%,var(--ink) 60%,transparent 72%);animation:spin 6s linear infinite}
+.rring.b{inset:58px;opacity:.7;animation-duration:3.8s;animation-direction:reverse}
+.rgesture{font-size:96px;line-height:1;filter:drop-shadow(0 0 26px var(--c));
+          transform:scale(calc(1 + var(--rc)*.3));transition:transform .15s linear}
+.rprompt{margin:14px 0 12px;color:var(--txt);letter-spacing:3px;font-weight:700;display:inline-block;
+        padding:5px 16px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+#holdBtn{position:relative;width:120px;height:120px;border-radius:50%;border:2px solid var(--c);cursor:pointer;overflow:hidden;
+         background:color-mix(in srgb,var(--ink) 70%,transparent);color:var(--c);font-weight:900;letter-spacing:2px;font-size:14px;
+         box-shadow:0 0 30px color-mix(in srgb,var(--c) 40%,transparent);touch-action:none;user-select:none}
+#holdBtn i{position:absolute;left:0;right:0;bottom:0;height:0;background:color-mix(in srgb,var(--c) 45%,transparent);transition:height .05s linear}
+#holdBtn span{position:relative}
+.rdone{font-size:30px;font-weight:900;letter-spacing:4px;color:var(--paper-raised);text-shadow:0 0 34px var(--c);animation:cardin .6s ease;display:inline-block;
+      padding:8px 22px;border-radius:18px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.rflash{position:absolute;inset:0;background:var(--paper-raised);opacity:0;pointer-events:none}
+.rflash.go{animation:flash .9s ease}
+@keyframes flash{0%{opacity:0}18%{opacity:.95}100%{opacity:0}}
+
+/* ── BEGIN ritual word-choice (KICKOFF-PLAN.md Part B) ──
+   The pre-seal question, rendered inside #ritualOverlay by
+   ritual-controller.js. Reuses quiz-cell's .qopt/.qn/.qfill/.qburst/.nope/
+   .yes styling as-is (see the quiz-cell block above) so the answer buttons
+   look and animate identically to a quiz question — only this wrapper
+   (.rchoice/.rcq/.rchint) is new, ritual-themed. While .choicephase is on
+   the overlay, the seal's own gesture glyph/prompt/rings/gate hide — the
+   choice question stands in their place until the correct pick resolves. */
+.rchoice{position:relative;margin-bottom:6px}
+.rcq{font-size:17px;font-weight:700;color:var(--paper-raised);margin-bottom:16px;text-shadow:0 0 18px color-mix(in srgb,var(--c) 40%,transparent);display:inline-block;
+    padding:8px 18px;border-radius:14px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+.rchint{margin-top:12px;color:var(--dim);font-size:11.5px;letter-spacing:1px;display:inline-block;
+       padding:3px 12px;border-radius:12px;background:color-mix(in srgb,var(--ink) 78%,transparent);backdrop-filter:blur(2px)}
+#ritualOverlay.choicephase .rrings,#ritualOverlay.choicephase .rgesture,
+#ritualOverlay.choicephase .rprompt,#ritualOverlay.choicephase #rgate{display:none}
+/* ── END ritual word-choice ── */
+
+/* cheat dev stage: the fx panel floated over an act (book not entered yet) */
+#scenepanel.devstage{position:fixed;right:14px;top:64px;width:420px;z-index:55;margin:0;
+  box-shadow:0 10px 40px color-mix(in srgb,var(--ink) 60%,transparent)}
+
+/* cheat/dev panel: type "pip" or open with #cheat */
+#cheat{position:fixed;left:12px;bottom:12px;z-index:60;display:flex;flex-direction:column;gap:4px;
+  padding:10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--warm) 50%,transparent);
+  background:color-mix(in srgb,var(--ink) 94%,transparent);box-shadow:0 6px 26px color-mix(in srgb,var(--ink) 50%,transparent)}
+#cheat b{color:var(--warm);font-size:10px;letter-spacing:3px;margin-bottom:2px}
+#cheat button{padding:5px 12px;border-radius:8px;cursor:pointer;text-align:left;font:600 11.5px "Cascadia Code",Consolas,monospace;
+  color:var(--txt);background:var(--panel);border:1px solid var(--line)}
+#cheat button:hover{border-color:var(--warm);color:var(--paper-raised)}
+
+.toast{position:fixed;left:50%;bottom:36px;transform:translateX(-50%) translateY(12px);opacity:0;z-index:30;
+       padding:10px 20px;border:1px solid var(--line);border-radius:22px;background:color-mix(in srgb,var(--ink) 92%,transparent);
+       color:var(--warm);font-size:13px;pointer-events:none;transition:.3s}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.warn{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:40px;background:var(--ink);color:var(--warm);z-index:40}
+.warn code{background:var(--ink);padding:2px 8px;border-radius:6px;color:var(--c)}
+
+/* ── gesture-feel juice (2026-07-04, swipe/track "laggy/unfun" fix) — own
+   block, does not touch/interleave any other author's CSS ──
+   1. .qtarget magnetism: a drifting track chip glows/scales as the smoothed
+      fingertip nears it (quiz-cell.js sets --near 0..1 + toggles .near). */
+.qtarget{transition:box-shadow .2s,transform .15s}
+.qtarget.near{transform:translate(-50%,-50%) scale(calc(1 + var(--near,0) * .18));
+  box-shadow:0 0 calc(10px + var(--near,0) * 22px) color-mix(in srgb,var(--c) calc(30% + var(--near,0) * 40%),transparent)}
+/* 2. swipe capture-open affordance: pulse the ◀/▶ arrows once CAPTURE opens
+      (boss-fight.js#armSwipe toggles .capturing on .qopts.swipe). */
+.qopts.swipe.capturing .swipeleft .qn,.qopts.swipe.capturing .swiperight .qn{animation:gArrowPulse .6s ease-in-out infinite}
+@keyframes gArrowPulse{0%,100%{opacity:.65;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
+/* 3. slash-trail FX (gesture-ui.js#flashSlash): one-shot streak across the
+      camera chip in the resolved swipe direction, self-removing. */
+.gslash{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.gslash::after{content:'';position:absolute;top:50%;left:50%;width:160%;height:3px;
+  background:linear-gradient(90deg,transparent,var(--c),transparent);
+  box-shadow:0 0 10px var(--c);animation:gSlashMove .38s ease-out forwards}
+.gslash-left::after{transform:translate(-50%,-50%) rotate(0deg) scaleX(-1)}
+.gslash-right::after{transform:translate(-50%,-50%) rotate(0deg)}
+.gslash-up::after{transform:translate(-50%,-50%) rotate(-90deg)}
+.gslash-down::after{transform:translate(-50%,-50%) rotate(90deg)}
+@keyframes gSlashMove{0%{opacity:0}25%{opacity:1}100%{opacity:0}}
+/* ── END gesture-feel juice ── */
+
+/* === track gesture fix (centroid + trail + bigger chips) ===
+   Owner bug report: hovering a fingertip on a drifting track-quiz answer
+   didn't register (had to move the whole hand); chips were too small; the
+   single tracked fingertip was too jittery. Non-CSS half of the fix lives in
+   JS: handCentroid (gesture-math.js) is now fed to both the hit-test
+   (two-phase-gate.js#makeTrackCapture) and the on-screen dot/trail
+   (gesture-ui.js#armScreenFingertipDot), and TRACK_CATCH_RADIUS was widened
+   (constants.js). This block only enlarges .qtarget (later rule of the same
+   specificity overrides the base declaration above it) — verified it still
+   fits on-screen at 1366x768 and 1920x1080 given trackPos()'s drift
+   amplitude (±0.20/±0.06 normalized around 0.5/0.62). Surgical, no other
+   selectors touched here. */
+.qtarget{padding:20px 32px;border-radius:32px;font-size:20px;min-width:96px;min-height:56px;
+  display:flex;align-items:center;justify-content:center;text-align:center}
+@media (max-width:1400px){.qtarget{padding:16px 26px;font-size:17px;min-width:80px;min-height:48px}}
+/* === end track gesture fix === */
+
+/* ══════════════════════════════════════════════════════════════════════
+   THỢ RÈN + BOM MẬT NGỮ (FORGE-PLAN.md) — own block, surgical edits only.
+   1. .forgecell — the anvil/blacksmith screen (engine/forge-cell.js).
+   2. .bbomb + .bombsweep/.bombdmg — boss arena's 💣 deploy control + the
+      "bùm chéo" diagonal sweep FX (engine/boss-fight.js#deployBomb).
+   ══════════════════════════════════════════════════════════════════════ */
+/* FULLSCREEN ARENA (owner: "lò rèn cần riêng một màn hình, tận dụng hết diện
+   tích" — same fixed-overlay trick as .bosscell/ritual, dedicated to the
+   forge, not squeezed in the notebook column). .done reverts it to an
+   in-flow summary card once finish() completes (mirrors .bosscell.done). */
+.forgecell{position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;
+  justify-content:safe center;gap:14px;padding:min(6vh,40px) 18px;text-align:center;overflow-y:auto;--heat:0;--strikep:0;
+  background:radial-gradient(1400px 900px at 50% 0%,color-mix(in srgb,var(--warm) 10%,var(--panel2)),var(--panel2))}
+.forgecell>*{flex-shrink:0}
+.forgecell.done{position:static;padding:26px 18px;border-radius:16px;overflow:visible;min-height:0;justify-content:flex-start;
+  border:1px solid color-mix(in srgb,var(--warm) 40%,var(--line));
+  background:radial-gradient(620px 340px at 50% 0%,color-mix(in srgb,var(--warm) 9%,var(--panel2)),var(--panel2))}
+.forgehead{font-size:26px}
+.forgeexplain{max-width:44em}
+.forgecell.done .forgehead{font-size:15px}
+.forgehead{font-weight:800;letter-spacing:2px;color:var(--warm);font-size:15px}
+.anvilwrap{position:relative;width:180px;height:180px;display:flex;align-items:center;justify-content:center}
+.forgecell.done .anvilwrap{width:120px;height:120px}
+/* --heat 0→1 (one bump per cleared forge question, forge-cell.js#setHeat):
+   the fire behind the anvil grows + the anvil's glow builds; --strikep is the
+   live ✋-hold charge — swell + shake like winding up a hammer blow. */
+.forgefire{position:absolute;left:50%;bottom:2px;width:96px;height:96px;pointer-events:none;
+  transform:translateX(-50%) scale(calc(.35 + .95*var(--heat) + .35*var(--strikep)));transform-origin:50% 92%;
+  border-radius:50% 50% 44% 44%;filter:blur(5px);opacity:calc(.10 + .9*var(--heat));
+  background:radial-gradient(ellipse 52% 64% at 50% 80%,var(--paper-warm) 0%,var(--honey) 34%,var(--honey-line) 60%,transparent 80%);
+  transition:opacity .9s ease,transform .9s ease;  /* post-forge cooldown (setHeat(0)) fades the fire out instead of snapping */
+  animation:fireFlick 1.1s ease-in-out infinite}
+@keyframes fireFlick{0%,100%{filter:blur(5px) brightness(1)}35%{filter:blur(6px) brightness(1.28)}70%{filter:blur(4px) brightness(.88)}}
+.anvil{position:relative;z-index:1;font-size:64px;cursor:pointer;transition:transform .15s;
+  transform:scale(calc(1 + .08*var(--heat) + .16*var(--strikep)));
+  filter:drop-shadow(0 0 10px color-mix(in srgb,var(--warm) 50%,transparent)) drop-shadow(0 0 calc(28px*var(--heat) + 22px*var(--strikep)) var(--warm))}
+.anvil:active{transform:scale(.92)}
+/* leveled anvil art (assets/anvil-0..3.png swapped by --heat in forge-cell.js);
+   ⚒️ emoji is the .noimg fallback only */
+.anvil .animg{width:104px;height:auto;display:block;transition:filter .3s}
+.anvil .aemoji{display:none}
+.anvil.noimg .aemoji{display:inline}
+.forgecell.striking .anvilwrap{animation:strikeShake .16s linear infinite}
+@keyframes strikeShake{0%,100%{transform:translate(0,0)}25%{transform:translate(1.5px,-1px)}50%{transform:translate(-1.5px,1px)}75%{transform:translate(1px,1.5px)}}
+/* .fhit — the per-correct-answer SUCCESS BEAT (forge-cell.js#forgeHit): fire
+   flares PAST its new level then settles, anvil clang-bounces, embers
+   fountain up, "+LỬA" pops. Restartable (class removed/re-added). */
+.forgecell.fhit .forgefire{animation:fireFlick 1.1s ease-in-out infinite,fireFlare .55s ease-out}
+@keyframes fireFlare{0%{opacity:1;scale:1.05}22%{opacity:1;scale:1.55}100%{scale:1}}
+.forgecell.fhit .anvil{animation:anvilClang .45s cubic-bezier(.2,2.4,.4,1)}
+@keyframes anvilClang{0%{translate:0 0}18%{translate:0 7px}45%{translate:0 -5px}100%{translate:0 0}}
+.femberburst{position:absolute;left:50%;top:58%;width:0;height:0;pointer-events:none;z-index:2}
+.femberburst i{position:absolute;width:5px;height:5px;border-radius:50%;background:var(--honey);
+  box-shadow:0 0 8px var(--honey-line),0 0 3px var(--paper-raised);animation:femberFly .95s ease-out forwards;opacity:0}
+@keyframes femberFly{0%{transform:translate(0,0) scale(1.15);opacity:1}
+  70%{opacity:.95}100%{transform:translate(var(--dx),var(--dy)) scale(.25);opacity:0}}
+.fpop{position:absolute;left:50%;top:8px;transform:translateX(-50%);white-space:nowrap;pointer-events:none;z-index:3;
+  font:800 15px inherit;color:var(--honey);text-shadow:0 0 12px var(--honey-line);animation:fpopRise .9s ease-out forwards}
+@keyframes fpopRise{0%{opacity:0;translate:0 10px;scale:.7}18%{opacity:1;scale:1.18}100%{opacity:0;translate:0 -26px;scale:1}}
+/* .bombreveal — forge-success ceremony (forge-cell.js#revealBomb): the
+   rune-bomb art materializes out of the anvil, hovers glowing, then DOCKS
+   beside the (now cooling) anvil and stays as the forged reward on display. */
+.bombreveal{position:absolute;left:50%;top:50%;z-index:4;pointer-events:none;transform:translate(-50%,-50%);font-size:56px}
+.bombreveal img{width:112px;height:112px;object-fit:contain;display:block;
+  filter:drop-shadow(0 0 24px var(--mint-line)) drop-shadow(0 0 10px var(--mint-line));
+  animation:bombReveal 1.25s cubic-bezier(.2,.9,.3,1) forwards}
+@keyframes bombReveal{0%{opacity:0;transform:scale(.15) rotate(-40deg) translateY(12px)}
+  26%{opacity:1;transform:scale(1.28) rotate(9deg) translateY(-28px)}
+  70%{transform:scale(1.04) rotate(-5deg) translateY(-36px)}
+  100%{opacity:1;transform:scale(1.1) translateY(-32px)}}
+.bombreveal.dock img{animation:bombDock .65s cubic-bezier(.45,1.35,.55,1) forwards}
+@keyframes bombDock{0%{opacity:1;transform:scale(1.1) translateY(-32px)}
+  100%{opacity:1;transform:translate(86px,10px) scale(.58);filter:drop-shadow(0 0 12px var(--mint-line))}}
+/* .fanswerfly — a glowing copy of the picked answer arcing into the anvil
+   fire (forge-cell.js#flyToAnvil v3): moves via TRANSFORM transition
+   (compositor-smooth, no layout churn); .ftrailcv is the one-canvas comet
+   tail drawn behind it. */
+.fanswerfly{position:fixed;z-index:60;pointer-events:none;transform:translate(-50%,-50%);will-change:transform;
+  color:var(--honey);font:700 13px inherit;text-shadow:0 0 12px var(--honey-line),0 0 4px var(--paper-raised);max-width:40vw;white-space:nowrap;overflow:hidden;
+  transition:transform .45s cubic-bezier(.55,-.15,.85,.5),opacity .45s ease-in}
+.fanswerfly.go{opacity:.25}
+.ftrailcv{position:fixed;inset:0;z-index:59;pointer-events:none}
+.fpip{font-style:normal;font-size:15px;margin:0 1px;filter:grayscale(1) brightness(.5);opacity:.45;transition:filter .3s,opacity .3s}
+.fpip.lit{filter:none;opacity:1;text-shadow:0 0 8px var(--honey-line)}
+.fbombs{margin-left:8px;color:var(--dim)}
+.forgecell.forged .anvil{animation:forgeGlow 1.1s ease-out}
+@keyframes forgeGlow{0%{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--warm) 50%,transparent))}
+  40%{filter:drop-shadow(0 0 34px var(--warm)) brightness(1.6)}
+  100%{filter:drop-shadow(0 0 10px color-mix(in srgb,var(--warm) 50%,transparent))}}
+.forgestat{color:var(--dim);font-size:12.5px;letter-spacing:.5px}
+/* .fshelf — the collected-badge fuel rack (forge-cell.js#paintShelf):
+   crest art pops in staggered; spent badges burn out grey but stay. */
+.fshelf{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:36px}
+.fshelf .fbadge{width:36px;height:36px;object-fit:contain;opacity:0;transform:scale(.3);
+  filter:drop-shadow(0 0 7px color-mix(in srgb,var(--mint-line) 55%,transparent));animation:fbadgeIn .5s cubic-bezier(.4,1.6,.6,1) forwards}
+@keyframes fbadgeIn{to{opacity:1;transform:scale(1)}}
+.fshelf .fbadge.spent{animation:none;opacity:.32;transform:scale(.85);
+  filter:grayscale(1) brightness(.45);transition:filter .7s,opacity .7s,transform .7s}
+.frune{position:fixed;z-index:61;pointer-events:none;font-size:21px;color:var(--honey-soft);
+  text-shadow:0 0 10px var(--honey-line),0 0 4px var(--paper-raised);transform:translate(-50%,-50%);will-change:transform,opacity}
+.frune.rainbow{animation:runeRainbow 1.2s linear infinite}
+@keyframes runeRainbow{0%{filter:hue-rotate(0deg) brightness(1.35)}50%{filter:hue-rotate(180deg) brightness(1.8)}100%{filter:hue-rotate(360deg) brightness(1.35)}}
+.forgehint{color:var(--txt);font-size:12.5px}
+.forgemsg{min-height:24px;font-size:13px}
+.ffail{color:var(--warm);font-weight:600}
+.fpractice{display:flex;flex-direction:column;align-items:center;gap:8px}
+.fpq{font-weight:600}
+.fpopts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.fpopt{padding:7px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--txt);
+  cursor:pointer;font:600 12.5px inherit}
+.fpopt:hover{border-color:var(--c)}
+.fpopt.yes{border-color:var(--ok);color:var(--ok);box-shadow:0 0 12px color-mix(in srgb,var(--ok) 40%,transparent)}
+.fpopt.nope{animation:fpShake .3s}
+@keyframes fpShake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.forgebtns{margin-top:4px}
+.fbtn{padding:6px 16px;border-radius:20px;border:1px solid var(--line);background:transparent;color:var(--dim);
+  cursor:pointer;font:600 11.5px inherit}
+.fbtn:hover{color:var(--txt);border-color:var(--dim)}
+
+/* boss arena bomb control — sits beside .bwands in .btop (boss-fight.js) */
+.bbomb{padding:6px 14px;border-radius:20px;border:1px solid var(--warm);background:color-mix(in srgb,var(--warm) 16%,var(--panel));
+  color:var(--warm);font:700 12px inherit;cursor:pointer;letter-spacing:.3px}
+.bbomb:hover{background:color-mix(in srgb,var(--warm) 30%,var(--panel))}
+.bbomb.gone{display:none}
+/* EXPOSED reframe (owner 2026-07-04): once the boss is ground down low the
+   bomb is pitched as THE finisher — pulse it so it reads as "use me now". */
+.bbomb.examine{animation:bombExamine 1s ease-in-out infinite}
+@keyframes bombExamine{0%,100%{box-shadow:0 0 0 color-mix(in srgb,var(--warm) 0%,transparent);transform:scale(1)}
+  50%{box-shadow:0 0 18px color-mix(in srgb,var(--warm) 80%,transparent);transform:scale(1.06)}}
+.bexposed{font-size:14px;font-weight:800;letter-spacing:1.5px;color:var(--warm);text-shadow:0 0 14px color-mix(in srgb,var(--warm) 60%,transparent);
+  margin:8px 0;animation:hintpulse 1.4s ease-in-out infinite}
+/* "bùm chéo" — a diagonal light streak sweeps the whole arena + a shake,
+   layered on top of the existing hit-flash/spark FX (self-removing). */
+.bosscell.bombsweep::before{content:'';position:fixed;inset:-20%;z-index:45;pointer-events:none;opacity:0;
+  background:linear-gradient(135deg,transparent 42%,color-mix(in srgb,var(--warm) 85%,var(--paper-raised)) 50%,transparent 58%);
+  animation:bombSweep .5s ease-out forwards}
+.bosscell.bombsweep .barenain{animation:bombShake .45s}
+@keyframes bombSweep{0%{opacity:0;transform:translate(-30%,-30%)}30%{opacity:1}100%{opacity:0;transform:translate(30%,30%)}}
+@keyframes bombShake{0%,100%{transform:translate(0,0)}20%{transform:translate(-8px,4px)}40%{transform:translate(7px,-5px)}
+  60%{transform:translate(-6px,-3px)}80%{transform:translate(5px,4px)}}
+.bfloat.bombdmg{color:var(--warm)}
+/* KO detonation (boss-fight.js#detonate/#koImpact — the bomb-hover/launch/
+   flash/sweep choreography CSS lives in boss-fight.js#injectBossCss):
+   .kowave.fire/.ice are the two expanding shockwave rings at impact; the
+   fireburst/iceburst sparkBurst variants recolor .qburst embers (round fire
+   motes vs long ice slivers); .kolock blanches the boss at target-lock. */
+.kowave{position:fixed;left:50%;top:46%;width:64px;height:64px;z-index:45;pointer-events:none;border-radius:50%;
+  transform:translate(-50%,-50%) scale(0);opacity:0}
+.kowave.fire{border:4px solid var(--honey-line);box-shadow:0 0 34px var(--honey-line),inset 0 0 22px var(--honey-line);animation:kowaveGrow .85s ease-out forwards}
+.kowave.ice{border:3px solid var(--mint-mid);box-shadow:0 0 28px var(--mint-line),inset 0 0 18px var(--mint-line);animation:kowaveGrow .95s ease-out .12s forwards}
+@keyframes kowaveGrow{0%{transform:translate(-50%,-50%) scale(0);opacity:1}100%{transform:translate(-50%,-50%) scale(9);opacity:0}}
+.qburst.fireburst i{background:var(--honey);box-shadow:0 0 10px var(--honey-line),0 0 3px var(--paper-raised)}
+.qburst.iceburst i{width:3px;height:12px;border-radius:2px;background:linear-gradient(var(--mint-soft),var(--mint-line));box-shadow:0 0 9px var(--mint-line)}
+.kolock{animation:kolockPing .42s ease-out}
+@keyframes kolockPing{0%{filter:brightness(2.6) saturate(.15)}60%{filter:brightness(1.5) saturate(.6)}100%{filter:none}}
+/* ── END THỢ RÈN + BOM MẬT NGỮ ── */
+
+/* ══ PROSE TYPOGRAPHY OVERHAUL (owner 2026-07-05: "code hiển thị cần rà
+   soát toàn bộ — font chữ, tool/lib") — engine/prose.js's renderProse()
+   output. `.ic` = an inline `code` chip (npc/remember/quiz/checkpoint/gift
+   text); `.cb` = a fenced ```block``` rendered as a real code panel. Also
+   nudges prose line-height/size up slightly across the dark theme (owner:
+   "văn phong ok nhưng hiển thị và font chưa ok") — still dense, just less
+   cramped. Own block, additive only. ══ */
+body{font-size:14.5px;line-height:1.6}
+.ic{font-family:"Cascadia Code",Consolas,ui-monospace,monospace;font-size:.92em;
+  color:var(--mint-mid);background:color-mix(in srgb,var(--c) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--c) 22%,transparent);
+  border-radius:5px;padding:1px 6px;white-space:pre-wrap;word-break:break-word}
+.cb{display:block;margin:8px 0;padding:12px 14px;border-radius:10px;
+  background:var(--panel2);border:1px solid var(--line);
+  overflow-x:auto;max-width:100%;text-align:left;
+  box-shadow:inset 0 1px 0 color-mix(in srgb,var(--paper-raised) 4%,transparent)}
+.cb code{font-family:"Cascadia Code",Consolas,ui-monospace,monospace;font-size:13px;line-height:1.55;
+  display:block;color:var(--mint-mid);white-space:pre-wrap;overflow-wrap:break-word;background:none;border:none;padding:0;
+  font-weight:500;letter-spacing:0;tab-size:2}
+.tok-kw{color:var(--honey-line);font-weight:800}
+.tok-lit{color:var(--honey-line);font-weight:800}
+.tok-builtin{color:var(--mint-line);font-weight:700}
+.tok-fn{color:var(--mint-line)}
+.tok-str{color:var(--honey)}
+.tok-num{color:var(--mint-mid)}
+.tok-com{color:var(--mint-line);font-style:italic}
+.tok-op{color:var(--danger-soft)}
+.bubble .txt,.remember span,.ckbubble span,.qq,.gotblurb,.cnote{line-height:1.62}
+.qq .ic,.qopt .ic,.fpq .ic{font-size:.88em}
+.qq .cb,.fpq .cb{margin:10px auto 12px}
+
+/* Kotopia Storybook visual system (2026-07-12). Generated art and warm paper
+   surfaces replace the previous black/cyber-neon shell while code areas keep
+   a deep teal ground for contrast. */
+:root{--c:var(--ink-muted);--c2:var(--honey-line);--bg:var(--mint-mid);--panel:var(--ink);--panel2:var(--ink);
+  --line:var(--mint-line);--txt:var(--ink);--dim:var(--ink-muted);--ok:var(--ink-muted);--warm:var(--honey-line);
+  --paper2:var(--paper-warm);--paper-line:var(--mint-line);--ink-dim:var(--ink-muted);
+  --night:var(--ink);--night2:var(--ink);--night-line:var(--ink-muted);--night-ink:var(--mint-soft);--night-dim:var(--mint-line)}
+html{min-height:100%;background:var(--mint-soft)}
+body{position:relative;background:
+  linear-gradient(color-mix(in srgb,var(--mint-soft) 92%,transparent),color-mix(in srgb,var(--paper-warm) 94%,transparent)),
+  url(assets/storybook/kotopia-world-v2.webp?v=20260713-224338) center top/cover fixed;color:var(--txt);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;background:
+  radial-gradient(circle at 15% 12%,color-mix(in srgb,var(--paper-raised) 70%,transparent),transparent 28%),
+  radial-gradient(circle at 85% 70%,color-mix(in srgb,var(--honey) 16%,transparent),transparent 35%)}
+.hdr{height:58px;background:color-mix(in srgb,var(--paper) 90%,transparent);border-bottom-color:color-mix(in srgb,var(--ink-muted) 28%,transparent);
+  box-shadow:0 8px 28px color-mix(in srgb,var(--success-ink) 12%,transparent);backdrop-filter:blur(12px)}
+.logo{color:var(--ink-muted);text-shadow:0 2px 0 var(--paper-raised)}.pystat{background:color-mix(in srgb,var(--paper-raised) 68%,transparent)}
+.bubble,.quizcell,.remember,.checkpointcell,.islandfinish,.gotcell,.forgecell,.ritualcell{
+  background:color-mix(in srgb,var(--paper) 94%,transparent);border-color:color-mix(in srgb,var(--ink-muted) 28%,transparent);box-shadow:0 14px 36px color-mix(in srgb,var(--success-ink) 12%,transparent)}
+.bubble{border-radius:8px 20px 20px 20px}.avatar{background-size:contain;background-repeat:no-repeat;border-color:var(--honey-soft);
+  box-shadow:0 5px 16px color-mix(in srgb,var(--success-ink) 22%,transparent)}
+.cta,.crun{color:var(--paper-raised);background:linear-gradient(180deg,var(--mint-line),var(--ink-muted));box-shadow:0 5px 0 var(--success-ink),0 10px 22px color-mix(in srgb,var(--ink-muted) 22%,transparent)}
+.qopt,.fpopt,.fbtn,.ckholdbtn,.ifbtn{background:var(--paper-raised);color:var(--txt);border-color:var(--mint-line);box-shadow:0 4px 12px color-mix(in srgb,var(--success-ink) 8%,transparent)}
+.qopt:hover,.fpopt:hover{border-color:var(--ink-muted);background:var(--mint-soft)}
+.act{background:linear-gradient(color-mix(in srgb,var(--mint-mid) 88%,transparent),color-mix(in srgb,var(--paper-warm) 92%,transparent)),url(assets/storybook/kotopia-world-v2.webp?v=20260713-224338) center/cover}
+.act h1{color:var(--ink);background:color-mix(in srgb,var(--paper) 94%,transparent);text-shadow:0 2px 0 var(--paper-raised);box-shadow:0 12px 32px color-mix(in srgb,var(--success-ink) 14%,transparent)}
+.nodenum,.actsub,.ghint{color:var(--ink-muted);background:color-mix(in srgb,var(--paper) 90%,transparent);border:1px solid color-mix(in srgb,var(--ink-muted) 20%,transparent);text-shadow:none}
+.gotname,.introtitle,.iftitle,.qdone{color:var(--ink);text-shadow:0 2px 0 var(--paper-raised)}.gotblurb,.ifsub{color:var(--ink-muted)}
+.remember span,.ckbubble span{color:var(--ink)}.ckholdbtn,.ifbtn{color:var(--ink);background:var(--paper-raised)}
+.codecell,.cb,.monaco-editor,.monaco-editor-background{--panel:var(--ink);--panel2:var(--ink);--line:var(--success-ink);color:var(--mint-soft)}
+.codecell{background:var(--ink);border-color:var(--ink-muted);box-shadow:0 14px 34px color-mix(in srgb,var(--ink) 20%,transparent)}
+.chead,.cnote{background:var(--ink);border-color:var(--success-ink)}.chead{color:var(--mint-soft)}
+.cb{background:var(--ink);border-color:var(--ink-muted)}.cb code{color:var(--mint-soft)}.ic{color:var(--success-ink);background:var(--success-soft);border-color:var(--mint-line)}
+.bubble .ic,.quizcell .ic,.remember .ic,.checkpointcell .ic{color:var(--success-ink)}
+.bosscell{background:linear-gradient(color-mix(in srgb,var(--ink) 90%,transparent),color-mix(in srgb,var(--ink) 95%,transparent)),url(assets/storybook/island-dark-v2.webp?v=20260713-224338) center 22%/min(72vw,760px) auto no-repeat fixed;color:var(--mint-soft)}
+.bosscell .bubble,.bosscell .qopt,.bosscell .bround{background:color-mix(in srgb,var(--ink) 90%,transparent);color:var(--mint-soft);border-color:var(--ink-muted)}
+#scenepanel{background:linear-gradient(180deg,var(--mint-mid),var(--honey-soft));border-color:var(--mint-line);box-shadow:0 12px 30px color-mix(in srgb,var(--success-ink) 16%,transparent)}
+.polaroid{background:var(--paper);box-shadow:0 12px 30px color-mix(in srgb,var(--success-ink) 20%,transparent)}
+.anatomy .part img,.giftmini img,.gotcard img,.cameoart img{border-radius:16px;background:color-mix(in srgb,var(--paper) 70%,transparent);
+  filter:saturate(.78) contrast(.94) drop-shadow(0 10px 16px color-mix(in srgb,var(--success-ink) 18%,transparent))}
+@media (max-width:700px){.hdr{height:64px;padding:8px 10px;display:grid;grid-template-columns:126px 1fr;gap:4px 8px;align-items:start}
+  .logo{font-size:13px;line-height:1.25}.logo small{display:block}.crumb{font-size:11px;line-height:1.35;min-width:0}.pystat{display:none}
+  .pystat.error{display:block;position:fixed;left:10px;right:10px;top:72px;margin:0;text-align:center}
+  #book{padding-top:82px}.bubble,.quizcell,.checkpointcell,.islandfinish{border-radius:14px}.actin{padding:16px}.act h1{font-size:clamp(28px,9vw,38px)}}
+
+/* Contrast contract: paper cells never inherit light text; interactive/code
+   modules never inherit paper panels. Keep these two surface families explicit. */
+.bubble,.quizcell,.remember,.checkpointcell,.islandfinish,.ritualcell{
+  --panel:var(--paper);--panel2:var(--paper2);--line:var(--paper-line);--txt:var(--ink);--dim:var(--ink-dim);
+  color:var(--ink);background:color-mix(in srgb,var(--paper) 96%,transparent);border-color:color-mix(in srgb,var(--ink-muted) 32%,transparent)}
+.bubble .txt,.remember span,.ckbubble span,.ifsub,.gotblurb{color:var(--ink)}
+.bubble b,.ckbubble b,.remember b,.qhead,.qdots,.qhint{color:var(--ink-muted)}
+.quizcell .qq{color:var(--paper-raised);background:var(--ink);border:1px solid var(--success-ink);text-shadow:none}
+.quizcell .qopt{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}
+.quizcell .qopt:hover,.quizcell .qopt.arm{color:var(--ink);background:var(--mint-soft);border-color:var(--ink-muted)}
+.quizcell .qopt.yes{color:var(--paper-raised);background:var(--success-ink)}.quizcell .qopt.no{color:var(--paper-raised);background:var(--danger-ink)}
+.checkpointcell .ckholdbtn,.islandfinish .ifbtn{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}
+.giftcell .gotname,.giftcell .gotblurb{color:var(--ink);text-shadow:none}
+
+.codecell,.cb,.walkthrough,.code-trace,.program-counter,.forgecell,.bosscell{
+  --panel:var(--night);--panel2:var(--night2);--line:var(--night-line);--txt:var(--night-ink);--dim:var(--night-dim)}
+.codecell,.walkthrough,.ctfit,.pcfit{color:var(--night-ink)}
+.forgecell{color:var(--night-ink);background:radial-gradient(900px 650px at 50% 35%,var(--ink) 0%,var(--ink) 58%,var(--ink) 100%);
+  border-color:var(--night-line);box-shadow:none}
+.forgecell .fpq,.forgecell .forgehead,.forgecell .fstatus{color:var(--night-ink);text-shadow:0 2px 12px var(--ink)}
+.forgecell .fpopt,.forgecell .qopt,.forgecell .fbtn{color:var(--night-ink);background:var(--ink);border-color:var(--ink-muted);box-shadow:none}
+.forgecell .fpopt:hover,.forgecell .qopt:hover,.forgecell .qopt.arm,.forgecell .fbtn:hover{color:var(--paper-raised);border-color:var(--mint-line);background:var(--ink)}
+.forgecell .qopt .qn{color:var(--paper-warm);background:var(--ink);border-color:var(--mint-line)}
+.bosscell .btop,.bosscell .bround,.bosscell .btaunt,.bosscell .bfinish{color:var(--night-ink)}
+.walkthrough .wthead,.walkthrough .wtside,.walkthrough .wtcontrols,
+.code-trace .cthead,.code-trace .ctpredict,.code-trace .ctvisual,.code-trace .ctcontrols,
+.program-counter .pchead,.program-counter .pcpredict,.program-counter .pccontrols{color:var(--night-ink)}
+.walkthrough .bubble,.code-trace .bubble,.program-counter .bubble{color:var(--ink);background:var(--paper)}
+.anatomy{--txt:var(--night-ink);--dim:var(--night-dim);color:var(--night-ink);background:var(--ink);border-color:var(--ink-muted)}
+.anatomy .part .pname{color:var(--mint-mid)}.anatomy .caption{color:var(--honey)}
+
+/* Full light-storybook contract (owner 2026-07-12): every learning cell and
+   module uses paper/mint surfaces. Dark pixels may exist inside lesson art or
+   a live camera frame, but never as the surrounding UI theme. */
+:root{
+  --panel:var(--mint-soft);--panel2:var(--paper);--line:var(--mint-line);--txt:var(--ink);--dim:var(--ink-muted);
+  --night:var(--mint-soft);--night2:var(--paper);--night-line:var(--mint-line);--night-ink:var(--ink);--night-dim:var(--ink-muted)
+}
+.codecell,.cb,.walkthrough,.code-trace,.program-counter,.forgecell,.bosscell{
+  --panel:var(--success-soft);--panel2:var(--paper);--line:var(--mint-line);--txt:var(--ink);--dim:var(--ink-muted);color:var(--ink)}
+
+/* Code and inline code */
+.codecell{background:var(--paper);border-color:var(--mint-line);box-shadow:0 14px 34px color-mix(in srgb,var(--success-ink) 14%,transparent)}
+.chead{color:var(--ink);background:var(--mint-mid);border-color:var(--mint-line)}.chead .inlbl,.chead .clabel{color:var(--success-ink)}
+.cnote{color:var(--danger-ink);background:var(--paper-warm);border-color:var(--honey-line)}.ced,.monaco-editor,.monaco-editor-background{background:var(--paper)!important;color:var(--ink)!important}
+.cout,.cout.live{color:var(--ink);background:var(--paper-warm);border-color:var(--mint-line)}
+.cout .t-sys{color:var(--ink-muted)}.cout .t-prompt{color:var(--danger-ink)}.cout .t-echo{color:var(--success-ink)}
+.cout .t-out{color:var(--success-ink);text-shadow:none}.cout .t-out::before{color:var(--ink-muted)}
+.cout .t-err,.cout .t-fail{color:var(--danger-ink)}.cout .tin{color:var(--ink);caret-color:var(--danger-ink)}
+.creset,.csolution{color:var(--success-ink);background:var(--paper-raised);border-color:var(--mint-line)}.creset:hover,.csolution:hover,.csolution.shown{color:var(--honey-ink);background:var(--honey-soft);border-color:var(--honey-line)}
+.crun{color:var(--honey-ink);background:linear-gradient(180deg,var(--paper-warm),var(--honey));box-shadow:0 5px 13px color-mix(in srgb,var(--danger-ink) 20%,transparent)}
+.codecell.done .inlbl{color:var(--success-ink)}
+.cta{color:var(--honey-ink);background:linear-gradient(180deg,var(--paper-warm),var(--honey));box-shadow:0 5px 0 var(--honey-line),0 10px 22px color-mix(in srgb,var(--danger-ink) 18%,transparent)}
+.pystat.ok{color:var(--success-ink);background:var(--success-soft);border-color:var(--mint-line);box-shadow:none}
+.cb{color:var(--ink);background:var(--mint-soft);border-color:var(--mint-line)}.cb code{color:var(--ink)}
+.tok-kw{color:var(--danger-ink)}.tok-lit{color:var(--danger-ink)}.tok-builtin{color:var(--success-ink)}.tok-fn{color:var(--success-ink)}
+.tok-str{color:var(--honey-ink)}.tok-num{color:var(--success-ink)}.tok-com{color:var(--ink-muted)}.tok-op{color:var(--danger-ink)}
+
+/* Quiz/checkpoint/gift remain paper; questions use tinted paper, not navy. */
+.quizcell .qq{color:var(--ink);background:var(--success-soft);border-color:var(--mint-line)}
+.quizcell .qhead{color:var(--honey-ink);background:var(--paper-warm);border:1px solid var(--honey);text-shadow:none;backdrop-filter:none}
+.quizcell .qhint{color:var(--ink-muted)}
+.quizcell .qopt,.qtarget{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line);box-shadow:0 5px 14px color-mix(in srgb,var(--success-ink) 10%,transparent)}
+.quizcell .qopt:hover,.quizcell .qopt.arm,.qtarget:hover{color:var(--honey-ink);background:var(--paper-warm);border-color:var(--honey-line)}
+.qopt .qn{color:var(--honey-ink);background:var(--honey);border-color:var(--honey-line)}.qdots i{background:var(--mint-mid)}
+.checkpointcell .ckbubble{max-width:480px;margin:6px auto 12px;padding:12px 16px;border:1px solid var(--mint-line);border-radius:14px;
+  color:var(--ink);background:var(--success-soft);box-shadow:0 5px 14px color-mix(in srgb,var(--success-ink) 10%,transparent)}
+.checkpointcell .ckbubble b{color:var(--success-ink)}
+.checkpointcell .ckbubble span{color:var(--ink)}
+.checkpointcell .ckhint{display:inline-block;padding:6px 12px;border:1px solid var(--honey);border-radius:12px;
+  color:var(--honey-ink);background:var(--paper-warm);box-shadow:0 4px 12px color-mix(in srgb,var(--honey-line) 12%,transparent)}
+.checkpointcell .ckholdbtn{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line);
+  box-shadow:0 5px 14px color-mix(in srgb,var(--success-ink) 12%,transparent)}
+.checkpointcell .ckholdbtn:disabled{cursor:wait;color:var(--ink-muted);background:var(--paper-warm);border-color:var(--honey);
+  box-shadow:none}
+.quizcell .qhint{display:inline-block;padding:6px 12px;border:1px solid var(--honey);border-radius:12px;
+  color:var(--honey-ink);background:var(--paper-warm);box-shadow:0 4px 12px color-mix(in srgb,var(--honey-line) 12%,transparent)}
+.giftcell,.gotcell{color:var(--ink)}.gotlabel,.gotname,.gotblurb,.gifthint{color:var(--ink);background:color-mix(in srgb,var(--paper) 90%,transparent);text-shadow:none}
+
+/* Forge */
+.forgecell{color:var(--ink);background:radial-gradient(900px 650px at 50% 35%,var(--mint-mid) 0%,var(--paper-warm) 62%,var(--mint-soft) 100%);
+  border-color:var(--mint-line);box-shadow:none}
+.forgecell .forgehead,.forgecell .forgeexplain,.forgecell .fpq,.forgecell .fstatus,.forgecell .forgestat,
+.forgecell .forgehint,.forgecell .forgemsg{color:var(--ink);text-shadow:none}
+.forgecell .forgehead{padding:6px 14px;border:1px solid var(--honey);border-radius:14px;background:var(--paper-warm)}
+.forgecell .forgeexplain{padding:10px 14px;border:1px solid var(--mint-line);border-radius:14px;background:var(--success-soft)}
+.forgecell .forgestat,.forgecell .forgehint{padding:6px 12px;border:1px solid var(--mint-line);border-radius:12px;background:var(--paper-raised)}
+.forgecell .forgemsg:not(:empty){padding:8px;border:1px solid var(--mint-line);border-radius:16px;background:var(--paper)}
+.forgecell .fpractice{padding:14px;border:1px solid var(--mint-line);border-radius:16px;background:color-mix(in srgb,var(--paper) 92%,transparent)}
+.forgecell .fpopt,.forgecell .qopt,.forgecell .fbtn{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}
+.forgecell .fpopt:hover,.forgecell .qopt:hover,.forgecell .qopt.arm,.forgecell .fbtn:hover{color:var(--honey-ink);background:var(--paper-warm);border-color:var(--honey-line)}
+.forgecell .qopt .qn,.bosscell .qopt .qn{color:var(--honey-ink);background:var(--honey);border-color:var(--honey-line)}
+
+/* Boss */
+.bosscell{color:var(--ink);background:linear-gradient(color-mix(in srgb,var(--mint-soft) 90%,transparent),color-mix(in srgb,var(--paper-warm) 94%,transparent)),url(assets/storybook/island-dark-v2.webp?v=20260713-224338) center 26%/min(68vw,700px) auto no-repeat fixed}
+.bosscell .btop{color:var(--danger-ink);background:var(--danger-soft);border-color:var(--honey-line)}
+.bosscell .bhead,.bosscell .bwands{color:var(--danger-ink);background:color-mix(in srgb,var(--paper) 94%,transparent);border:1px solid var(--honey-line);text-shadow:none;backdrop-filter:none}
+.bosscell .bwands small{color:var(--ink-muted);opacity:1}
+.bosscell .bname,.bosscell .btaunt,.bosscell .bfinish,.bosscell .bwin{color:var(--ink);text-shadow:none}
+.bosscell .bround,.bosscell .bubble,.bosscell .qopt{color:var(--ink);background:color-mix(in srgb,var(--paper) 96%,transparent);border-color:var(--mint-line)}
+.bosscell .qopt:hover,.bosscell .qopt.arm{color:var(--ink);background:var(--success-soft)}.bosscell .bhp{background:var(--danger-soft);border-color:var(--honey-line)}
+
+/* Anatomy and scene modules */
+.anatomy{--txt:var(--ink);--dim:var(--ink-muted);color:var(--ink);background:var(--paper);border-color:var(--mint-line)}
+.anatomy .part{background:var(--mint-soft)}.anatomy .part .pname{color:var(--success-ink)}
+.anatomy .caption{max-width:620px;margin:6px auto 0;padding:8px 14px;border:1px solid var(--honey);border-radius:12px;
+  color:var(--honey-ink);background:var(--paper-warm);box-shadow:0 4px 12px color-mix(in srgb,var(--honey-line) 12%,transparent)}
+#scenepanel{color:var(--ink);background:linear-gradient(180deg,var(--mint-mid),var(--paper-warm));border-color:var(--mint-line)}
+#scstat,#sccount{color:var(--ink);text-shadow:none;background:var(--paper);border:1px solid var(--mint-line)}
+#scask{color:var(--ink);background:color-mix(in srgb,var(--paper) 94%,transparent);border-color:var(--mint-line)}#scask input{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}
+#scenepanel .studio-title,#scenepanel .studio-gift{color:var(--ink);background:color-mix(in srgb,var(--paper) 92%,transparent)}
+#scenepanel .photo-light-project,#scenepanel .photo-light-project.is-lit{background:radial-gradient(circle at 50% 42%,var(--mint-mid) 0,var(--paper-warm) 60%,var(--paper) 100%)}
+#scenepanel .photo-light-picture{background:var(--mint-soft)}
+#scenepanel .light-board-project{background:var(--mint-soft)}#scenepanel .light-board-start{background:color-mix(in srgb,var(--paper) 88%,transparent)}
+
+/* Walkthrough */
+.walkthrough{color:var(--ink);background:var(--paper);border-color:var(--mint-line);box-shadow:0 18px 42px color-mix(in srgb,var(--success-ink) 16%,transparent)}
+.wthead,.wtcontrols{color:var(--ink);background:var(--mint-mid);border-color:var(--mint-line)}.wthead strong{color:var(--ink)}.wthead span{color:var(--success-ink)}
+.wtcode,.wtobserve-shell,.wtobserve{background:var(--paper)}.wtside-title{color:var(--success-ink);background:var(--mint-soft);border-color:var(--mint-line)}
+.wtline b{color:var(--ink-muted)}.wtline code{color:var(--ink)}.wtline.active{background:linear-gradient(90deg,color-mix(in srgb,var(--honey-soft) 67%,transparent),transparent);border-left-color:var(--honey-line)}
+.wtline.active b{color:var(--danger-ink)}.wtline.active code{color:var(--ink);text-shadow:none}.wtline.executed:not(.active) code{color:var(--ink-muted)}
+.wtscene{background:var(--mint-soft)}.wtmemory{color:var(--honey-ink);background:var(--paper-warm);border-color:var(--honey)}
+
+/* Deterministic code trace */
+.ctfit{color:var(--ink);background:var(--paper);border-color:var(--mint-line);box-shadow:0 18px 42px color-mix(in srgb,var(--success-ink) 16%,transparent)}
+.cthead,.ctcontrols{color:var(--ink);background:var(--mint-mid);border-color:var(--mint-line)}.cthead strong{color:var(--ink)}.cthead span{color:var(--success-ink)}
+.ctintro,.ctcode,.ctobserve{color:var(--ink);background:var(--paper)}.cttitle{color:var(--success-ink);background:var(--mint-soft);border-color:var(--mint-line)}
+.ctpredict{background:var(--paper-warm)}.ctpredict>b{color:var(--danger-ink)}.ctpredict-q{color:var(--ink)}
+.ctpredict-option{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}.ctpredict-option:hover,.ctpredict-option.chosen{color:var(--honey-ink);background:var(--paper-warm);border-color:var(--honey-line)}
+.ctline>b{color:var(--ink-muted)}.ctline>code{color:var(--ink)}.ctline.active{background:linear-gradient(90deg,color-mix(in srgb,var(--honey-soft) 67%,transparent),transparent);border-left-color:var(--honey-line)}.ctline.active>b{color:var(--danger-ink)}
+.ctvalue{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}.ctvalue span{color:var(--ink-muted)}.ctvalue strong{color:var(--ink)}.ctvalue code{color:var(--honey-ink);background:var(--honey-soft)}
+.ctvariables>div{background:var(--danger-soft);border-color:var(--mint-line)}.ctvariables code,.ctvariables strong{color:var(--ink)}
+.ctoutput{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}.ctoutput span{color:var(--ink)}
+
+/* Program counter */
+.pcfit{color:var(--ink);background:var(--paper);border-color:var(--mint-line);box-shadow:0 18px 42px color-mix(in srgb,var(--success-ink) 16%,transparent)}
+.pchead,.pccontrols{color:var(--ink);background:var(--mint-mid);border-color:var(--mint-line)}.pchead strong{color:var(--ink)}.pchead span{color:var(--success-ink)}
+.pcintro,.pcprogram,.pcmachine{color:var(--ink);background:var(--paper)}.pchistory{background:linear-gradient(135deg,var(--paper-warm),var(--mint-soft));border-color:var(--mint-line)}
+.pchistory-copy>b{color:var(--honey-ink)}.pchistory-copy>span,.pchistory-copy>em{color:var(--success-ink)}.punch-feed{color:var(--honey-ink)}
+.pctitle{color:var(--success-ink);background:var(--mint-soft);border-color:var(--mint-line)}.pcpredict{background:var(--paper-warm)}.pcpredict>b{color:var(--danger-ink)}.pcpredict-q{color:var(--ink)}
+.pcpredict-option{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}.pcpredict-option:hover,.pcpredict-option.chosen{color:var(--honey-ink);background:var(--paper-warm);border-color:var(--honey-line)}
+.pccycle span{color:var(--ink-muted);background:var(--paper-raised);border-color:var(--mint-line)}.pccycle span.next{color:var(--success-ink);border-color:var(--mint-line)}.pccycle span.active{color:var(--honey-ink);background:var(--honey-soft);border-color:var(--honey-line)}
+.pcstate{background:var(--success-soft);border-color:var(--mint-line)}.pcstate strong{color:var(--success-ink)}.pcmemory{color:var(--ink);background:var(--danger-soft);border-color:var(--mint-line)}
+.pcoutput{color:var(--ink);background:var(--paper-raised);border-color:var(--mint-line)}.pcoutput>div{color:var(--ink)}
+
+/* Ritual/utility overlays use translucent paper rather than navy chrome. */
+.ritualcell .rlead{color:var(--ink);background:var(--paper-raised);border:1px solid var(--mint-line);text-shadow:none;backdrop-filter:none}
+.ritualcell .ghint{color:var(--ink-muted);background:var(--paper-raised);border-color:var(--mint-mid)}
+.rprompt,.rchint,.rcq,.rdone{color:var(--ink);background:color-mix(in srgb,var(--paper) 94%,transparent);text-shadow:none;border:1px solid var(--mint-line)}
+#holdBtn{color:var(--ink);background:color-mix(in srgb,var(--paper) 90%,transparent);border-color:var(--mint-line)}
+#cheat,.toast{color:var(--ink);background:color-mix(in srgb,var(--paper) 96%,transparent);border-color:var(--mint-line);box-shadow:0 8px 28px color-mix(in srgb,var(--success-ink) 15%,transparent)}
+#cheat button{color:var(--ink);background:var(--mint-soft);border-color:var(--mint-line)}
+
+@media(max-width:520px){
+  .codecell .chead{align-items:flex-start;flex-wrap:wrap;gap:6px 9px;padding:8px 10px}
+  .codecell .chead-actions{width:100%;margin-left:0;justify-content:flex-end;gap:6px}
+  .codecell .csolution{margin-right:auto}.codecell .crun{padding-inline:13px}
+}
+@media(max-width:760px){
+  .cworkspace{grid-template-columns:minmax(0,1fr)}
+  .ced{border-right:0;border-bottom:1px solid var(--mint-line)}
+  .coutput{min-height:150px;max-height:none}
+  .creset,.csolution,.cexplain,.crun{min-height:48px}
+}
+
+/* ── image lab (engine/image-lab.js) ───────────────────────────────────────
+   Full-screen interactive BEFORE/AFTER viewer. #scenepanel is a 480px box
+   holding one frame; comparing versions, reading the numbers behind a picture,
+   and seeing a coarse grid next to the artwork it came from all need far more
+   room. The digit table is CSS grid, never printed text, so rows cannot wrap. */
+.ilab{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:16px;
+      background:color-mix(in srgb,var(--ink) 88%,transparent);backdrop-filter:blur(6px);animation:ilabin .22s ease}
+@keyframes ilabin{from{opacity:0}to{opacity:1}}
+.ilab-box{max-width:min(1240px,97vw);max-height:95vh;overflow:auto;padding:16px 18px 18px;border-radius:16px;
+          background:var(--paper);border:1px solid var(--mint-line);box-shadow:0 18px 60px color-mix(in srgb,var(--ink) 55%,transparent);text-align:center}
+.ilab-title{font-size:18px;font-weight:900;letter-spacing:1px;color:var(--ink);margin-bottom:12px}
+.ilab-title:empty{display:none}
+.ilab-row{display:flex;flex-wrap:wrap;gap:16px;justify-content:center;align-items:flex-start}
+.ilab-panel{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0}
+.ilab-cap{font-size:13px;font-weight:800;letter-spacing:1.2px;color:var(--ink);
+          padding:4px 12px;border-radius:20px;background:color-mix(in srgb,var(--mint-line) 30%,transparent)}
+/* the picture and the pixels it became, always together */
+.ilab-pair{display:flex;gap:8px;align-items:flex-start}
+.ilab-stage{position:relative;line-height:0}
+.ilab-stage.ilab-live{cursor:crosshair}
+.ilab-tag{display:block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:.8px;color:var(--ink);opacity:.62;line-height:1.2}
+.ilab-art{width:clamp(120px,17vw,208px);height:auto;aspect-ratio:1;image-rendering:pixelated;
+          border-radius:9px;border:1px solid var(--mint-line);background:var(--ink);display:block}
+/* a full-resolution result is the point of the cell, not a swatch beside digits */
+.ilab-art.is-photo{width:clamp(180px,26vw,340px);image-rendering:auto}
+.ilab-photo{image-rendering:auto;width:clamp(180px,26vw,340px)}
+.ilab-mark{position:absolute;pointer-events:none;opacity:0;box-sizing:border-box;
+           border:2px solid var(--paper-raised);box-shadow:0 0 0 1px var(--ink),0 0 10px var(--paper-raised);border-radius:2px}
+.ilab-nums{display:grid;grid-template-columns:repeat(var(--ilab-cols),var(--ilab-size));
+           gap:1px;padding:5px;border-radius:9px;background:var(--ink);border:1px solid var(--mint-line);max-width:100%;overflow:auto}
+.ilab-nums i{display:flex;align-items:center;justify-content:center;width:var(--ilab-size);height:var(--ilab-size);
+             font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-style:normal;
+             font-size:calc(var(--ilab-size) * .42);line-height:1;border-radius:2px}
+.ilab-nums i.on{outline:2px solid var(--paper-raised);outline-offset:-2px;font-weight:900}
+/* pixel board: the image lab's grid, but the learner drags a selection across
+   the digits and shifts them — same pixels/digits renderer, own chrome */
+.pbcell{padding:16px 18px;border-radius:16px;background:var(--paper-raised);border:1px solid var(--mint-line)}
+.pbtext{font-size:14px;line-height:1.55;color:var(--ink);margin-bottom:12px}
+.pbrow{display:flex;gap:18px;justify-content:center;align-items:flex-start;flex-wrap:wrap}
+.pbstage{text-align:center}
+.pbart canvas{width:clamp(150px,22vw,260px);height:auto;aspect-ratio:1;image-rendering:pixelated;
+              border-radius:9px;border:1px solid var(--mint-line);background:var(--ink);display:block}
+.pbnums .ilab-nums{touch-action:none;cursor:crosshair;user-select:none}
+/* the selection is the whole interaction, so it reads at a glance on a dark
+   plate: a bright ring plus a lift, not the viewer's hairline inspect outline */
+.pbtable i.on{outline:2px solid var(--c);outline-offset:-2px;box-shadow:0 0 0 1px var(--paper-raised) inset,0 0 8px color-mix(in srgb,var(--c) 60%,transparent)}
+.pbgoal{margin-top:14px;text-align:center;font-size:13px;font-weight:800;letter-spacing:.4px;color:var(--ink)}
+.pbfoot{margin-top:10px;display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
+.pbbtn{padding:9px 18px;border-radius:20px;cursor:pointer;font-size:12px;font-weight:900;letter-spacing:1px;
+       color:var(--ink);background:color-mix(in srgb,var(--mint-line) 34%,transparent);border:1px solid var(--mint-line)}
+.pbbtn:disabled{opacity:.42;cursor:default}
+.pbgo:not(:disabled){background:linear-gradient(180deg,color-mix(in srgb,var(--c) 55%,var(--paper-raised)),var(--c))}
+.pbbtn:not(:disabled):hover{filter:brightness(1.08)}
+.pbstat{margin-top:9px;text-align:center;font-size:12px;opacity:.75;color:var(--ink)}
+@media(max-width:760px){.pbart canvas{width:min(44vw,190px)}}
+/* readout: the SAME cell across every panel, which is how before/after is read */
+.ilab-read{margin-top:12px;min-height:44px;font-size:12px;color:var(--ink)}
+.ilab-read-hint{display:block;opacity:.7;margin-bottom:5px}
+.ilab-read-cells{display:flex;flex-wrap:wrap;gap:7px;justify-content:center}
+.ilab-chip{display:inline-flex;align-items:center;gap:7px;padding:4px 10px;border-radius:16px;
+           background:color-mix(in srgb,var(--mint-line) 22%,transparent);border:1px solid var(--mint-line)}
+.ilab-chip::before{content:'';width:12px;height:12px;border-radius:3px;background:var(--chip);border:1px solid var(--mint-line)}
+.ilab-chip b{font-weight:800;letter-spacing:.6px}
+.ilab-chip em{font-style:normal;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;opacity:.85}
+.ilab-foot{margin-top:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.ilab-nums-btn,.ilab-go{padding:10px 22px;border-radius:22px;border:0;cursor:pointer;
+         font-size:13px;font-weight:900;letter-spacing:1.2px}
+.ilab-nums-btn{color:var(--ink);background:color-mix(in srgb,var(--mint-line) 34%,transparent);border:1px solid var(--mint-line)}
+.ilab-go{color:var(--ink);background:linear-gradient(180deg,color-mix(in srgb,var(--c) 55%,var(--paper-raised)),var(--c))}
+.ilab-nums-btn:hover,.ilab-go:hover{filter:brightness(1.08)}
+@media(max-width:760px){
+  .ilab-art{width:min(30vw,132px)}
+  .ilab-art.is-photo{width:min(42vw,190px)}
+  .ilab-with-nums .ilab-row{flex-direction:column;flex-wrap:nowrap}
+}
+
+/* ── voice charm (py/voice_charm + interactive-studio #listenForWord) ───────
+   Real spoken INPUT. The spell words are ALWAYS rendered as buttons as well as
+   listened for: a blocked mic, a silent room, or a browser without
+   SpeechRecognition must degrade to a tap, never to a dead lesson. */
+/* A STRIP, not a curtain. Listening happens while the show keeps playing —
+   inside a while-True stage the old full-panel overlay tore the performance
+   down on every lap and the flow never felt continuous. */
+.vcharm{position:absolute;left:0;right:0;bottom:0;z-index:7;display:flex;flex-direction:column;align-items:center;
+        gap:6px;padding:8px 10px 10px;text-align:center;
+        background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--ink) 88%,transparent) 38%);
+        backdrop-filter:blur(2px)}
+.vcharm-state{font-size:14px;font-weight:800;letter-spacing:.6px;color:var(--paper-raised)}
+.vcharm-words{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.vcharm-word{padding:8px 16px;border-radius:20px;cursor:pointer;font-size:13px;font-weight:900;letter-spacing:1px;
+             color:var(--ink);border:1px solid var(--mint-line);
+             background:linear-gradient(180deg,color-mix(in srgb,var(--c) 50%,var(--paper-raised)),var(--c))}
+.vcharm-word:hover{filter:brightness(1.1)}
+.vcharm-heard{min-height:18px;font-size:12px;font-style:italic;color:var(--paper-raised);opacity:.8}
+.vcharm-bar{display:block;width:min(220px,70%);height:4px;border-radius:3px;overflow:hidden;
+            background:color-mix(in srgb,var(--paper-raised) 25%,transparent)}
+.vcharm-bar b{display:block;height:100%;width:100%;background:var(--c);transform-origin:left;
+              animation:vcdrain var(--vcsec,8s) linear forwards}
+@keyframes vcdrain{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+
+/* Full-size moving FX plate over the lesson camera (interactive-studio
+   #playEffectClip). mix-blend-mode:screen IS the add-and-clamp blend the
+   learner writes by hand — the clips are glowing light on black, so screen
+   drops the black and keeps the light. */
+.studio-effect-clip{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+                    z-index:4;pointer-events:none;mix-blend-mode:screen;
+                    filter:contrast(1.28) brightness(1.06) saturate(1.2)}
+
+/* The human charm's composite (engine/human-layers.js). It draws the WHOLE
+   stack itself — backdrop, behind-FX, cut-out person, front-FX — so it sits
+   above the raw camera and hides it completely. */
+.human-layers{position:absolute;inset:0;width:100%;height:100%;z-index:5;pointer-events:none}
+/* live mic level + raw transcript: a quiet panel must never be mistaken for a
+   dead mic, and a learner needs to see what the machine THOUGHT they said */
+.vcharm-meter{display:block;width:min(220px,70%);height:22px;border-radius:6px;
+              background:color-mix(in srgb,var(--ink) 55%,transparent)}
+.vcharm-or{font-size:11px;letter-spacing:.4px;color:var(--paper-raised);opacity:.7}
+/* A RAW plate view: the video exactly as it is on disk, no screen blend, so a
+   learner sees it is glowing light on a plain black rectangle — and that the
+   "effect" is entirely the blend they wrote. */
+.studio-effect-clip.studio-effect-raw{mix-blend-mode:normal;filter:none;background:#000}
+
+/* FULLSCREEN STAGE. The scene panel is a 480px box beside the notebook, which
+   is right for reading and hopeless as a payoff — a learner writes a show and
+   then squints at a thumbnail. A performance takes the whole screen for as
+   long as it runs and hands it straight back. */
+#scenepanel.stage-full{position:fixed;inset:0;width:100vw;height:100vh;max-width:none;
+                       aspect-ratio:auto;margin:0;border-radius:0;z-index:80;
+                       box-shadow:0 0 0 100vmax var(--ink)}
+body.stage-full-on{overflow:hidden}
+#scenepanel.stage-full .studio-effect-clip,
+#scenepanel.stage-full .human-layers{border-radius:0}
+/* "Pip used your code — here is the result" */
+.stage-note{position:absolute;left:50%;top:22px;transform:translateX(-50%);z-index:9;
+            padding:8px 18px;border-radius:22px;pointer-events:none;white-space:nowrap;
+            font-size:13px;font-weight:800;letter-spacing:.6px;color:var(--paper-raised);
+            background:color-mix(in srgb,var(--ink) 72%,transparent);backdrop-filter:blur(4px);
+            animation:stagenote .5s ease both}
+@keyframes stagenote{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* The camera panel announces itself when a cell starts using it. A learner
+   running a cell is reading their code; without this the effect plays below
+   the fold and they report that nothing happened. */
+@keyframes sceneping{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 70%,transparent)}
+  60%{box-shadow:0 0 0 14px transparent}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+#scenepanel.scene-ping{animation:sceneping 1.2s ease-out 2}
+
+/* THE RESULT OUTLIVES THE CELL. A run that deletes its own output on the last
+   line leaves the learner looking at a bare camera feed and concluding their
+   effect never happened. The final composite stays until the next run. */
+#scenepanel .studio-result-still{position:absolute;inset:0;width:100%;height:100%;
+                                 object-fit:cover;z-index:4;pointer-events:none}
+#scenepanel .human-layers.result-frozen{z-index:5}
+
+/* FULLSCREEN CODE CELL (⛶ in the cell header).
+   A proper two-pane workspace, not a tall page you have to scroll: the OVERLAY
+   never scrolls. Code fills the top, the stage fills the bottom, and both are
+   on screen the whole time — so pressing RUN shows you the camera without
+   hunting for it. Anything too long scrolls INSIDE its own pane. Esc closes. */
+.codecell.cell-full{position:fixed;inset:0;z-index:75;margin:0;border-radius:0;
+                    display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
+body.cell-full-on{overflow:hidden}
+/* header and brief stay put; a long brief scrolls on its own */
+.codecell.cell-full .chead{flex:0 0 auto}
+.codecell.cell-full .cnote{flex:0 0 auto;max-height:16vh;overflow:auto}
+/* the workspace takes everything left over and splits it */
+.codecell.cell-full .cworkspace{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+.codecell.cell-full .ced{flex:1 1 46%;min-height:0;border-right:0;border-bottom:1px solid var(--line);overflow:hidden}
+/* the editor host carries an inline height sized to its line count; in here it
+   must fill its pane instead, or the cell goes fullscreen and the editor stays
+   a few hundred pixels stranded in the middle of it */
+.codecell.cell-full .ced > *{height:100%!important}
+.codecell.cell-full .coutput{flex:1 1 54%;min-height:0;max-height:none;overflow:auto}
+/* the stage fills the output pane rather than demanding a height of its own */
+.codecell.cell-full #scenepanel{max-width:none;width:100%;height:auto;aspect-ratio:auto;min-height:40vh;margin:0}
+.codecell.cell-full .csolution-explanation{flex:0 0 auto;max-height:22vh;overflow:auto}
+.cfull{cursor:pointer}
+@media(max-width:820px){
+  .codecell.cell-full .ced{flex:1 1 40%}
+  .codecell.cell-full .coutput{flex:1 1 60%}
+}
+}

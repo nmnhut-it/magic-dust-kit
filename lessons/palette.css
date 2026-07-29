@@ -1,0 +1,18 @@
+:root{
+  --paper:#fffaf0;
+  --paper-raised:#fffdf5;
+  --paper-warm:#fff0dc;
+  --mint-soft:#edf7ef;
+  --mint-mid:#d9eee5;
+  --mint-line:#78b2a5;
+  --ink:#183f49;
+  --ink-muted:#4f6f73;
+  --honey:#f4c85a;
+  --honey-soft:#ffe6a0;
+  --honey-ink:#533b00;
+  --honey-line:#d69a20;
+  --success-soft:#e3f3dc;
+  --success-ink:#2d6425;
+  --danger-soft:#fde7e5;
+  --danger-ink:#9b3845;
+}

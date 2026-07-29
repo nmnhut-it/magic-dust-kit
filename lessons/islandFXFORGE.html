@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gương Vô Cực — Magic Dust</title>
+<!-- Bonus side-island page (island.js, not node.js). Its finish card sends the
+     learner to the root camera app instead of the map — see content finish.page. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<link rel="stylesheet" href="node.css">
+<script type="module">
+import N from './content/islandFXFORGE.js';
+window.NODE = N;
+</script>
+<script defer src="theme.js"></script>
+<script defer src="cell-validation.js"></script>
+<script defer src="progress-versioning.js"></script>
+<script type="module" src="island.js"></script>
+</head>
+<body></body>
+</html>
