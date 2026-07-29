@@ -94,7 +94,7 @@ export function saveCell(cell, source) {
 // rải trong lời gọi và tôi thêm bài mới mà quên sửa, thành ra sân khấu báo
 // "chưa thấy hàm compose" dù học sinh đã làm xong.
 const SPELL_KINDS = ['fingers', 'voice', 'setup'];
-const IMAGE_KINDS = ['image', 'blend', 'blend_alpha', 'compose', 'scene'];
+const IMAGE_KINDS = ['image', 'blend', 'blend_alpha', 'over', 'compose', 'scene'];
 
 // Ghép các ô thành đúng hai file mà sân khấu thật đọc.
 export function publishFiles() {
@@ -316,11 +316,18 @@ function runOnDemo(py, cell, demo) {
     : `_image, _mask, _background, _out, ${width}, ${height}`;
   if (cell.kind === 'scene') args = `_image, _mask, _background, _behind, _layer, _out, ${width}, ${height}`;
   if (cell.kind === 'blend_alpha') args = `_image, _layer, 50, _out, ${width}, ${height}`;   // 50% cho dễ nhìn
+  if (cell.kind === 'over') args = `_image, _layer, _mask, _out, ${width}, ${height}`;      // _mask chính là kênh alpha
   py.globals.set('_image', py.toPy(toGrid(baseFor(cell, demo), width, height)));
   if (cell.kind === 'blend') py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
   // blend_alpha đè ẢNH lên ẢNH, nên lớp trên là một tấm ảnh thường (nhân vật),
   // không phải lớp hiệu ứng nền đen.
   if (cell.kind === 'blend_alpha') py.globals.set('_layer', py.toPy(toGrid(demo.person, width, height)));
+  // Ghép chuẩn: lớp dưới là cảnh, lớp trên là nhân vật, và alpha lấy thẳng từ
+  // kênh độ đục của chính tấm nhân vật — đúng như ảnh PNG ngoài đời.
+  if (cell.kind === 'over') {
+    py.globals.set('_layer', py.toPy(toGrid(demo.person, width, height)));
+    py.globals.set('_mask', py.toPy(demo.mask));
+  }
   if (cell.kind === 'compose' || cell.kind === 'scene') {
     py.globals.set('_mask', py.toPy(demo.mask));
     py.globals.set('_background', py.toPy(toGrid(demo.base, width, height)));
@@ -430,6 +437,7 @@ export function runChain({ py }, names, demo) {
       let args = `_image, _out, ${width}, ${height}`;
       if (name === 'blend') args = `_image, _layer, _out, ${width}, ${height}`;
       if (name === 'blend_alpha') args = `_image, _layer, 50, _out, ${width}, ${height}`;
+      if (name === 'blend_over') args = `_image, _layer, _mask, _out, ${width}, ${height}`;
       if (name === 'compose') args = `_image, _mask, _background, _out, ${width}, ${height}`;
       if (name === 'blur_background') args = `_image, _mask, _out, ${width}, ${height}`;
       if (name === 'scene') args = `_image, _mask, _background, _behind, _layer, _out, ${width}, ${height}`;

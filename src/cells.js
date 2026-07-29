@@ -132,6 +132,46 @@ SỰ cộng được: giữa ảnh 9, cạnh 6, góc 4. Chia cho \`count\` chứ
 là số nguyên.`,
   },
   {
+    id: 'blend', kind: 'blend', title: 'blend — ghép lớp hiệu ứng',
+    idea: `Ghép hai ảnh KHÔNG phải dán đè, mà là CỘNG ÁNH SÁNG. Chỗ nào của lớp hiệu ứng
+màu đen thì ba số gần 0, cộng vào nền gần như không đổi gì — nền hiện ra qua.
+Chỗ nào sáng thì đẩy nền sáng lên. Đó là lý do video hiệu ứng phải quay trên
+nền đen: nền đen tự biến mất, khỏi cần cắt.`,
+    input: 'Ảnh nền `image` và lớp hiệu ứng `layer`, cùng kích thước.',
+    job: 'Cộng từng màu của hai ô cùng vị trí. Tổng vượt quá 255 thì kẹp lại bằng `min(255, ...)`, kẹp riêng từng màu.',
+    output: 'Con rồng phát sáng nằm đè lên nền, nền vẫn nhìn thấy qua chỗ tối của lớp.',
+    footnote: `Đây là bậc "đè hình A lên hình B". Ở sân khấu, \`layer\` chính là KHUNG HÌNH của
+một đoạn video đang chạy — code y hệt, chỉ khác là máy gọi lại hàm này vài chục
+lần mỗi giây, mỗi lần một khung khác.`,
+    stub: `${PIXEL_HEADER}
+#
+# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với image.
+# Số màu chỉ chạy từ 0 tới 255, cộng quá thì kẹp bằng min(255, ...).
+#
+# Gợi ý: đặt tên cho hai ô trước cho dễ đọc, rồi mới cộng.
+#     base = image[row][col]
+#     glow = layer[row][col]
+def blend(image, layer, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
+            out[row][col] = image[row][col]
+`,
+    answer: `def blend(image, layer, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            base = image[row][col]
+            glow = layer[row][col]
+            out[row][col] = [min(255, base[0] + glow[0]),
+                             min(255, base[1] + glow[1]),
+                             min(255, base[2] + glow[2])]
+`,
+    why: `\`base\` và \`glow\` chỉ là tên gọi cho hai ô cùng vị trí, đặt tên xong đọc dễ hơn
+hẳn. \`min(255, a + b)\` giữ kết quả trong khoảng cho phép. Phải kẹp RIÊNG từng
+màu: nếu tính một lần rồi dùng chung cho cả ba, ba màu bị cắt lệch nhau và điểm
+ảnh đổi màu chứ không chỉ sáng lên.`,
+  },
+  {
     id: 'blend_alpha', kind: 'blend_alpha', title: 'blend_alpha — đè ảnh lên ảnh, pha theo tỉ lệ',
     idea: `\`blend\` cộng ánh sáng nên chỉ hợp với thứ tự PHÁT SÁNG: lửa, sét, hào quang.
 Đem cộng một tấm ảnh thường lên ảnh khác thì trắng bệch, xấu ngay.
@@ -180,6 +220,66 @@ Khi nào dùng cái nào: \`blend\` (cộng) cho thứ PHÁT SÁNG — lửa, s�
 cảnh. Phần mềm dựng phim thật cũng chia đúng hai kiểu đó.`,
   },
   {
+    id: 'blend_over', kind: 'over', title: 'blend_over — kênh alpha và phép ghép chuẩn',
+    idea: `Từ đầu tới giờ mỗi ô ảnh có ba số. Thật ra nó có BỐN: đỏ, xanh lá, xanh dương,
+và **alpha** — độ đục. Alpha 255 là đục hẳn (che kín phía sau), 0 là trong suốt
+hoàn toàn (nhìn xuyên qua), ở giữa là mờ mờ. Ảnh PNG có nền trong suốt chính là
+nhờ số thứ tư này.
+
+Phép ghép chuẩn — sách nào cũng gọi là "A đè lên B" (A over B) — hỏi từng ô:
+lớp trên đục bao nhiêu phần, thì lớp dưới còn lại bấy nhiêu phần.
+
+    kết quả = (trên × alpha + dưới × (255 - alpha)) ÷ 255
+
+Hai bài trước là hai trường hợp riêng của đúng công thức này: \`blend_alpha\` là
+khi alpha giống nhau ở mọi ô, còn \`compose\` là khi alpha chỉ nhận 0 hoặc 255
+(nên viền răng cưa). Alpha thật thì mượt ở rìa.`,
+    input: '`base` (lớp dưới), `top` (lớp trên), `alpha` — `alpha[row][col]` là MỘT số 0..255 nói ô đó của lớp trên đục bao nhiêu.',
+    job: 'Với mỗi màu: `(trên × alpha + dưới × (255 - alpha)) // 255`.',
+    output: 'Nhân vật đứng trên nền, rìa mềm chứ không răng cưa — vì rìa ảnh có alpha ở giữa chừng.',
+    stub: `# Mỗi ô ảnh thật ra có BỐN số: đỏ, xanh lá, xanh dương, và ALPHA (độ đục).
+# Ở bài này alpha được tách riêng ra một bảng cho dễ nhìn:
+#
+#     alpha[row][col] = 255  ô này của lớp trên ĐỤC HẲN, che kín phía dưới
+#     alpha[row][col] = 0    TRONG SUỐT, chỉ thấy lớp dưới
+#     alpha[row][col] = 128  nửa nọ nửa kia
+#
+# Công thức chuẩn (mọi phần mềm ảnh đều dùng), làm cho từng màu:
+#
+#     (tren * alpha + duoi * (255 - alpha)) // 255
+#
+# Chia cho 255 chứ không phải 100: alpha đo bằng thang 0..255.
+def blend_over(base, top, alpha, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: pha hai màu theo độ đục của ô này
+            out[row][col] = base[row][col]
+`,
+    answer: `def blend_over(base, top, alpha, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            under = base[row][col]
+            over = top[row][col]
+            a = alpha[row][col]
+            rest = 255 - a
+            out[row][col] = [(over[0] * a + under[0] * rest) // 255,
+                             (over[1] * a + under[1] * rest) // 255,
+                             (over[2] * a + under[2] * rest) // 255]
+`,
+    why: `\`a\` và \`rest\` cộng lại đúng 255, nên kết quả không bao giờ vượt khỏi 0..255 —
+khỏi cần \`min\` hay \`max\`. Đó là điểm khác hẳn phép cộng ở bài \`blend\`: cộng thì
+tràn, còn pha thì luôn nằm gọn trong khoảng.
+
+Ba bài ghép giờ nối thành một mạch:
+· \`compose\` — alpha chỉ 0 hoặc 255, rìa răng cưa
+· \`blend_alpha\` — alpha giống nhau khắp ảnh, cả tấm mờ đều
+· \`blend_over\` — alpha riêng cho từng ô, rìa mượt. Đây là bản đầy đủ; hai bài
+  kia chỉ là trường hợp đặc biệt của nó.
+
+Còn \`blend\` (cộng) không thuộc mạch này: nó dành cho ánh sáng — lửa, sét, hào
+quang — thứ làm sáng thêm chứ không che mất phía sau.`,
+  },
+  {
     id: 'compose', kind: 'compose', title: 'compose — ghép nền, người, rồi hiệu ứng',
     idea: `Phim trường xanh làm thế này: máy có một tấm MẶT NẠ nói rõ ô nào là người, ô
 nào không. Ghép ảnh chỉ là đi từng ô rồi hỏi một câu — ô này là người hay là
@@ -213,46 +313,6 @@ def compose(person, mask, background, out, width, height):
 ảnh. \`mask[row][col]\` chỉ có MỘT số nên không cần ngoặc thứ ba — nó không phải
 màu, nó là mức chắc chắn. Đổi 128 thành số khác là viền người dày mỏng khác
 nhau; thử 60 rồi thử 200 để thấy.`,
-  },
-  {
-    id: 'blend', kind: 'blend', title: 'blend — ghép lớp hiệu ứng',
-    idea: `Ghép hai ảnh KHÔNG phải dán đè, mà là CỘNG ÁNH SÁNG. Chỗ nào của lớp hiệu ứng
-màu đen thì ba số gần 0, cộng vào nền gần như không đổi gì — nền hiện ra qua.
-Chỗ nào sáng thì đẩy nền sáng lên. Đó là lý do video hiệu ứng phải quay trên
-nền đen: nền đen tự biến mất, khỏi cần cắt.`,
-    input: 'Ảnh nền `image` và lớp hiệu ứng `layer`, cùng kích thước.',
-    job: 'Cộng từng màu của hai ô cùng vị trí. Tổng vượt quá 255 thì kẹp lại bằng `min(255, ...)`, kẹp riêng từng màu.',
-    output: 'Con rồng phát sáng nằm đè lên nền, nền vẫn nhìn thấy qua chỗ tối của lớp.',
-    footnote: `Đây là bậc "đè hình A lên hình B". Ở sân khấu, \`layer\` chính là KHUNG HÌNH của
-một đoạn video đang chạy — code y hệt, chỉ khác là máy gọi lại hàm này vài chục
-lần mỗi giây, mỗi lần một khung khác.`,
-    stub: `${PIXEL_HEADER}
-#
-# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với image.
-# Số màu chỉ chạy từ 0 tới 255, cộng quá thì kẹp bằng min(255, ...).
-#
-# Gợi ý: đặt tên cho hai ô trước cho dễ đọc, rồi mới cộng.
-#     base = image[row][col]
-#     glow = layer[row][col]
-def blend(image, layer, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
-            out[row][col] = image[row][col]
-`,
-    answer: `def blend(image, layer, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            base = image[row][col]
-            glow = layer[row][col]
-            out[row][col] = [min(255, base[0] + glow[0]),
-                             min(255, base[1] + glow[1]),
-                             min(255, base[2] + glow[2])]
-`,
-    why: `\`base\` và \`glow\` chỉ là tên gọi cho hai ô cùng vị trí, đặt tên xong đọc dễ hơn
-hẳn. \`min(255, a + b)\` giữ kết quả trong khoảng cho phép. Phải kẹp RIÊNG từng
-màu: nếu tính một lần rồi dùng chung cho cả ba, ba màu bị cắt lệch nhau và điểm
-ảnh đổi màu chứ không chỉ sáng lên.`,
   },
   {
     id: 'blur_background', kind: 'compose', title: 'blur_background — nền mờ, người vẫn nét',
@@ -546,5 +606,4 @@ thứ hai)", nên nói mỗi từ tiếng Anh là ra phép dù tay sai.
 Nhánh \`else\` nói rõ đang thiếu vế nào — nghe đúng lời mà tay sai thì học sinh
 biết ngay phải giơ mấy ngón.`,
   },
-
 ];

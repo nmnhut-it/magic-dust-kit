@@ -92,6 +92,25 @@ def blend_alpha(image, layer, strength, out, width, height):
             out[row][col] = image[row][col]
 
 
+# Mỗi ô ảnh thật ra có BỐN số: đỏ, xanh lá, xanh dương, và ALPHA (độ đục).
+# Ở bài này alpha được tách riêng ra một bảng cho dễ nhìn:
+#
+#     alpha[row][col] = 255  ô này của lớp trên ĐỤC HẲN, che kín phía dưới
+#     alpha[row][col] = 0    TRONG SUỐT, chỉ thấy lớp dưới
+#     alpha[row][col] = 128  nửa nọ nửa kia
+#
+# Công thức chuẩn (mọi phần mềm ảnh đều dùng), làm cho từng màu:
+#
+#     (tren * alpha + duoi * (255 - alpha)) // 255
+#
+# Chia cho 255 chứ không phải 100: alpha đo bằng thang 0..255.
+def blend_over(base, top, alpha, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: pha hai màu theo độ đục của ô này
+            out[row][col] = base[row][col]
+
+
 # person     = ảnh người, dạng person[row][col] -> [đỏ, lá, dương]
 # background = ảnh nền, cùng kích thước
 # mask       = MẶT NẠ, mask[row][col] là MỘT SỐ chứ không phải ba:

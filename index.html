@@ -249,7 +249,8 @@ function build(cell) {
         : cell.kind === 'compose' || cell.kind === 'scene' ? 'NGƯỜI' : 'ẢNH VÀO';
       frame(firstLabel, baseFor(cell, demo));
       if (cell.kind === 'blend') frame('LỚP HIỆU ỨNG', demo.layer);
-      if (cell.id === 'blur_background') frame('MẶT NẠ', maskPixels(demo));
+      if (cell.kind === 'over') { frame('LỚP TRÊN (nhân vật)', demo.person); frame('KÊNH ALPHA', maskPixels(demo)); }
+      else if (cell.id === 'blur_background') frame('MẶT NẠ', maskPixels(demo));
       else if (cell.kind === 'compose') { frame('NỀN', demo.base); frame('MẶT NẠ', maskPixels(demo)); }
       if (cell.kind === 'scene') {
         frame('NỀN', demo.base); frame('LỚP SAU LƯNG', demo.behind);
@@ -469,7 +470,7 @@ function buildLab() {
   const show = () => { msg.textContent = picks.length ? `chuỗi: ${picks.join(' → ')}` : 'chưa chọn phép nào'; };
 
   for (const cell of CELLS) {
-    if (!['image', 'blend', 'compose', 'scene'].includes(cell.kind)) continue;
+    if (!['image', 'blend', 'blend_alpha', 'over', 'compose', 'scene'].includes(cell.kind)) continue;
     const button = document.createElement('button');
     button.textContent = cell.id;
     button.onclick = () => { picks.push(cell.id); show(); };

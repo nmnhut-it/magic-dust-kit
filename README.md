@@ -129,7 +129,8 @@ Khác mỗi chỗ: máy gọi hàm của bạn hàng chục lần mỗi giây tr
 | `flip` | soi gương trái–phải | `F` |
 | `blur` | mỗi ô lấy màu trung bình với hàng xóm | `B` |
 | `blend` | cộng ánh sáng — cho lửa, sét, hào quang | `N` |
-| `blend_alpha` | đè ảnh lên ảnh, pha theo tỉ lệ (alpha) | `Y` |
+| `blend_alpha` | pha đều theo tỉ lệ | `Y` |
+| `blend_over` | ghép chuẩn theo kênh alpha từng ô | `J` |
 | `compose` | tách người khỏi phòng rồi dán lên nền khác | `O` |
 | `blur_background` | nền mờ, người vẫn nét (kiểu họp trực tuyến) | `Z` |
 | `scene` | cả cảnh phim: nền video · lớp sau · người · hiệu ứng trước | `S` |
@@ -179,8 +180,9 @@ Sáu bài ảnh bắt buộc là một bậc thang, bài sau dùng lại hàm c�
 | `flip` | ảnh là bảng ô, đổi chỗ ô là đổi ảnh |
 | `blur` | trộn một ô với hàng xóm |
 | `compose` | **tách nền** — mặt nạ nói ô nào là người |
-| `blend` | **cộng ánh sáng** — đúng cho thứ phát sáng |
-| `blend_alpha` | **đè ảnh lên ảnh**, pha theo tỉ lệ — đúng cho thứ che phía sau |
+| `blend` | **cộng ánh sáng** — đúng cho lửa, sét, hào quang |
+| `blend_alpha` | pha theo tỉ lệ, cả tấm cùng một độ mờ |
+| `blend_over` | **kênh alpha** — độ đục riêng cho từng ô, phép ghép chuẩn |
 | `blur_background` | gọi lại `blur` + `compose`: nền mờ, người nét |
 | `scene` | gọi lại `blend` + `compose`: **nền video · lớp sau · người · hiệu ứng trước** |
 
@@ -207,6 +209,30 @@ khấu, mặt nạ đó là **của chính bạn**, do MediaPipe cắt ra từ c
 Ghép tiếp `blend` nữa là đủ ba lớp — nền, người, rồi hiệu ứng phủ lên trước.
 Ở trang làm bài có **XƯỞNG THỬ** cuối trang: bấm `compose` rồi `blend`, máy
 chạy nối tiếp hai hàm của bạn trên cùng một tấm ảnh.
+
+## Kênh alpha và ba kiểu ghép
+
+Mỗi ô ảnh thật ra có **bốn** số: đỏ, xanh lá, xanh dương, và **alpha** — độ
+đục. 255 là đục kín, 0 là trong suốt, ở giữa là mờ. Ảnh PNG nền trong suốt sống
+được là nhờ số thứ tư đó.
+
+Phép ghép chuẩn (sách nào cũng gọi là "A đè lên B"):
+
+```python
+(trên * alpha + dưới * (255 - alpha)) // 255
+```
+
+Ba bài trong bộ này là ba nấc của đúng công thức đó:
+
+| Bài | Alpha ra sao | Kết quả |
+|---|---|---|
+| `compose` | chỉ 0 hoặc 255 | cắt cứng, rìa răng cưa |
+| `blend_alpha` | một số duy nhất cho cả tấm | cả ảnh mờ đều |
+| `blend_over` | riêng cho từng ô | rìa mượt — bản đầy đủ |
+
+`blend` (cộng) không nằm trong mạch này: nó dành cho ánh sáng, thứ làm sáng
+thêm chứ không che mất phía sau. Hai kiểu ghép ấy khác nhau về bản chất, và đó
+là lý do có cả hai bài.
 
 ## Bảng nút của riêng bạn
 

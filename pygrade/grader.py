@@ -14,7 +14,7 @@
 
 import traceback
 
-TASKS = ("flip", "blur", "blend", "blend_alpha", "compose", "blur_background", "scene",
+TASKS = ("flip", "blur", "blend", "blend_alpha", "blend_over", "compose", "blur_background", "scene",
          "negative", "grayscale", "flip_vertical", "drop_blue")
 EXTRA_TASKS = ("negative", "grayscale", "flip_vertical", "drop_blue")
 
@@ -244,11 +244,35 @@ def _check_blend_alpha(fn):
     return True, "blend_alpha"
 
 
+def _check_blend_over(fn):
+    """Phép ghép chuẩn: lớp trên ĐÈ LÊN lớp dưới theo độ đục của từng ô.
+
+    Ba ô cho ba trường hợp: đục hẳn, trong suốt hẳn, và nửa vời — chỗ nửa vời
+    mới phân biệt được ai làm đúng công thức, ai chỉ chép đại.
+    """
+    base = solid(3, 1, 0, 0, 255)          # dưới: xanh dương
+    top = solid(3, 1, 255, 0, 0)           # trên: đỏ
+    alpha = [[255, 0, 128]]                # đục hẳn · trong suốt · nửa vời
+    out = blank(3, 1)
+    fn(base, top, alpha, out, 3, 1)
+    if list(out[0][0]) != [255, 0, 0]:
+        return False, "blend_over: ô có alpha 255 (đục hẳn) phải ra đúng màu lớp trên"
+    if list(out[0][1]) != [0, 0, 255]:
+        return False, "blend_over: ô có alpha 0 (trong suốt) phải giữ nguyên màu lớp dưới"
+    got = list(out[0][2])
+    if got == [128, 0, 127]:
+        return True, "blend_over"
+    if got in ([255, 0, 255], [255, 0, 0]):
+        return False, "blend_over: ô nửa trong suốt đang lấy nguyên lớp trên — thiếu phần (255 - alpha) của lớp dưới"
+    return False, f"blend_over: ô alpha 128 phải ra [128,0,127], đang ra {got}"
+
+
 CHECKERS = {
     "flip": _check_flip,
     "blur": _check_blur,
     "blend": _check_blend,
     "blend_alpha": _check_blend_alpha,
+    "blend_over": _check_blend_over,
     "compose": _check_compose,
     "blur_background": _check_blur_background,
     "scene": _check_scene,
@@ -326,20 +350,32 @@ def _pixels(image):
     return " / ".join(parts)
 
 
-def _run(fn, image, width, height, layer=None):
+def _run(fn, image, width, height, extra=None):
+    """Gọi hàm của học sinh với đúng bộ tham số của bài đó.
+
+    `extra` nói rõ bài nào cần gì, thay vì đoán mò theo kiểu dữ liệu — đoán mò
+    thì thêm một bài mới là nhánh cũ bắt nhầm ngay.
+        None                      -> fn(image, out, w, h)
+        ("layer", top)            -> fn(image, top, out, w, h)
+        ("strength", top, 50)     -> fn(image, top, 50, out, w, h)
+        ("alpha", top, alpha)     -> fn(image, top, alpha, out, w, h)
+        ("mask", background, mask)-> fn(image, mask, background, out, w, h)
+    """
     out = blank(width, height)
-    if layer is None:
+    if extra is None:
         fn(image, out, width, height)
-    elif isinstance(layer, list) and len(layer) == 2 and isinstance(layer[1], int):
-        # blend_alpha: layer là [lớp trên, độ đậm]
-        top, strength = layer
-        fn(image, top, strength, out, width, height)
-    elif isinstance(layer, list) and len(layer) == 2 and isinstance(layer[1][0], list):
-        # compose: layer là [nền, mặt nạ]; mặt nạ là bảng SỐ chứ không phải bảng ô
-        background, mask = layer
-        fn(image, mask, background, out, width, height)
+        return out
+    kind = extra[0]
+    if kind == "layer":
+        fn(image, extra[1], out, width, height)
+    elif kind == "strength":
+        fn(image, extra[1], extra[2], out, width, height)
+    elif kind == "alpha":
+        fn(image, extra[1], extra[2], out, width, height)
+    elif kind == "mask":
+        fn(image, extra[2], extra[1], out, width, height)
     else:
-        fn(image, layer, out, width, height)
+        raise ValueError("khong biet kieu tham so: " + str(kind))
     return out
 
 
@@ -384,7 +420,7 @@ def _case_drop_blue():
 def _case_blend():
     layer = [[[0, 0, 0], [100, 100, 100]]]
     return ("nền [200,10,0]; lớp hiệu ứng ô đen rồi ô [100,100,100]",
-            solid(2, 1, 200, 10, 0), layer, 2, 1, [[[200, 10, 0], [255, 110, 100]]])
+            solid(2, 1, 200, 10, 0), ("layer", layer), 2, 1, [[[200, 10, 0], [255, 110, 100]]])
 
 
 def _case_blur():
@@ -403,12 +439,18 @@ def _case_compose():
     mask = [[255, 0, 200]]
     expected = [[[200, 40, 40], [20, 20, 120], [200, 40, 40]]]
     return ("người [200,40,40], nền [20,20,120], mặt nạ 255 · 0 · 200",
-            person, [background, mask], 3, 1, expected)
+            person, ("mask", background, mask), 3, 1, expected)
 
 
 def _case_blend_alpha():
     return ("nền [200,0,0], lớp trên [0,0,200], strength 50",
-            solid(1, 1, 200, 0, 0), [solid(1, 1, 0, 0, 200), 50], 1, 1, [[[100, 0, 100]]])
+            solid(1, 1, 200, 0, 0), ("strength", solid(1, 1, 0, 0, 200), 50), 1, 1, [[[100, 0, 100]]])
+
+
+def _case_blend_over():
+    return ("dưới [0,0,255], trên [255,0,0], alpha 255 · 0 · 128",
+            solid(3, 1, 0, 0, 255), ("alpha", solid(3, 1, 255, 0, 0), [[255, 0, 128]]), 3, 1,
+            [[[255, 0, 0], [0, 0, 255], [128, 0, 127]]])
 
 
 CASES = {
@@ -419,6 +461,7 @@ CASES = {
     "drop_blue": _case_drop_blue,
     "blend": _case_blend,
     "blend_alpha": _case_blend_alpha,
+    "blend_over": _case_blend_over,
     "compose": _case_compose,
     "blur": _case_blur,
 }
