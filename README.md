@@ -1,5 +1,7 @@
 # Magic Dust — Bộ Đồ Nghề
 
+**Chơi ngay, không cài gì: <https://magic-dust-project.nmnhut.dev>**
+
 Bạn vừa bước qua Gương Vô Cực. Đây là xưởng của bạn: mã nguồn của chính đồ chơi
 bạn vừa chơi. **Bạn viết Python, và Python của bạn điều khiển camera thật.**
 
