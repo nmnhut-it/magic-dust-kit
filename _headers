@@ -18,12 +18,15 @@
 
 # Mã trang: mặc định của Pages là giữ 4 tiếng, nên sau khi cập nhật, trình duyệt
 # vẫn nạp file cũ và vỡ ngay chỗ import (đúng lỗi đã gặp: "does not provide an
-# export named baseFor" trong khi file trên máy chủ đã có). Bắt kiểm lại mỗi lần.
+# export named baseFor" trong khi file trên máy chủ đã có).
+#
+# Dùng `no-store` chứ không phải `no-cache`: đã đo trên chính site này, rule
+# `no-cache` không có tác dụng (vẫn trả về max-age=14400), còn `no-store` thì có.
 /src/*
-  Cache-Control: no-cache
+  Cache-Control: no-store
 
 /*.html
-  Cache-Control: no-cache
+  Cache-Control: no-store
 
 /
-  Cache-Control: no-cache
+  Cache-Control: no-store
