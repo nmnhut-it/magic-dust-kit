@@ -46,7 +46,10 @@ def _fingers_now():
 
 
 def _record_button(label, effect):
-    calls.append(("button", str(label), str(effect)))
+    # effect co the la ten hieu ung (chuoi) hoac mot ham Python cua hoc sinh —
+    # bo cham chi dem nut, khong can chay thu ham do.
+    shown = "(ham rieng)" if callable(effect) else str(effect)
+    calls.append(("button", str(label), shown))
 
 
 def _record_stage_pick(role):

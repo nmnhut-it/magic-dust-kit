@@ -192,6 +192,14 @@ kết quả (`check_all()` nằm cuối `student/image_spells.py`).
 Chấm ở ba chỗ dùng chung một bộ đề, nên không có chuyện máy chủ nói đạt mà
 trang nói chưa.
 
+**`add_button` nhận cả hàm riêng, không chỉ tên hiệu ứng.** `add_button(label,
+effect)` — nếu `effect` là một hàm Python (không phải chuỗi), bấm nút chạy
+đúng hàm đó thay vì `play_effect()` mặc định. Kỹ thuật: Pyodide chỉ giữ một
+hàm Python đưa sang JS sống hết MỘT lượt gọi, nên `py-runtime.js` phải
+`.copy()` nó lại lúc `add_button()` chạy (nút bấm về sau, lâu sau khi
+`setup()`/`stage()` đã trả về) và `.destroy()` bản copy đó khi bấm `R` nạp
+lại — nếu bỏ bước này, hàm sẽ chạy được đúng một lần đầu rồi báo lỗi.
+
 **Bài `stage` không có đáp án đúng** — cả ba nơi chấm (`runStageCell` trong
 `src/notebook.js`, phím `T`/`san-khau.html`, và `cham.py`) chỉ đòi ít nhất một
 `set_background(...)` và một `add_button(...)`; không so khớp tên nền/hiệu

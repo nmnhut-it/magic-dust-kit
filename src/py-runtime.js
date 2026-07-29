@@ -51,6 +51,9 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   // chỉ dùng đồ có sẵn khi các em chưa chọn gì.
   const state = { py: null, mode: null, frame: 0, layer: null, lastFingers: -1, busy: false,
                   pick: { behind: null, front: null } };
+  // Handler riêng (hàm Python) của mấy nút add_button — giữ để huỷ đúng lúc,
+  // xem ghi chú ở add_button/reload().
+  const buttonHandlers = [];
 
   // ── nạp Pyodide + hai file của học sinh ────────────────────────────────────
   async function boot() {
@@ -68,8 +71,18 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       // Chỗ chứa kết quả tạm cho bài `scene`.
       new_image: (width, height) => blankGrid(width, height),
       // Học sinh tự dựng bảng điều khiển của mình: mỗi lời gọi là một nút thật
-      // trên màn hình. Gọi trong hàm setup() ở student/spells.py.
-      add_button: (label, effect) => { addButton(String(label), String(effect)); return true; },
+      // trên màn hình. Gọi trong hàm setup() ở student/spells.py. `effect` là
+      // TÊN một hiệu ứng có sẵn (chuỗi) — hoặc HÀM Python của chính học sinh,
+      // Pyodide tự đưa sang thành một hàm JS gọi được, nên bấm nút là chạy
+      // đúng mã các em viết, không chỉ chọn cái tên có sẵn.
+      add_button: (label, effect) => {
+        // Pyodide chỉ giữ một hàm Python đưa sang JS sống hết một lượt gọi —
+        // nút thì bấm bất cứ lúc nào, lâu sau add_button() đã trả về, nên
+        // phải .copy() để giữ nó sống tới lúc đó (destroy khi bấm R nạp lại).
+        const handler = (typeof effect === 'function' && typeof effect.copy === 'function') ? effect.copy() : effect;
+        addButton(String(label), handler);
+        return true;
+      },
       // Bao nhiêu ngón tay đang giơ NGAY LÚC NÀY. Có nó thì on_voice mới kết
       // hợp được hai điều kiện: đúng thế tay VÀ đúng lời niệm.
       fingers_now: () => state.lastFingers < 0 ? 0 : state.lastFingers,
@@ -99,7 +112,10 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       const sources = await Promise.all([readFile(GRADER), ...FILES.map(readFile)]);
       for (const source of sources) state.py.runPython(source);
       // setup() là chỗ học sinh tự gắn nút cho phép của mình. Xoá bảng cũ
-      // trước, nếu không mỗi lần bấm R lại mọc thêm một bộ nút trùng.
+      // trước, nếu không mỗi lần bấm R lại mọc thêm một bộ nút trùng — và huỷ
+      // proxy của hàm cũ (nếu nút nào dùng handler riêng) kẻo rò bộ nhớ.
+      for (const handler of buttonHandlers) handler.destroy?.();
+      buttonHandlers.length = 0;
       ui.buttons.textContent = '';
       state.pick = { behind: null, front: null };
       if (state.py.globals.get('setup')) call('setup');
@@ -333,14 +349,28 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
     if (MODES[key]) setMode(MODES[key]);
   });
 
-  // Nút do học sinh gọi add_button() dựng ra. Bấm là chạy đúng hiệu ứng các em
-  // gán, không qua bảng phép mặc định.
+  // Nút do học sinh gọi add_button() dựng ra. `effect` là tên hiệu ứng có sẵn
+  // (chuỗi) thì bấm là chạy play_effect(effect); là HÀM của chính học sinh thì
+  // bấm là chạy đúng hàm đó — nút của em có thể làm bất cứ gì mã Python cho phép.
   function addButton(label, effect) {
+    const isHandler = typeof effect === 'function';
+    if (isHandler) buttonHandlers.push(effect);
     const button = document.createElement('button');
     button.className = 'py-btn';
     button.textContent = label;
-    button.title = `play_effect("${effect}")`;
-    button.onclick = () => { playEffect(effect); say(`${label} · play_effect("${effect}")`); };
+    button.title = isHandler ? `${label} — chạy hàm Python của bạn` : `play_effect("${effect}")`;
+    button.onclick = () => {
+      if (isHandler) {
+        // Hàm của học sinh thường tự gọi play_effect/say rồi — cái đó đã
+        // hiện lên máy in, không cần đè thêm dòng chung chung lên trên.
+        state.acted = false;
+        try { effect(); } catch (err) { say(pyError(err), true); return; }
+        if (!state.acted) say(`${label} · đã chạy hàm của bạn`);
+      } else {
+        playEffect(effect);
+        say(`${label} · play_effect("${effect}")`);
+      }
+    };
     ui.buttons.appendChild(button);
   }
 

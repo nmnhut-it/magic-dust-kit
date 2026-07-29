@@ -248,6 +248,22 @@ def setup():
 Mỗi lời gọi mọc một nút thật ở góc phải sân khấu. Cạnh đó có ô gõ từ để thử
 `on_voice()` khi máy không có micro — gõ "mưa" rồi Enter là thấy hàm mình chạy.
 
+`add_button` không chỉ nhận TÊN hiệu ứng có sẵn — vế thứ hai còn nhận thẳng
+một HÀM Python của chính bạn. Bấm nút là chạy đúng hàm đó, không đi qua
+`play_effect` mặc định nữa, nên nút có thể làm bất cứ gì mã Python cho phép:
+gọi liền mấy hiệu ứng, in ra một câu, hay bất cứ logic nào bạn viết.
+
+```python
+def combo():
+    play_effect("dragon")
+    play_effect("phoenix")
+    say("hai phép cùng lúc!")
+
+def setup():
+    add_button("Rồng Lửa", "dragon")     # nhãn + tên hiệu ứng có sẵn
+    add_button("Combo", combo)           # nhãn + hàm của riêng bạn
+```
+
 ## `stage` — bài cuối cùng, tự dựng sân khấu của mình
 
 Không có đáp án đúng. `stage()` chạy đúng một lần lúc sân khấu mở, và mọi thứ
@@ -275,7 +291,8 @@ lớp trước/sau) — chúng còn nhận đúng cái tên bạn vừa đặt c
 khung **"+ HIỆU ỨNG CỦA BẠN"**. Tải một clip `.mp4` quay trên nền đen lên,
 đặt tên `rong_tu_ve` chẳng hạn, rồi gọi thẳng `set_front("rong_tu_ve")` —
 video của chính bạn giờ là lớp phủ trước mặt, y hệt cách `play_effect()` đã
-dùng cái tên đó.
+dùng cái tên đó. `add_button` trong `stage()` cũng nhận hàm riêng như ở trên —
+ví dụ một nút gọi `combo()` để bắn liền hai hiệu ứng.
 
 ## Máy chấm giúp ngay lúc bật máy chủ
 

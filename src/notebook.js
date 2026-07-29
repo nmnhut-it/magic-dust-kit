@@ -131,7 +131,13 @@ export async function bootPython(onStatus) {
     play_effect: name => { log.push(['fx', String(name)]); return true; },
     cast: name => { log.push(['fx', String(name)]); return true; },
     say: text => { log.push(['say', String(text)]); return true; },
-    add_button: (label, effect) => { log.push(['button', String(label), String(effect)]); return true; },
+    add_button: (label, effect) => {
+      // effect có thể là tên hiệu ứng (chuỗi) hoặc một hàm Python của học
+      // sinh — trang làm bài chỉ cần ĐẾM nút, không cần chạy thử hàm đó.
+      const shown = typeof effect === 'function' ? '(hàm riêng)' : String(effect);
+      log.push(['button', String(label), shown]);
+      return true;
+    },
     new_image: (width, height) => blankGrid(width, height),
     // Lúc chấm, số ngón tay do bộ chấm đặt trước mỗi lượt thử.
     fingers_now: () => handHolds.count,
