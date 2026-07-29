@@ -72,7 +72,10 @@ function build() {
       <div class="fx-list"></div>
       <p class="fx-empty">Chưa có hiệu ứng nào của bạn.</p>
     </section>`;
-  document.body.appendChild(wrap);
+  // vào chung cột trái với mấy thứ khác của Python (xem #pystation)
+  const station = document.getElementById('pystation') || Object.assign(document.createElement('div'), { id: 'pystation' });
+  if (!station.isConnected) document.body.appendChild(station);
+  station.append(...wrap.childNodes);
   const q = sel => wrap.querySelector(sel);
   return { panel: q('.fx-panel'), toggle: q('.fx-toggle'), name: q('.fx-name'),
            file: q('.fx-pick input'), list: q('.fx-list'), empty: q('.fx-empty') };

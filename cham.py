@@ -17,8 +17,13 @@ ROOT = pathlib.Path(__file__).parent
 STUDENT_DIR = ROOT / "student"
 GRADER_FILE = ROOT / "pygrade" / "grader.py"
 FINGER_TASKS = ((1, "dragon"), (2, "phoenix"), (3, "sakura"))
-VOICE_TASKS = (("rồng", "dragon"), ("dragon", "dragon"), ("hoa", "sakura"),
-               ("sakura", "sakura"), ("mưa", "rain"), ("rain", "rain"))
+# (số ngón tay, lời niệm, phép phải hiện) — phải đúng CẢ HAI vế
+VOICE_TASKS = ((1, "rồng", "dragon"), (2, "phượng", "phoenix"), (3, "hoa", "sakura"),
+               (1, "dragon", "dragon"), (3, "sakura", "sakura"))
+# sai một vế thì tuyệt đối không được ra phép
+VOICE_TRAPS = ((2, "rồng"), (1, "hoa"), (0, "dragon"))
+
+fingers_held = [0]          # số ngón tay giả cho fingers_now()
 
 calls = []          # nhật ký lệnh mà mã của học sinh đã gọi ra
 
@@ -33,6 +38,11 @@ def _record_cast(name):
 
 def _record_say(text):
     calls.append(("say", str(text)))
+
+
+def _fingers_now():
+    """Số ngón tay đang giơ — lúc chấm thì do bộ chấm đặt trước mỗi lượt."""
+    return fingers_held[0]
 
 
 def _record_button(label, effect):
@@ -62,6 +72,7 @@ def _load():
     fake_stage.say = _record_say
     fake_stage.add_button = _record_button
     fake_stage.new_image = _new_image
+    fake_stage.fingers_now = _fingers_now
     sys.modules["magic_stage"] = fake_stage
 
     namespace = {"__name__": "student"}
@@ -80,13 +91,21 @@ def _check_spells(namespace):
     del calls[:]
     namespace["on_fingers"](9)
     results.append((bool(calls), "số chưa gán phép thì phải nói ra chứ không im lặng"))
-    for word, wanted in VOICE_TASKS:
+    for fingers, word, wanted in VOICE_TASKS:
+        fingers_held[0] = fingers
         del calls[:]
         namespace["on_voice"](word)
-        results.append((("fx", wanted) in calls, f'nói "{word}" ra {wanted}'))
-    del calls[:]
-    namespace["on_voice"]("bâng quơ")
-    results.append((bool(calls), "từ lạ thì phải đọc lại cho biết máy nghe ra gì"))
+        results.append((("fx", wanted) in calls,
+                        f'{fingers} ngón + nói "{word}" ra {wanted}'))
+    for fingers, word in VOICE_TRAPS:
+        fingers_held[0] = fingers
+        del calls[:]
+        fired = [entry for entry in calls if entry[0] == "fx"]
+        namespace["on_voice"](word)
+        fired = [entry for entry in calls if entry[0] == "fx"]
+        results.append((not fired,
+                        f'{fingers} ngón + nói "{word}" thì KHÔNG được ra phép'))
+    fingers_held[0] = 0
 
     setup = namespace.get("setup")
     if setup is not None:

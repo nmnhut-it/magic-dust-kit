@@ -1,12 +1,10 @@
 # ============================================================================
 #  BÀI TẬP 1 — BỘ CHỌN THẦN CHÚ VÀ BẢNG NÚT CỦA BẠN
-#  Cùng đề bài với trang làm bài. Sửa xong lưu file rồi bấm R ở sân khấu.
+#  Cùng đề bài với trang làm bài. Sửa xong bấm R ở sân khấu.
 # ============================================================================
 
-from magic_stage import play_effect, say, add_button
+from magic_stage import play_effect, say, add_button, fingers_now
 
-# Máy gọi setup() một lần sau khi nạp mã của bạn.
-#     add_button("Rồng Lửa", "dragon")   -> mọc một nút, bấm là ra rồng
 
 # Máy gọi setup() một lần sau khi nạp mã của bạn.
 #     add_button("Rồng Lửa", "dragon")   -> mọc một nút, bấm là ra rồng
@@ -32,11 +30,14 @@ def on_fingers(count):
     # lượt của bạn: thay dòng trên bằng if / elif / else gọi play_effect(...)
 
 
-# word là chuỗi, nên so sánh bằng dấu nháy: word == "rồng"
-# Dấu tiếng Việt tính là khác nhau: "rong" KHÔNG khớp "rồng".
-# Muốn một nhánh nhận nhiều từ thì nối bằng or.
+# word là chuỗi, so sánh bằng dấu nháy: word == "rồng"
+# fingers_now() là số ngón tay đang giơ NGAY LÚC NÀY.
 #
-# Nhánh cuối nên đọc lại từ vừa nghe — đó là cách bạn biết micro nghe ra gì.
+# Nối hai điều kiện bằng and — cả hai đúng thì mới chạy:
+#     if fingers_now() == 1 and (word == "rồng" or word == "dragon"):
+#
+# Dấu ngoặc quanh phần or là bắt buộc, nếu không Python hiểu sai thứ tự.
+# Nhánh cuối nên nhắc bạn đang thiếu gì: đúng lời mà sai tay thì nói ra.
 def on_voice(word):
     say("nghe được: " + word)
-    # lượt của bạn: viết if / elif / else ở đây
+    # lượt của bạn: viết if / elif / else, mỗi nhánh kết hợp tay AND lời

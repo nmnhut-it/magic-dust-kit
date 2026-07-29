@@ -93,15 +93,22 @@ def on_voice(word):       # micro nghe được một từ thì gọi hàm này
 | giơ 2 ngón | `phoenix` |
 | giơ 3 ngón | `sakura` |
 | số khác | nói ra "chưa gán phép cho số này" |
-| nói "rồng" / "dragon" | `dragon` |
-| nói "hoa" / "sakura" | `sakura` |
-| nói "mưa" / "rain" | `rain` |
-| từ lạ | đọc lại đúng từ vừa nghe, để bạn biết máy nghe ra gì |
+| 1 ngón **và** nói "rồng"/"dragon" | `dragon` |
+| 2 ngón **và** nói "phượng"/"phoenix" | `phoenix` |
+| 3 ngón **và** nói "hoa"/"sakura" | `sakura` |
+| đúng lời nhưng sai tay | không ra phép, `say(...)` nhắc thiếu gì |
 
-Trong hàm bạn gọi `play_effect("dragon")` để mở một lớp hiệu ứng, hoặc
-`say("...")` để hiện chữ. Tên hiệu ứng dùng được: `dragon`, `koto`, `rose`,
-`phoenix`, `butterfly`, `sakura`, `smoke`, `rain`, `flower`, `magic`,
-`lightning`.
+Nói suông không ra phép — phải bắt đúng thế tay rồi mới niệm. Đó là chỗ học
+`and`: cả hai vế đúng thì cả điều kiện mới đúng.
+
+Trong hàm bạn gọi `play_effect("dragon")` để mở một lớp hiệu ứng, `say("...")`
+để hiện chữ, và `fingers_now()` để hỏi đang giơ mấy ngón.
+
+**Sân khấu cố ý để trống.** Máy chỉ dọn sẵn nền, micro và bốn hiệu ứng mà đề
+bài dùng (`dragon`, `phoenix`, `sakura`, `rain`) — phần còn lại là của bạn: gán
+phép trong `on_fingers`/`on_voice`, gắn nút bằng `setup()`, bỏ video của mình
+vào. Mấy hiệu ứng khác (`koto`, `rose`, `butterfly`, `smoke`, `flower`, `magic`)
+vẫn gọi được bằng `play_effect("tên")`, chỉ là không bày sẵn ra bảng.
 
 Bài này không cần ai chấm: giơ tay lên camera là thấy ngay mình đúng hay sai.
 

@@ -502,35 +502,49 @@ Thứ tự các nhánh ở bài này không quan trọng vì mỗi số chỉ kh
 giờ tới lượt.`,
   },
   {
-    id: 'on_voice', kind: 'voice', title: 'on_voice — nói gì thì ra phép gì',
-    idea: `Micro nghe được một TỪ thì máy gọi hàm này và đưa từ đó vào \`word\`, đã chuyển
-sang chữ thường. Vẫn là \`if / elif / else\`, chỉ khác chỗ so sánh chuỗi thay vì
-số. Một nhánh nhận được nhiều từ nhờ \`or\`.`,
-    input: '`word` — từ máy nghe được, chữ thường, có dấu tiếng Việt.',
-    job: '"rồng" hoặc "dragon" ra `dragon`; "hoa"/"sakura" ra `sakura`; "mưa"/"rain" ra `rain`; từ lạ thì `say(...)` đọc lại đúng từ đó.',
-    output: 'Nói là ra phép. Từ nào máy nghe nhầm thì bạn thấy ngay nó nghe ra gì.',
-    stub: `# word là chuỗi, nên so sánh bằng dấu nháy: word == "rồng"
-# Dấu tiếng Việt tính là khác nhau: "rong" KHÔNG khớp "rồng".
-# Muốn một nhánh nhận nhiều từ thì nối bằng or.
+    id: 'on_voice', kind: 'voice', title: 'on_voice — thế tay ĐÚNG và lời niệm ĐÚNG mới ra phép',
+    idea: `Một mình lời nói thì dễ nhầm: micro nghe lỏm câu chuyện trong lớp là phép nhảy
+ra loạn xạ. Phù thuỷ thật phải làm hai việc CÙNG LÚC — bắt đúng thế tay rồi mới
+niệm. Trong Python, "cùng lúc" viết bằng \`and\`: cả hai vế đúng thì cả điều kiện
+mới đúng.
+
+\`fingers_now()\` cho biết ngay lúc này bạn đang giơ mấy ngón.`,
+    input: '`word` — từ micro nghe được (chữ thường, có dấu). `fingers_now()` — số ngón tay đang giơ.',
+    job: 'Rồng cần 1 ngón + "rồng"/"dragon". Phượng hoàng cần 2 ngón + "phượng"/"phoenix". Hoa anh đào cần 3 ngón + "hoa"/"sakura". Sai thế tay thì `say(...)` nhắc đúng số ngón cần giơ.',
+    output: 'Nói suông không ra phép. Đúng thế tay mới ra — và đó là lúc trò ảo thuật thành thật.',
+    stub: `# word là chuỗi, so sánh bằng dấu nháy: word == "rồng"
+# fingers_now() là số ngón tay đang giơ NGAY LÚC NÀY.
 #
-# Nhánh cuối nên đọc lại từ vừa nghe — đó là cách bạn biết micro nghe ra gì.
+# Nối hai điều kiện bằng and — cả hai đúng thì mới chạy:
+#     if fingers_now() == 1 and (word == "rồng" or word == "dragon"):
+#
+# Dấu ngoặc quanh phần or là bắt buộc, nếu không Python hiểu sai thứ tự.
+# Nhánh cuối nên nhắc bạn đang thiếu gì: đúng lời mà sai tay thì nói ra.
 def on_voice(word):
     say("nghe được: " + word)
-    # lượt của bạn: viết if / elif / else ở đây
+    # lượt của bạn: viết if / elif / else, mỗi nhánh kết hợp tay AND lời
 `,
     answer: `def on_voice(word):
-    if word == "rồng" or word == "dragon":
+    fingers = fingers_now()
+    if fingers == 1 and (word == "rồng" or word == "dragon"):
         play_effect("dragon")
-    elif word == "hoa" or word == "sakura":
+    elif fingers == 2 and (word == "phượng" or word == "phoenix"):
+        play_effect("phoenix")
+    elif fingers == 3 and (word == "hoa" or word == "sakura"):
         play_effect("sakura")
-    elif word == "mưa" or word == "rain":
-        play_effect("rain")
     else:
-        say("nghe được: " + word)
+        say("nghe " + word + " nhưng tay đang giơ " + str(fingers) + " ngón")
 `,
-    why: `\`or\` cho một nhánh nhận nhiều từ: chỉ cần MỘT vế đúng là cả điều kiện đúng.
-Phải viết đủ \`word == "dragon"\` ở vế sau — viết tắt \`word == "rồng" or "dragon"\`
-thì Python hiểu sai và nhánh nào cũng đúng. Nhánh \`else\` đọc lại từ vừa nghe,
-nhờ đó bạn biết micro có nghe nhầm không.`,
+    why: `Gọi \`fingers_now()\` MỘT lần rồi cất vào \`fingers\`: gọi lại ở mỗi nhánh thì
+tay có thể đã đổi giữa chừng, và đọc cũng rối.
+
+\`and\` khác \`or\`: \`and\` bắt cả hai vế đúng, \`or\` chỉ cần một. Ở đây cần cả hai —
+đúng thế tay VÀ đúng lời niệm. Ngoặc quanh \`(word == ... or word == ...)\` là
+bắt buộc: không có nó, Python đọc thành "(tay đúng và lời thứ nhất) hoặc (lời
+thứ hai)", nên nói mỗi từ tiếng Anh là ra phép dù tay sai.
+
+Nhánh \`else\` nói rõ đang thiếu vế nào — nghe đúng lời mà tay sai thì học sinh
+biết ngay phải giơ mấy ngón.`,
   },
+
 ];

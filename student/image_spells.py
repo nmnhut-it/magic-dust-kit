@@ -1,12 +1,10 @@
 # ============================================================================
-#  BÀI TẬP 2 — CÁC PHÉP XỬ LÝ ẢNH, CHẠY TRÊN CHÍNH KHUÔN MẶT BẠN
-#  Cùng đề bài với trang làm bài. Sửa file này rồi quay ra sân khấu bấm R để
-#  nạp lại, bấm T để máy chấm.
+#  BÀI TẬP 2 — CÁC PHÉP XỬ LÝ ẢNH
+#  Cùng đề bài với trang làm bài. Sửa xong bấm R ở sân khấu, bấm T để chấm.
 # ============================================================================
 
 from magic_stage import new_image
 
-# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
 
 # image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
 # out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.

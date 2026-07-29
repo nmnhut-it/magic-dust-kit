@@ -64,6 +64,9 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       // Học sinh tự dựng bảng điều khiển của mình: mỗi lời gọi là một nút thật
       // trên màn hình. Gọi trong hàm setup() ở student/spells.py.
       add_button: (label, effect) => { addButton(String(label), String(effect)); return true; },
+      // Bao nhiêu ngón tay đang giơ NGAY LÚC NÀY. Có nó thì on_voice mới kết
+      // hợp được hai điều kiện: đúng thế tay VÀ đúng lời niệm.
+      fingers_now: () => state.lastFingers < 0 ? 0 : state.lastFingers,
     });
     await reload();
   }
@@ -105,9 +108,10 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   // ── ba chỗ Python được gọi ────────────────────────────────────────────────
   const api = {
     fingers(count) {
-      if (!state.py || count === state.lastFingers) return;
-      state.lastFingers = count;
-      if (count > 0) call('on_fingers', count);
+      if (!state.py) return;
+      const changed = count !== state.lastFingers;
+      state.lastFingers = count;                 // luôn ghi lại, kể cả 0
+      if (changed && count > 0) call('on_fingers', count);
     },
     // Trả về true nếu mã của học sinh đã làm gì đó với từ này, để sân khấu
     // không bắn thêm hiệu ứng mặc định đè lên phép của các em.
@@ -295,9 +299,9 @@ function buildPanel() {
   const canvas = document.createElement('canvas');
   canvas.className = 'py-stage'; canvas.width = W; canvas.height = H;
   Object.assign(canvas.style, {
-    position: 'fixed', right: '14px', bottom: '14px', width: '288px', height: '216px',
-    borderRadius: '12px', border: '1px solid rgba(120,178,165,.5)', zIndex: 40, display: 'none',
-    background: '#0b0f18', boxShadow: '0 8px 30px rgba(0,0,0,.45)', imageRendering: 'pixelated',
+    width: '288px', height: '216px', borderRadius: '12px', display: 'none',
+    border: '1px solid rgba(120,178,165,.5)', background: '#0b0f18',
+    boxShadow: '0 8px 30px rgba(0,0,0,.45)', imageRendering: 'pixelated',
   });
   // Hàng nút do chính học sinh dựng bằng add_button(), và ô thử giọng nói cho
   // máy không có micro (hoặc phòng quá ồn).
@@ -308,11 +312,12 @@ function buildPanel() {
   voiceBox.innerHTML = '<input class="py-word" placeholder="gõ một từ rồi Enter — thử on_voice()" maxlength="24">';
 
   const log = document.createElement('div');
-  Object.assign(log.style, {
-    position: 'fixed', right: '14px', bottom: '278px', zIndex: 41, maxWidth: '320px',
-    font: '700 12px/1.45 ui-monospace,Menlo,monospace', letterSpacing: '.5px', color: '#eaf4ff',
-    background: 'rgba(11,15,24,.85)', padding: '7px 10px', borderRadius: '9px', whiteSpace: 'pre-wrap',
-  });
-  document.body.append(canvas, buttons, voiceBox, log);
+  log.className = 'py-log';
+
+  // Một cột duy nhất bên trái. Trước đây mỗi thứ neo một chỗ và đè lên bảng
+  // thần chú của đồ chơi — nhìn rối, bấm nhầm.
+  const station = document.getElementById('pystation') || Object.assign(document.createElement('div'), { id: 'pystation' });
+  station.append(log, buttons, voiceBox);
+  document.body.append(canvas, station);
   return { canvas, log, buttons, word: voiceBox.querySelector('.py-word') };
 }

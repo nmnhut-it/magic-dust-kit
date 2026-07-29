@@ -34,11 +34,15 @@ export function legacyWork() {
 }
 const DEMO_W = 160, DEMO_H = 120;
 const IMAGE_PREAMBLE = 'from magic_stage import new_image\n\n';
-const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, new_image\n\n';
+const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, fingers_now' + '\n\n';
 
 
 const FINGER_TASKS = [[1, 'dragon'], [2, 'phoenix'], [3, 'sakura']];
-const VOICE_TASKS = [['rồng', 'dragon'], ['hoa', 'sakura'], ['mưa', 'rain']];
+// [số ngón tay, từ nói ra, phép phải hiện]. Hai lượt cuối cố tình sai thế tay
+// và sai lời, để bắt được bài chỉ kiểm một vế.
+const VOICE_TASKS = [[1, 'rồng', 'dragon'], [2, 'phượng', 'phoenix'], [3, 'hoa', 'sakura'],
+                     [1, 'dragon', 'dragon'], [3, 'sakura', 'sakura']];
+const VOICE_TRAPS = [[2, 'rồng'], [1, 'hoa'], [0, 'dragon']];
 
 // ── điểm ────────────────────────────────────────────────────────────────────
 // Năm ô bắt buộc 1.4 điểm mỗi ô (7.0), bốn ô thêm 0.75 (3.0) — vừa tròn 10.
@@ -106,6 +110,8 @@ export function publishFiles() {
 const homeless = CELLS.filter(c => !SPELL_KINDS.includes(c.kind) && !IMAGE_KINDS.includes(c.kind));
 if (homeless.length) console.warn('ô chưa được gán vào file nào:', homeless.map(c => c.id));
 
+const handHolds = { count: 0 };   // số ngón tay giả, dùng khi chấm ô on_voice
+
 export async function bootPython(onStatus) {
   onStatus('Đang tải Python… lần đầu hơi lâu, chỉ lần này thôi.');
   if (!self.loadPyodide) await new Promise((ok, no) => {
@@ -126,6 +132,8 @@ export async function bootPython(onStatus) {
     say: text => { log.push(['say', String(text)]); return true; },
     add_button: (label, effect) => { log.push(['button', String(label), String(effect)]); return true; },
     new_image: (width, height) => blankGrid(width, height),
+    // Lúc chấm, số ngón tay do bộ chấm đặt trước mỗi lượt thử.
+    fingers_now: () => handHolds.count,
   });
   // Ô on_fingers/on_voice chỉ chứa đúng một hàm, không có dòng import ở đầu —
   // nên nhập sẵn hai lệnh đó vào namespace, đúng như file spells.py vẫn làm.
@@ -188,9 +196,48 @@ function runSetupCell(py, log, printed) {
   return { ok: true, message: 'setup', rows, output: outputLines(log, printed) };
 }
 
+
+// Ô on_voice: đòi ĐÚNG thế tay VÀ ĐÚNG lời niệm. Chấm hai phần — làm được thì
+// phép hiện, và làm sai một vế thì phép KHÔNG được hiện.
+function runVoiceCell(py, log, printed) {
+  const rows = [];
+  const everything = [];
+  let ok = true;
+
+  const speak = (fingers, word) => {
+    handHolds.count = fingers;
+    log.length = 0;
+    py.runPython(`on_voice(${JSON.stringify(word)})`);
+    everything.push(...log);
+    return log.filter(entry => entry[0] === 'fx').map(entry => entry[1]);
+  };
+
+  try {
+    for (const [fingers, word, wanted] of VOICE_TASKS) {
+      const fired = speak(fingers, word);
+      const hit = fired.includes(wanted);
+      if (!hit) ok = false;
+      rows.push({ input: `${fingers} ngón + "${word}"`, wanted, hit,
+                  got: fired.length ? fired.join(', ') : '(không gọi phép nào)' });
+    }
+    for (const [fingers, word] of VOICE_TRAPS) {
+      const fired = speak(fingers, word);
+      const hit = fired.length === 0;                 // sai vế nào cũng KHÔNG được ra phép
+      if (!hit) ok = false;
+      rows.push({ input: `${fingers} ngón + "${word}"`, wanted: 'không ra phép nào', hit,
+                  got: fired.length ? fired.join(', ') : '(đúng: không gọi phép)' });
+    }
+  } catch (err) { return { ok: false, message: pyError(err), output: outputLines(everything, printed) }; }
+  finally { handHolds.count = 0; }
+
+  return { ok, message: ok ? 'on_voice' : 'on_voice: còn dòng ✖ ở bảng dưới', rows,
+           output: outputLines(everything, printed) };
+}
+
 function runSpellCell(py, log, cell, printed) {
-  const tasks = cell.kind === 'fingers' ? FINGER_TASKS : VOICE_TASKS;
-  const call = cell.kind === 'fingers' ? 'on_fingers' : 'on_voice';
+  if (cell.kind === 'voice') return runVoiceCell(py, log, printed);
+  const tasks = FINGER_TASKS;
+  const call = 'on_fingers';
   const rows = [];
   // `log` bị xoá trước mỗi lần gọi để đọc riêng từng lượt, nên gom lại vào đây
   // — nếu không, khung MÁY IN RA chỉ còn lệnh của lượt cuối cùng.

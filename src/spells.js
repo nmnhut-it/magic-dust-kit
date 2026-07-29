@@ -82,43 +82,34 @@ export const FRONT_SPELLS=['sakura','flower','dust'];
 // CLAUDE.md's testing section) and 3 keeps the 'rain' binding it already had.
 // The digits ran out at 'magic', so the two newest plates take the letters of
 // their own name ('d'/'r') — same side channel, same routine.
+// CHỈ giữ mấy phép mà bài tập có dùng. Bộ đồ nghề này để học sinh TỰ gán phép
+// bằng code của mình; bày sẵn mười mấy phím thì phần các em viết chìm nghỉm, và
+// giơ tay lên là phép của máy nhảy ra đè phép của các em.
+// Mấy phép còn lại (koto, rose, butterfly, smoke, flower, magic…) vẫn gọi được
+// bằng play_effect("tên") trong Python, chỉ là không bày ra sẵn nữa.
 const BASE_KEYS={
-  '3':'rain', '4':'koto', '5':'phoenix', '6':'butterfly',
-  '7':'sakura', '8':'smoke', '9':'flower', '0':'magic',
-  'd':'dragon', 'r':'rose',
+  '3':'rain', '5':'phoenix', '7':'sakura', 'd':'dragon',
 };
 export const SPELL_KEYS={...BASE_KEYS,
   ...Object.fromEntries(Object.entries(MY_FX).filter(([,v])=>v.hotkey).map(([k,v])=>[v.hotkey,k]))};
 
 // Order here also defines the on-screen gesture-guide list order.
 export const GUIDE=[
-  {key:'fireball', name:'Fireball',  label:'Index + “Fireball”',desc:'Point one index finger, then say “fireball”'},
-  {key:'lightning', name:'Lightning', label:'Index + “Lightning”',desc:'Point one index finger, then say “lightning”'},
-  {key:'summon', name:'Summon',    label:'Index + “Summon”',desc:'Summon continuous dust and draw a glowing ribbon with the fingertip'},
-  {key:'stop', name:'Stop',      label:'Say “Stop”',desc:'Stop continuous dust and clear the current atmosphere'},
-  {key:'rain', name:'Rain',      hotkey:'3', label:'Index + “Rain”',desc:'Summon a cinematic storm plate across the camera'},
-  {key:'blur', name:'Blur',      label:'Index + “Blur”',desc:'Point one index finger, then say “blur”'},
-  {key:'flip', name:'Flip',      label:'Index + “Flip”',desc:'Point one index finger, then say “flip” to mirror the camera'},
-  {key:'flower', name:'Flower',    hotkey:'9', label:'Index + “Flower”',desc:'Loop a full-frame atmosphere of floating pink flower petals'},
-  {key:'magic', name:'Glyphs',     hotkey:'0', label:'Index + “Magic”',desc:'Loop a separate atmosphere of luminous magical symbols'},
-  {key:'koto', name:'Stag',      hotkey:'4', label:'Index + “Koto”',desc:'Summon the glowing spirit stag video spell'},
-  {key:'dragon', name:'Dragon',    hotkey:'D', label:'Index + “Dragon”',desc:'Call a spirit dragon that bursts out of a glowing summoning circle'},
-  {key:'rose', name:'Rose',      hotkey:'R', label:'Index + “Rose”',desc:'Bloom a luminous spirit rose in a drift of glowing motes'},
-  {key:'phoenix', name:'Phoenix',   hotkey:'5', label:'Index + “Phoenix”',desc:'Summon a spirit phoenix that spreads its wings in a burst of embers'},
-  {key:'butterfly', name:'Butterfly', hotkey:'6', label:'Index + “Butterfly”',desc:'Release a drifting swarm of glowing crystal butterflies'},
-  {key:'sakura', name:'Sakura',    hotkey:'7', label:'Index + “Sakura”',desc:'Scatter a warm swirl of glowing cherry-blossom petals'},
-  {key:'smoke', name:'Smoke',     hotkey:'8', label:'Index + “Smoke”',desc:'Fill the stage with a looping blue smoke overlay'},
-  {key:'photo', name:'Photo',     label:'Heart Hands',desc:'Make a heart and hold to take a magic photo'},
-  {key:'lighting', name:'Lumos/Nox',  label:'Index + “Lumos / Nox”',desc:'Point one index finger; Lumos brightens and Nox darkens'},
-  // Thần chú và hiệu ứng bạn thêm ở my-spells.js tự hiện xuống cuối bảng này,
-  // kèm đúng số ngón tay hoặc phím bạn đã gán — không phải khai báo lần nữa.
+  // Bảng này cố ý ngắn: bốn phép cơ bản mà đề bài dùng, cộng thêm phép do
+  // chính học sinh khai báo. Sân khấu là chỗ khoe đồ các em làm ra.
+  {key:'dragon', name:'Rồng',    hotkey:'D', label:'1 ngón + nói “rồng”',desc:'Phép mẫu — code của bạn quyết định khi nào nó hiện'},
+  {key:'phoenix', name:'Phượng hoàng', hotkey:'5', label:'2 ngón + nói “phượng”',desc:'Phép mẫu'},
+  {key:'sakura', name:'Hoa anh đào', hotkey:'7', label:'3 ngón + nói “hoa”',desc:'Phép mẫu'},
+  {key:'rain', name:'Mưa',     hotkey:'3', label:'Nói “mưa”',desc:'Phép mẫu'},
+  {key:'photo', name:'Chụp ảnh',  label:'Chụm tay thành trái tim',desc:'Giữ hình trái tim để chụp một tấm'},
+  // Thần chú và hiệu ứng bạn thêm ở my-spells.js tự hiện xuống cuối bảng này.
   ...Object.entries(MY_SPELLS).map(([key,spell])=>({key,name:spell.n,
     hotkey:Object.entries(MY_FINGERS).find(([,v])=>v===key)?.[0],
     label:`Giơ ${Object.entries(MY_FINGERS).find(([,v])=>v===key)?.[0]||'?'} ngón tay`,
     desc:'Thần chú bạn tự viết trong src/my-spells.js'})),
   ...Object.entries(MY_FX).map(([key,fx])=>({key,name:fx.n,hotkey:fx.hotkey,
     label:fx.hotkey?`Bấm phím ${fx.hotkey.toUpperCase()}`:'',
-    desc:'Hiệu ứng video bạn tự bỏ vào assets/my-fx/'})),
+    desc:'Hiệu ứng video bạn tự bỏ vào'})),
 ];
 
 export const ROT={
