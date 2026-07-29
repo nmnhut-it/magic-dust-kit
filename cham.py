@@ -112,6 +112,12 @@ def check():
 
 
 def main():
+    # Console Windows mặc định là bảng mã cũ: in dấu ✓/✖ ra là văng
+    # UnicodeEncodeError, chấm xong mà không đọc được kết quả.
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
     lines, wrong = check()
     print("\n".join(lines))
     if wrong:

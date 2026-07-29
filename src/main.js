@@ -5,15 +5,15 @@ import { UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Pass }           from 'three/addons/postprocessing/Pass.js';
 import { ShaderPass }     from 'three/addons/postprocessing/ShaderPass.js';
 import { CopyShader }     from 'three/addons/shaders/CopyShader.js';
-import { SPELLS, ROT, ENERGY, GUIDE, FINGER_TO_SPELL, OVERLAY_SPELLS, SPELL_KEYS, FRONT_SPELLS } from './spells.js';
-import { FINGERTIPS, handSize, countExtendedFingers, heartGestureMetrics, isIndexWand, StableGestureTrigger } from './gestures.js';
-import { AudioManager } from './audio.js';
-import { Efk } from './effekseer.js';
-import { StudioEffects } from './studio-effects.js';
-import { Segmentation } from './segmentation.js';
-import { mountPython } from './py-runtime.js';
-import { mountFxPanel } from './my-fx-panel.js';
-import { Lotus3DEngine } from '../lessons/weather-lab/lotus-3d.js';
+import { SPELLS, ROT, ENERGY, GUIDE, FINGER_TO_SPELL, OVERLAY_SPELLS, SPELL_KEYS, FRONT_SPELLS } from './spells.js?v=3';
+import { FINGERTIPS, handSize, countExtendedFingers, heartGestureMetrics, isIndexWand, StableGestureTrigger } from './gestures.js?v=3';
+import { AudioManager } from './audio.js?v=3';
+import { Efk } from './effekseer.js?v=3';
+import { StudioEffects } from './studio-effects.js?v=3';
+import { Segmentation } from './segmentation.js?v=3';
+import { mountPython } from './py-runtime.js?v=3';
+import { mountFxPanel } from './my-fx-panel.js?v=3';
+import { Lotus3DEngine } from '../lessons/weather-lab/lotus-3d.js?v=3';
 
 const $=id=>document.getElementById(id);
 // Saga theme bridge: the teaching platform's picker (localStorage 'magicdust.theme', see lessons/theme.js) recolors the ambient dust + neutral HUD here too; BLOOM also renders motes as hard pixel squares.

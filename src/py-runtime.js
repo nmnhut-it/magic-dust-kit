@@ -12,7 +12,7 @@
 // Pyodide chạy ở luồng chính (không Worker) để đưa khung hình sang Python mà
 // không phải chép qua chép lại — đổi lại, khi Python chạy thì hình đứng yên
 // trong chốc lát, nên phần xử lý ảnh chạy cách khung (xem FRAME_EVERY).
-import { storedSource } from './student-store.js';
+import { storedSource } from './student-store.js?v=3';
 
 const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
 const GRADER = './pygrade/grader.py';        // bộ chấm dùng chung, học sinh không sửa
