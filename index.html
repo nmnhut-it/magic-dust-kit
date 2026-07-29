@@ -106,6 +106,8 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .console::before{content:'MÁY IN RA';display:block;margin-bottom:6px;font:700 9.5px/1 ui-monospace,monospace;
   letter-spacing:1px;color:#5f7f92}
 .shot.fx video{width:200px;height:150px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000}
+.ans-warn{margin:0 0 10px;color:#e2c072;font-size:13px}
+.ans-copy{margin-top:10px;color:#0b0f18;background:#e2c072}
 </style>
 
 <header>
@@ -310,7 +312,8 @@ function build(cell) {
 
   runBtn.onclick = run;
   el.querySelector('.reset').onclick = () => { box.value = cell.stub; saveCell(cell, cell.stub); };
-  el.querySelector('.key').onclick = () => showAnswer(cell, el.querySelector('.answer'));
+  el.querySelector('.key').onclick = () => showAnswer(cell, el.querySelector('.answer'),
+    answer => { box.value = answer; saveCell(cell, answer); run(); });
   return { enable: () => { runBtn.disabled = false; } };
 }
 
@@ -335,16 +338,20 @@ function buildGate() {
 // phải để con bấm cho nhanh. Mở một ô thì mở luôn cả trang cho tới lúc tải lại.
 let answersUnlocked = false;
 
-function showAnswer(cell, host) {
+function showAnswer(cell, host, onCopy) {
   if (host.dataset.open === 'yes') { host.textContent = ''; host.dataset.open = 'no'; return; }
-  if (!answersUnlocked) return askPassword(host, () => showAnswer(cell, host));
+  if (!answersUnlocked) return askPassword(host, () => showAnswer(cell, host, onCopy));
   host.dataset.open = 'yes';
   host.innerHTML = `
     <p class="ans-head">ĐÁP ÁN — dành cho bố mẹ hoặc thầy cô giảng lại</p>
+    <p class="ans-warn">Đáp án này CHƯA chạy: ô bài vẫn giữ nguyên bài bạn đang gõ,
+    nên dòng đúng/sai phía trên là của bài đó. Muốn thử thì bấm nút bên dưới.</p>
     <pre class="ans-code"></pre>
+    <button class="ans-copy">⇥ chép vào ô rồi chạy thử</button>
     <p class="ans-why"></p>`;
   host.querySelector('.ans-code').textContent = cell.answer;
   host.querySelector('.ans-why').innerHTML = prose(cell.why);
+  host.querySelector('.ans-copy').onclick = () => onCopy(cell.answer);
 }
 
 function askPassword(host, done) {
