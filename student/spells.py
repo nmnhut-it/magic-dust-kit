@@ -1,54 +1,40 @@
 # ============================================================================
-#  BÀI TẬP 1 — BỘ CHỌN THẦN CHÚ
-#  File này là Python thật, chạy thật, ngay trong trang đang mở camera của bạn.
-#  Sửa file, lưu lại, quay ra trang web bấm phím  R  là nạp lại — không cần
-#  tải lại trang, không cần cài gì thêm.
+#  BÀI TẬP 1 — BỘ CHỌN THẦN CHÚ VÀ BẢNG NÚT CỦA BẠN
+#  Cùng đề bài với trang làm bài. Sửa xong lưu file rồi bấm R ở sân khấu.
 # ============================================================================
-#
-# Gương cho bạn hai lệnh:
-#
-#     play_effect("dragon")   mở một lớp hiệu ứng quay sẵn lên khung hình
-#     say("chữ gì đó")        hiện một dòng chữ ở góc màn hình
-#
-# Tên hiệu ứng dùng được:
-#     dragon · koto · rose · phoenix · butterfly · sakura · smoke · rain
-#     flower · magic · lightning
-#
-# ---------------------------------------------------------------------------
 
-from magic_stage import play_effect, say
+from magic_stage import play_effect, say, add_button
 
 
-# ── GIƠ MẤY NGÓN TAY THÌ RA PHÉP GÌ ─────────────────────────────────────────
-# Máy đếm số ngón tay bạn giơ lên camera rồi gọi hàm này, đưa vào số đó.
-# Hãy viết chuỗi if / elif / else để mỗi số ngón tay gọi một hiệu ứng khác nhau.
+# Máy gọi setup() một lần sau khi nạp mã của bạn.
+#     add_button("Rồng Lửa", "dragon")   -> mọc một nút, bấm là ra rồng
 #
-# ĐỀ BÀI: sửa hàm dưới đây để
-#     1 ngón  -> dragon
-#     2 ngón  -> phoenix
-#     3 ngón  -> sakura
-#     còn lại -> nói "chưa gán phép cho số này"
+# Tên phép dùng được: dragon · koto · rose · phoenix · butterfly · sakura
+#                     smoke · rain · flower · magic · lightning
+# và cả hiệu ứng video bạn tự bỏ vào ở sân khấu.
+def setup():
+    # lượt của bạn: gọi add_button(...) cho mấy phép bạn thích
+    pass
+
+
+# Hai lệnh bạn gọi được:
+#     play_effect("dragon")   mở một lớp hiệu ứng lên khung hình
+#     say("chữ gì đó")        hiện một dòng chữ
+#
+# Tên hiệu ứng có sẵn: dragon · koto · rose · phoenix · butterfly · sakura
+#                      smoke · rain · flower · magic · lightning
+#
+# else phải nằm CUỐI CÙNG, vì nó là nhánh "không khớp cái nào ở trên".
 def on_fingers(count):
     say("thấy " + str(count) + " ngón tay")
     # lượt của bạn: thay dòng trên bằng if / elif / else gọi play_effect(...)
 
 
-# ── NÓI GÌ THÌ RA PHÉP GÌ ───────────────────────────────────────────────────
-# Khi micro nghe được một từ, máy gọi hàm này và đưa vào từ đó (chữ thường).
-# Hãy làm giống hệt bên trên, nhưng so sánh chuỗi thay vì số.
+# word là chuỗi, nên so sánh bằng dấu nháy: word == "rồng"
+# Dấu tiếng Việt tính là khác nhau: "rong" KHÔNG khớp "rồng".
+# Muốn một nhánh nhận nhiều từ thì nối bằng or.
 #
-# ĐỀ BÀI:
-#     "rồng" hoặc "dragon"  -> dragon
-#     "hoa"  hoặc "sakura"  -> sakura
-#     "mưa"  hoặc "rain"    -> rain
-#     còn lại -> nói lại đúng từ vừa nghe, để bạn biết máy nghe ra gì
+# Nhánh cuối nên đọc lại từ vừa nghe — đó là cách bạn biết micro nghe ra gì.
 def on_voice(word):
     say("nghe được: " + word)
     # lượt của bạn: viết if / elif / else ở đây
-
-
-# ============================================================================
-#  Ghi chú nhỏ: hai hàm trên KHÔNG cần return gì cả. Chúng chỉ ra lệnh.
-#  Sai cú pháp thì màn hình hiện đúng dòng báo lỗi Python và số dòng — đọc
-#  dòng đó trước khi hỏi ai.
-# ============================================================================
