@@ -12,7 +12,10 @@
 // Pyodide chạy ở luồng chính (không Worker) để đưa khung hình sang Python mà
 // không phải chép qua chép lại — đổi lại, khi Python chạy thì hình đứng yên
 // trong chốc lát, nên phần xử lý ảnh chạy cách khung (xem FRAME_EVERY).
+import { storedSource } from './student-store.js';
+
 const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+const GRADER = './pygrade/grader.py';        // bộ chấm dùng chung, học sinh không sửa
 const FILES = ['./student/spells.py', './student/image_spells.py'];
 const W = 96, H = 72;              // Python thuần chạy ~22-160 khung/giây ở cỡ này
 const FRAME_EVERY = 2;             // xử lý 1 trong 2 khung, chừa hơi cho phần 3D
@@ -47,13 +50,20 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     await reload();
   }
 
+  // Bài học sinh gõ trong BÀN VIẾT được ưu tiên hơn file trên đĩa — đó là cách
+  // dùng bộ này mà không cần cài gì: mở link, gõ, chạy.
+  async function readFile(path) {
+    const name = path.split('/').pop();
+    const typed = storedSource(name);
+    if (typed != null) return typed;
+    const res = await fetch(`${path}?t=${Date.now()}`);        // ?t= để trình duyệt đừng dùng bản cũ
+    if (!res.ok) throw new Error(`không đọc được ${path}`);
+    return res.text();
+  }
+
   async function reload() {
     try {
-      const sources = await Promise.all(FILES.map(async path => {
-        const res = await fetch(`${path}?t=${Date.now()}`);      // ?t= để trình duyệt đừng dùng bản cũ
-        if (!res.ok) throw new Error(`không đọc được ${path}`);
-        return res.text();
-      }));
+      const sources = await Promise.all([readFile(GRADER), ...FILES.map(readFile)]);
       for (const source of sources) state.py.runPython(source);
       say('Python sẵn sàng — sửa file trong student/ rồi bấm R để nạp lại');
       return true;
@@ -79,6 +89,8 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     },
     voice(word) { if (state.py) call('on_voice', String(word)); },
     ready: () => !!state.py,
+    reload,                                    // BÀN VIẾT gọi lại sau khi học sinh bấm CHẠY
+    grade: () => call('check_all'),
   };
 
   // ── vòng lặp ảnh ──────────────────────────────────────────────────────────

@@ -3,12 +3,18 @@
 Bạn vừa bước qua Gương Vô Cực. Đây là xưởng của bạn: mã nguồn của chính đồ chơi
 bạn vừa chơi. **Bạn viết Python, và Python của bạn điều khiển camera thật.**
 
-Trong này có hai thứ:
+Trong này có ba trang:
 
 | | |
 |---|---|
-| `index.html` | **Đồ chơi VFX** — camera bật lên, tay bạn hiện trong khung, và mã Python bạn viết quyết định phép nào hiện ra |
+| `bai.html` | **Trang làm bài — vào đây trước.** Chín ô kiểu sổ tay: gõ Python, bấm CHẠY, máy chấm ngay và dựng ẢNH VÀO / ẢNH RA bằng chính code bạn vừa viết. Xong bảy ô bắt buộc thì cổng sang sân khấu mở |
+| `index.html` | **Sân khấu thật** — camera bật lên, tay bạn hiện trong khung, và mã Python bạn vừa viết quyết định phép nào hiện ra |
 | `lessons/islandFXFORGE.html` | **Đảo GƯƠNG VÔ CỰC** — nơi bạn học lật ảnh, ghép lớp, chỉnh sáng trên lưới số nhỏ |
+
+**Không cài Python cũng học được.** Python chạy sẵn trong trình duyệt (Pyodide),
+bài lưu trong `localStorage` của chính máy bạn. Mở `bai.html`, làm, rồi bấm nút
+ra sân khấu — code đi theo. Ai muốn sửa file trên đĩa như thợ thật thì vẫn sửa
+`student/*.py` được, hai đường dùng chung một bộ chấm.
 
 ---
 
@@ -25,7 +31,8 @@ python serve.py
 
 Rồi mở:
 
-- đồ chơi → <http://localhost:8123/index.html>
+- làm bài → <http://localhost:8123/bai.html>
+- sân khấu → <http://localhost:8123/index.html>
 - đảo gương → <http://localhost:8123/lessons/islandFXFORGE.html>
 
 Dùng **Chrome** hoặc **Edge** nhé.
@@ -41,12 +48,18 @@ Lần đầu mở, trang phải tải Python về máy nên hơi lâu. Xong sẽ
 
 # BÀI CỦA BẠN
 
-Bạn sửa **đúng hai file**, cả hai nằm trong thư mục `student/`. Mọi thứ còn lại
-trong bộ này là máy móc — cứ để yên.
+Chín hàm, chia làm hai nhóm. Có hai cách làm, chọn cách nào cũng được:
 
-Mở bằng bất cứ trình soạn thảo nào (Notepad cũng được, VS Code thì dễ nhìn
-hơn). **Sửa xong lưu file, quay ra trang web bấm phím `R`** — máy nạp lại mã của
-bạn ngay, không phải tải lại trang, không phải chờ Python khởi động lần nữa.
+**Cách 1 — trong trang `bai.html` (khuyên dùng).** Mỗi hàm một ô riêng, có tô
+màu code, có nút CHẠY & CHẤM. Chạy xong máy nói ngay đúng hay sai và vẽ luôn
+ảnh mà code bạn dựng ra — sai thì sửa rồi chạy lại. Không cần cài gì, không
+cần biết thư mục nằm ở đâu.
+
+**Cách 2 — sửa file `student/*.py` bằng trình soạn thảo.** Lưu file rồi quay ra
+trang bấm phím `R`. Hợp với ai đã quen dùng VS Code.
+
+Bài làm ở cách 1 được ưu tiên: khi trong máy đã có bài bạn gõ trên trang, sân
+khấu chạy bài đó chứ không đọc file trên đĩa nữa.
 
 ## Bài 1 — `student/spells.py`: chọn phép bằng tay và bằng giọng nói
 

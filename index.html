@@ -125,6 +125,30 @@ html,body{background:#183f49}
    sit right behind it — a dark halo underneath is what keeps it legible */
 #sname{text-shadow:0 0 2px rgba(9,28,34,.95),0 1px 3px rgba(9,28,34,.95),0 2px 10px rgba(9,28,34,.8),0 0 22px var(--g)}
 #f4c85ar{gap:7px}
+/* BÀN VIẾT — khung soạn code trong trang, cho máy không cài được Python */
+.ed-toggle{position:fixed;left:14px;bottom:14px;z-index:60;border:0;cursor:pointer;
+  font:700 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.6px;padding:10px 14px;
+  border-radius:9px;color:#0b0f18;background:#9fe8d5;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+.ed-panel{position:fixed;left:14px;bottom:60px;z-index:59;width:min(560px,calc(100vw - 28px));
+  display:none;flex-direction:column;gap:8px;padding:12px;border-radius:12px;
+  background:rgba(11,15,24,.94);border:1px solid rgba(120,178,165,.45);box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.ed-panel.open{display:flex}
+.ed-tabs{display:flex;gap:6px}
+.ed-tabs button{flex:1;border:0;cursor:pointer;padding:7px 9px;border-radius:7px;
+  font:700 11px/1.2 ui-monospace,Menlo,monospace;color:#9fb4c8;background:rgba(120,178,165,.12)}
+.ed-tabs button.on{color:#0b0f18;background:#9fe8d5}
+.ed-area{width:100%;height:min(46vh,340px);resize:vertical;padding:10px;border-radius:8px;
+  font:400 12px/1.55 ui-monospace,Menlo,monospace;color:#eaf4ff;background:#070b12;
+  border:1px solid rgba(120,178,165,.3);tab-size:4}
+.ed-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ed-bar button,.ed-open{border:0;cursor:pointer;padding:8px 11px;border-radius:7px;
+  font:700 11px/1 ui-monospace,Menlo,monospace;color:#eaf4ff;background:rgba(120,178,165,.18)}
+.ed-bar .ed-run{color:#0b0f18;background:#9fe8d5}
+.ed-bar .ed-run small{font-weight:400;opacity:.65}
+.ed-grow{flex:1}
+.ed-state{font:400 11px/1 ui-monospace,Menlo,monospace;color:#7f95a8}
+.ed-log{margin:0;min-height:1.2em;font:400 11px/1.5 ui-monospace,Menlo,monospace;
+  color:#9fe8d5;white-space:pre-wrap}
 </style>
 
 <script type="importmap">

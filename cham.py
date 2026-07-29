@@ -13,7 +13,9 @@ import sys
 import types
 import pathlib
 
-STUDENT_DIR = pathlib.Path(__file__).parent / "student"
+ROOT = pathlib.Path(__file__).parent
+STUDENT_DIR = ROOT / "student"
+GRADER_FILE = ROOT / "pygrade" / "grader.py"
 FINGER_TASKS = ((1, "dragon"), (2, "phoenix"), (3, "sakura"))
 VOICE_TASKS = (("rồng", "dragon"), ("dragon", "dragon"), ("hoa", "sakura"),
                ("sakura", "sakura"), ("mưa", "rain"), ("rain", "rain"))
@@ -34,42 +36,47 @@ def _record_say(text):
 
 
 def _load():
-    """Nạp hai file của học sinh với một `magic_stage` giả."""
-    sys.path.insert(0, str(STUDENT_DIR))
+    """Chạy bộ chấm + hai file của học sinh trong CÙNG một namespace.
+
+    Trình duyệt nạp ba file đó chồng lên nhau y hệt cách này, nên chấm ở đây và
+    chấm trong trang không thể lệch nhau.
+    """
     fake_stage = types.ModuleType("magic_stage")
     fake_stage.play_effect = _record_effect
     fake_stage.cast = _record_cast
     fake_stage.say = _record_say
     sys.modules["magic_stage"] = fake_stage
-    import image_spells
-    import spells
-    return spells, image_spells
+
+    namespace = {"__name__": "student"}
+    for path in (GRADER_FILE, STUDENT_DIR / "spells.py", STUDENT_DIR / "image_spells.py"):
+        exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+    return namespace
 
 
-def _check_spells(spells):
+def _check_spells(namespace):
     """Gọi on_fingers / on_voice với từng đề bài, xem có ra đúng hiệu ứng không."""
     results = []
     for count, wanted in FINGER_TASKS:
         del calls[:]
-        spells.on_fingers(count)
+        namespace["on_fingers"](count)
         results.append((("fx", wanted) in calls, f"{count} ngón tay ra {wanted}"))
     del calls[:]
-    spells.on_fingers(9)
+    namespace["on_fingers"](9)
     results.append((bool(calls), "số chưa gán phép thì phải nói ra chứ không im lặng"))
     for word, wanted in VOICE_TASKS:
         del calls[:]
-        spells.on_voice(word)
+        namespace["on_voice"](word)
         results.append((("fx", wanted) in calls, f'nói "{word}" ra {wanted}'))
     del calls[:]
-    spells.on_voice("bâng quơ")
+    namespace["on_voice"]("bâng quơ")
     results.append((bool(calls), "từ lạ thì phải đọc lại cho biết máy nghe ra gì"))
     return results
 
 
-def _check_images(image_spells):
+def _check_images(namespace):
     """Chạy đúng người-chấm-bài mà học sinh bấm phím T trong trang."""
     results = []
-    for line in image_spells.check_all().split("\n"):
+    for line in namespace["check_all"](namespace).split("\n"):
         if line.startswith("—"):                      # dòng tiêu đề "bài thêm"
             continue
         results.append((not line.startswith("✖"), line[1:].strip()))
@@ -79,17 +86,17 @@ def _check_images(image_spells):
 def check():
     """Trả về (danh sách dòng đã định dạng, số chỗ còn sai)."""
     try:
-        spells, image_spells = _load()
+        namespace = _load()
     except Exception as err:
         return [f"  ✖ không nạp được student/: {type(err).__name__}: {err}"], 1
 
     results = []
     try:
-        results += _check_images(image_spells)
+        results += _check_images(namespace)
     except Exception as err:
         results.append((False, f"phần ảnh văng lỗi: {type(err).__name__}: {err}"))
     try:
-        results += _check_spells(spells)
+        results += _check_spells(namespace)
     except Exception as err:
         results.append((False, f"phần thần chú văng lỗi: {type(err).__name__}: {err}"))
 
