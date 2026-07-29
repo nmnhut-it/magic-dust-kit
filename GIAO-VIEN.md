@@ -157,6 +157,14 @@ Nói thẳng để thầy cô liệu: đây là **cái chốt cửa, không ph�
 sinh nào chịu khó mở mã nguồn vẫn đọc được. Mục đích chỉ là để các em không lỡ
 tay bấm ra đáp án khi đang bí.
 
+## Phát hành bản mới
+
+Sửa mã trong `src/` xong thì chạy `node tools/stamp.mjs` trước khi đưa lên
+mạng. Nó ghi cùng một con số vào `build.txt` và `src/build.js`; trang tải
+`build.txt` mỗi lần mở, thấy lệch với số nằm trong mã là tự nạp lại. Không có
+bước này thì máy học sinh có thể chạy mã cũ nửa ngày mà không ai biết — đã gặp
+thật, trang chết trắng vì mã cũ gặp dữ liệu mới.
+
 ## Chấm tự động
 
 `python cham.py` chấm cả hai file, không cần trình duyệt lẫn camera: nó dựng

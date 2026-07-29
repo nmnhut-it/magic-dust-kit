@@ -33,6 +33,7 @@ export function legacyWork() {
   } catch { return []; }
 }
 const DEMO_W = 160, DEMO_H = 120;
+const IMAGE_PREAMBLE = 'from magic_stage import new_image\n\n';
 const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, new_image\n\n';
 
 
@@ -85,15 +86,25 @@ export function saveCell(cell, source) {
   try { localStorage.setItem(CELL_KEY + cell.id, source); } catch { /* trình duyệt khoá localStorage */ }
 }
 
-// Ghép các ô đã làm thành đúng hai file mà sân khấu thật đọc.
+// Ô nào thuộc file nào. Khai một chỗ duy nhất — trước đây danh sách này nằm
+// rải trong lời gọi và tôi thêm bài mới mà quên sửa, thành ra sân khấu báo
+// "chưa thấy hàm compose" dù học sinh đã làm xong.
+const SPELL_KINDS = ['fingers', 'voice', 'setup'];
+const IMAGE_KINDS = ['image', 'blend', 'blend_alpha', 'compose', 'scene'];
+
+// Ghép các ô thành đúng hai file mà sân khấu thật đọc.
 export function publishFiles() {
   const pick = kinds => CELLS.filter(c => kinds.includes(c.kind)).map(c => cellSource(c).trimEnd()).join('\n\n\n');
   try {
-    localStorage.setItem(KEY + 'spells.py', SPELL_PREAMBLE + pick(['fingers', 'voice', 'setup']) + '\n');
-    localStorage.setItem(KEY + 'image_spells.py', pick(['image', 'blend']) + '\n');
+    localStorage.setItem(KEY + 'spells.py', SPELL_PREAMBLE + pick(SPELL_KINDS) + '\n');
+    localStorage.setItem(KEY + 'image_spells.py', IMAGE_PREAMBLE + pick(IMAGE_KINDS) + '\n');
     return true;
   } catch { return false; }
 }
+
+// Kiểm ngay: mọi ô phải nằm trong đúng một file, không ô nào rơi ra ngoài.
+const homeless = CELLS.filter(c => !SPELL_KINDS.includes(c.kind) && !IMAGE_KINDS.includes(c.kind));
+if (homeless.length) console.warn('ô chưa được gán vào file nào:', homeless.map(c => c.id));
 
 export async function bootPython(onStatus) {
   onStatus('Đang tải Python… lần đầu hơi lâu, chỉ lần này thôi.');

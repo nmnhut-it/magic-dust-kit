@@ -114,6 +114,7 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .stage-btn{color:#0b0f18;background:#9fe8d5;font:700 11px/1 ui-monospace,monospace;padding:9px 12px;border-radius:8px}
 #stale{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:rgba(200,162,74,.12);
   border:1px solid rgba(200,162,74,.4);color:#e2c072;font-size:13px}
+#fresh{margin-top:10px;background:rgba(120,178,165,.18)}
 </style>
 
 <header>
@@ -132,6 +133,7 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 // duyệt giữ notebook.js cũ trong 4 tiếng. Sửa file trong src/ thì bump số này.
 import { mountCodeBox } from './src/highlight.js?v=4';
 import { EFFECT_CLIPS } from './src/cells.js?v=4';
+import { checkFresh, hardReload } from './src/fresh.js?v=4';
 import { CELLS, cellSource, saveCell, publishFiles, bootPython, runCell, loadDemo, paintPixels,
          loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor, runChain,
          legacyWork } from './src/notebook.js?v=4';
@@ -152,6 +154,13 @@ gate.update();
 
 // Đề bài từng đổi cách biểu diễn ảnh. Máy nào còn giữ bài đời cũ thì nói thẳng,
 // vì code cũ chạy trên dữ liệu mới sẽ vỡ với thông báo chẳng ai đoán ra.
+// Có bản mới trên máy chủ thì tự nạp lại; kèm nút bấm tay ở đầu trang.
+checkFresh(() => say('Có bản mới nhưng nạp lại chưa ăn — bấm nút ⟳ LẤY BẢN MỚI.'));
+document.querySelector('header').appendChild(Object.assign(document.createElement('button'), {
+  id: 'fresh', textContent: '⟳ LẤY BẢN MỚI', onclick: hardReload,
+  title: 'Xoá bản cũ trong máy rồi tải lại trang',
+}));
+
 const stale = legacyWork();
 if (stale.length) {
   const warn = document.createElement('p');
@@ -222,6 +231,7 @@ function build(cell) {
       if (result.ok) el.querySelector('.tag').textContent = 'XONG';
       if (result.ok) passed.add(cell.id); else passed.delete(cell.id);
       savePassed(passed);
+      publishFiles();          // sân khấu luôn đọc được bài mới nhất, khỏi đợi mở cổng
       draw(result);
       gate.update();
       card.update();

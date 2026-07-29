@@ -30,3 +30,8 @@
 
 /
   Cache-Control: no-store
+
+# Dấu bản dựng: trang tải file này để biết máy có đang giữ bản cũ không.
+/build.txt
+  Cache-Control: no-store
+  Content-Type: text/plain; charset=utf-8

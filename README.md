@@ -46,6 +46,10 @@ Dùng **Chrome** hoặc **Edge** nhé.
 Lần đầu mở, trang phải tải Python về máy nên hơi lâu. Xong sẽ hiện
 `Python sẵn sàng` ở góc phải.
 
+**Nghi trang đang chạy bản cũ?** Bấm nút **⟳ LẤY BẢN MỚI** ở đầu trang: nó xoá
+bản cũ trong máy rồi tải lại. Thường thì khỏi cần — trang tự so số bản dựng với
+máy chủ mỗi lần mở, thấy lệch là tự nạp lại (đúng một lần, không quay vòng).
+
 ---
 
 # BÀI CỦA BẠN
