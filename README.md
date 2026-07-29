@@ -96,14 +96,50 @@ mỗi giây trên hình từ camera.
 **Bấm `T` trước khi hỏi ai** — máy dựng một ảnh tí hon rồi chỉ đúng chỗ bạn
 sai, kiểu `✖ blur: ô góc vẫn đen — ánh sáng chưa lan sang hàng xóm`.
 
+Chưa viết gì mà bấm `F` thì ô xem thử hiện đúng ảnh camera y như cũ. Máy sẽ
+nói thẳng `flip() chưa đổi gì trên ảnh` chứ không để bạn ngồi đoán là máy hỏng.
+
+> Yên tâm: phép video (`play_effect`) KHÔNG cần `blend`. Lớp hiệu ứng đó do
+> trang web tự ghép, nên bài 1 chạy được ngay cả khi bài 2 còn dang dở. `blend`
+> của bạn chỉ điều khiển ô xem thử khi bấm `N` — đó là chỗ bạn tự tay làm lại
+> việc mà trang web vẫn làm hộ.
+
+## Bài thêm — bốn phép nữa, làm được thì làm
+
+Nằm ngay dưới `blend` trong cùng file, cả bốn đều ngắn hơn `blur`:
+
+| Hàm | Việc của nó | Phím thử |
+|---|---|---|
+| `negative` | âm bản: mỗi kênh lấy `255 -` giá trị cũ | `A` |
+| `grayscale` | đen trắng: ba kênh cùng bằng trung bình cộng | `W` |
+| `flip_vertical` | lộn đầu xuống chân | `V` |
+| `drop_blue` | tắt hẳn kênh xanh dương | `C` |
+
 ## Mấy phím cần nhớ
 
 | Phím | Việc |
 |---|---|
 | `R` | nạp lại `student/*.py` sau khi bạn sửa |
-| `T` | máy tự chấm ba hàm xử lý ảnh và nói bạn sai ở đâu |
+| `T` | máy tự chấm mọi hàm xử lý ảnh và nói bạn sai ở đâu |
 | `F` `B` `N` | chạy `flip` / `blur` / `blend` của bạn trên hình camera |
+| `A` `W` `V` `C` | bốn bài thêm |
 | `X` | tắt phép xử lý ảnh |
+
+## Máy chấm giúp ngay lúc bật máy chủ
+
+Mỗi lần chạy `CHAY.bat` (hoặc `python serve.py`), cửa sổ đen in ra bảng chấm
+trước khi mở trang — bạn biết mình còn thiếu gì mà chưa cần bấm phím nào:
+
+```
+Bai trong student/ :
+  ✓ flip
+  ✖ blur: ô góc vẫn đen — ánh sáng chưa lan sang hàng xóm
+  ...
+  => con 1 cho chua xong.
+```
+
+Muốn chấm lại mà không tắt máy chủ thì mở cửa sổ khác gõ `python cham.py`, hoặc
+bấm `T` ngay trong trang.
 
 ---
 
@@ -164,18 +200,18 @@ bươm bướm) và cách kiểm xem nền đã đủ đen chưa.
 
 ## Mức 3 — phép xử lý ảnh của riêng bạn
 
-`flip`, `blur`, `blend` chỉ là ba hàm Python bình thường, chạy trên một danh
-sách số. Bạn viết được cái thứ tư. Vài ý để nghịch, sửa thẳng trong `flip` cho
-nhanh rồi bấm `F`:
+Bốn bài thêm ở trên (`negative`, `grayscale`, `flip_vertical`, `drop_blue`) là
+để bạn quen tay. Xong rồi thì tự nghĩ phép thứ năm — chúng chỉ là hàm Python
+bình thường chạy trên một danh sách số:
 
-- **Âm bản:** `out[o] = 255 - px[o]` cho cả ba kênh màu.
-- **Đen trắng:** tính trung bình `(đỏ + xanh lá + xanh dương) // 3` rồi ghi
-  cùng một con số đó vào cả ba kênh.
-- **Lật dọc:** giống `flip` nhưng đổi `row`, lấy hàng `height - 1 - row`.
-- **Bỏ bớt một màu:** cho `out[o + 2] = 0` xem thế giới không còn màu xanh
-  dương trông thế nào.
+- **Nửa ảnh soi gương:** chỉ lật cột bên trái, giữ nguyên bên phải.
+- **Tăng tương phản:** ô nào sáng hơn 128 thì đẩy lên 255, còn lại kéo về 0.
+- **Đổi chỗ hai kênh màu:** ghi đỏ vào chỗ xanh dương và ngược lại.
 - **Mờ mạnh hơn:** đổi `blur` từ 3×3 sang 5×5, và để ý máy chậm đi bao nhiêu —
   đó chính là lý do bộ này chạy ảnh ở 96×72.
+
+Muốn máy chấm giúp phép mới thì tự viết thêm vài dòng kiểm trong `check_all()`,
+đúng kiểu mấy dòng đã có sẵn.
 
 ---
 
@@ -205,8 +241,8 @@ trên mạng cả — nó do chính trang này dựng ra.
 |---|---|
 | MediaPipe nhìn thấy số ngón tay đổi | `on_fingers(count)` |
 | Micro nghe ra một từ | `on_voice(word)` |
-| Mỗi khung hình, khi đang bật `F`/`B`/`N` | `flip` / `blur` / `blend` |
-| Bạn bấm `T` | `kiem_tra()` |
+| Mỗi khung hình, khi đang bật `F`/`B`/`N`/`A`/`W`/`V`/`C` | hàm xử lý ảnh tương ứng |
+| Bạn bấm `T`, và `serve.py` lúc khởi động | `check_all()` |
 
 Nếu bạn đổi tên hàm hoặc chưa lưu file, máy sẽ nói thẳng
 `Chưa thấy hàm on_fingers()`.

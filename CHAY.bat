@@ -2,6 +2,8 @@
 setlocal EnableDelayedExpansion
 title Magic Dust
 cd /d "%~dp0"
+rem UTF-8, de bang cham bai in duoc tieng Viet co dau
+chcp 65001 >nul
 
 echo(
 echo   ==========================================

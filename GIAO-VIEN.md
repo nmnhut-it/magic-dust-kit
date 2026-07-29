@@ -122,6 +122,66 @@ def blend(px, layer, out, width, height):
         out[i + 2] = min(255, px[i + 2] + layer[i + 2])
 ```
 
+### Bốn bài thêm (`negative` · `grayscale` · `flip_vertical` · `drop_blue`)
+
+```python
+def negative(px, out, width, height):
+    for i in range(0, len(px), 4):
+        out[i] = 255 - px[i]
+        out[i + 1] = 255 - px[i + 1]
+        out[i + 2] = 255 - px[i + 2]
+
+
+def grayscale(px, out, width, height):
+    for i in range(0, len(px), 4):
+        gray = (px[i] + px[i + 1] + px[i + 2]) // 3
+        out[i] = gray
+        out[i + 1] = gray
+        out[i + 2] = gray
+
+
+def flip_vertical(px, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            o = (row * width + col) * 4
+            source = ((height - 1 - row) * width + col) * 4
+            out[o] = px[source]
+            out[o + 1] = px[source + 1]
+            out[o + 2] = px[source + 2]
+
+
+def drop_blue(px, out, width, height):
+    for i in range(0, len(px), 4):
+        out[i] = px[i]
+        out[i + 1] = px[i + 1]
+        out[i + 2] = 0
+```
+
+`grayscale` là bài đáng dừng lại nhất: nhiều em ghi trung bình vào đúng một
+kênh rồi thắc mắc sao ảnh ngả đỏ. Người chấm phân biệt hai lỗi đó bằng hai câu
+khác nhau — "ba kênh phải bằng nhau" và "đã bằng nhau nhưng chưa phải trung
+bình cộng".
+
+## Chấm tự động
+
+`python cham.py` chấm cả hai file, không cần trình duyệt lẫn camera: nó dựng
+một `magic_stage` giả rồi gọi thẳng `on_fingers`/`on_voice` và toàn bộ hàm ảnh.
+`serve.py` gọi nó mỗi lần khởi động, nên bấm `CHAY.bat` là bảng chấm hiện ngay
+trong cửa sổ đen trước khi trình duyệt mở. Trong trang thì phím `T` cho cùng
+kết quả (`check_all()` nằm cuối `student/image_spells.py`).
+
+Chấm ở ba chỗ dùng chung một bộ đề, nên không có chuyện máy chủ nói đạt mà
+trang nói chưa.
+
+## `blend` chưa xong thì phép video vẫn chạy
+
+Đáng nói vì dễ hiểu nhầm: `play_effect(...)` do JavaScript ghép lớp
+(`studio.playOverlay`), hoàn toàn không đi qua `blend` của học sinh. Bài 1 vì
+vậy chơi được ngay từ đầu buổi, khi bài 2 còn trống. `blend` chỉ điều khiển ô
+xem thử ở góc phải khi bấm `N` — và nếu hàm còn nguyên đề bài, `py-runtime.js`
+so ảnh vào/ra rồi báo `blend() chưa đổi gì trên ảnh`, thay vì để màn hình im
+lặng làm các em tưởng máy hỏng.
+
 ## Chỗ học sinh hay vấp
 
 - **Quên bấm `R`.** Sửa file xong nhìn màn hình không đổi rồi tưởng mình sai.

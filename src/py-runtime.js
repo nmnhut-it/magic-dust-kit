@@ -17,7 +17,12 @@ const FILES = ['./student/spells.py', './student/image_spells.py'];
 const W = 96, H = 72;              // Python thuần chạy ~22-160 khung/giây ở cỡ này
 const FRAME_EVERY = 2;             // xử lý 1 trong 2 khung, chừa hơi cho phần 3D
 const PLATE = './lessons/assets/camera-effects/plates/fx-dragon.webp';
-const MODES = { f: 'flip', b: 'blur', n: 'blend' };
+// Ba phép bắt buộc, rồi bốn bài thêm. Phím chọn sao cho không đụng phím nào
+// của đồ chơi (main.js đã giữ b/f/n/g/k/l/m/p/u và mấy phím số).
+const MODES = {
+  f: 'flip', b: 'blur', n: 'blend',
+  a: 'negative', w: 'grayscale', v: 'flip_vertical', c: 'drop_blue',
+};
 
 export function mountPython({ video, playEffect, cast, onStatus }) {
   const ui = buildPanel();
@@ -104,6 +109,9 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     state.busy = false;
     if (result === null && !state.py) return;
     if (ui.log.style.color === 'rgb(255, 180, 180)') { setMode(null); return; }   // hàm lỗi: tắt luôn, đừng nhấp nháy
+    // Hàm chưa làm bài thì chạy êm ru và trả lại đúng ảnh cũ — học sinh tưởng
+    // máy hỏng. Nói thẳng ra thay vì để màn hình im lặng.
+    if (unchanged(px, out)) say(`${state.mode}() chưa đổi gì trên ảnh — bạn đã viết phần "lượt của bạn" chưa?`);
     const frame = ctx.createImageData(W, H);
     for (let i = 0; i < frame.data.length; i++) frame.data[i] = out[i];
     ctx.putImageData(frame, 0, 0);
@@ -121,12 +129,19 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     const key = event.key.toLowerCase();
     if (key === 'x') { setMode(null); say('Đã tắt phép xử lý ảnh'); return; }
     if (key === 'r') { reload().then(ok => ok && say('Đã nạp lại student/*.py')); return; }
-    if (key === 't') { const verdict = call('kiem_tra'); if (verdict != null) say(String(verdict)); return; }
+    if (key === 't') { const verdict = call('check_all'); if (verdict != null) say(String(verdict)); return; }
     if (MODES[key]) setMode(MODES[key]);
   });
 
   boot().catch(err => say(`Không tải được Python: ${err.message}`, true));
   return api;
+}
+
+// Chỉ dò vài trăm ô là đủ biết hàm có đụng vào ảnh hay không — quét cả 96×72
+// mỗi khung hình thì tốn hơn chính phép xử lý.
+function unchanged(px, out) {
+  for (let i = 0; i < px.length; i += 397 * 4) if (px[i] !== out[i] || px[i + 1] !== out[i + 1] || px[i + 2] !== out[i + 2]) return false;
+  return true;
 }
 
 // Pyodide gói lỗi Python thành lỗi JS; dòng cuối của traceback mới là câu học

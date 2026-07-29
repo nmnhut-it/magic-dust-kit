@@ -30,8 +30,46 @@ class Handler(SimpleHTTPRequestHandler):
             super().log_message(fmt, *args)
 
 
+def safe_print(line):
+    """In một dòng chấm bài.
+
+    Console Windows mặc định còn dùng bảng mã cũ, in tiếng Việt ra ký tự lạ.
+    `CHAY.bat` đã bật sẵn UTF-8 (chcp 65001) và `main()` đổi luôn stdout sang
+    UTF-8; đây chỉ là lưới an toàn cuối cùng cho máy nào vẫn không chịu.
+    """
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        print(line.replace("✓", "OK").replace("✖", "!!").encode("ascii", "ignore").decode())
+
+
+def grade_student_files():
+    """Chấm `student/` ngay khi bật máy chủ, để học sinh thấy mình còn thiếu gì."""
+    try:
+        import cham
+        lines, wrong = cham.check()
+    except Exception as err:                     # chấm hỏng thì vẫn phải mở được trang
+        print(f"(khong cham duoc bai: {type(err).__name__}: {err})")
+        return
+    safe_print("")
+    safe_print("Bai trong student/ :")
+    for line in lines:
+        safe_print(line)
+    if wrong:
+        safe_print(f"  => con {wrong} cho chua xong."
+                   " Sua file trong student/ roi bam R va T ngay trong trang.")
+    else:
+        safe_print("  => XONG HET BAI.")
+    safe_print("")
+
+
 def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")     # để bảng chấm bài đọc được tiếng Việt
+    except Exception:
+        pass
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8123
+    grade_student_files()
     server = ThreadingHTTPServer(("", port), partial(Handler, directory="."))
     print(f"Magic Dust chay o http://localhost:{port}")
     print(f"  do choi  -> http://localhost:{port}/index.html")
