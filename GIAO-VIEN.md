@@ -79,83 +79,63 @@ def on_voice(word):
         say("nghe được: " + word)
 ```
 
-### `student/image_spells.py`
+### `student/image_spells.py` (và bốn bài thêm)
 
 ```python
-def flip(px, out, width, height):
+def blur(image, out, width, height):
     for row in range(height):
         for col in range(width):
-            o = (row * width + col) * 4
-            f = (row * width + (width - 1 - col)) * 4
-            out[o] = px[f]
-            out[o + 1] = px[f + 1]
-            out[o + 2] = px[f + 2]
-
-
-def blur(px, out, width, height):
-    for row in range(height):
-        for col in range(width):
-            do = xanh_la = xanh_duong = dem = 0
-            for dr in (-1, 0, 1):
-                nr = row + dr
-                if nr < 0 or nr >= height:
+            red = green = blue = count = 0
+            for row_step in (-1, 0, 1):
+                near_row = row + row_step
+                if near_row < 0 or near_row >= height:
                     continue
-                for dc in (-1, 0, 1):
-                    nc = col + dc
-                    if nc < 0 or nc >= width:
+                for col_step in (-1, 0, 1):
+                    near_col = col + col_step
+                    if near_col < 0 or near_col >= width:
                         continue
-                    i = (nr * width + nc) * 4
-                    do += px[i]
-                    xanh_la += px[i + 1]
-                    xanh_duong += px[i + 2]
-                    dem += 1
-            o = (row * width + col) * 4
-            out[o] = do // dem
-            out[o + 1] = xanh_la // dem
-            out[o + 2] = xanh_duong // dem
+                    pixel = image[near_row][near_col]
+                    red = red + pixel[0]
+                    green = green + pixel[1]
+                    blue = blue + pixel[2]
+                    count = count + 1
+            out[row][col] = [red // count, green // count, blue // count]
 
-
-def blend(px, layer, out, width, height):
-    for i in range(0, len(px), 4):
-        out[i] = min(255, px[i] + layer[i])
-        out[i + 1] = min(255, px[i + 1] + layer[i + 1])
-        out[i + 2] = min(255, px[i + 2] + layer[i + 2])
-```
-
-### Bốn bài thêm (`negative` · `grayscale` · `flip_vertical` · `drop_blue`)
-
-```python
-def negative(px, out, width, height):
-    for i in range(0, len(px), 4):
-        out[i] = 255 - px[i]
-        out[i + 1] = 255 - px[i + 1]
-        out[i + 2] = 255 - px[i + 2]
-
-
-def grayscale(px, out, width, height):
-    for i in range(0, len(px), 4):
-        gray = (px[i] + px[i + 1] + px[i + 2]) // 3
-        out[i] = gray
-        out[i + 1] = gray
-        out[i + 2] = gray
-
-
-def flip_vertical(px, out, width, height):
+def blend(image, layer, out, width, height):
     for row in range(height):
         for col in range(width):
-            o = (row * width + col) * 4
-            source = ((height - 1 - row) * width + col) * 4
-            out[o] = px[source]
-            out[o + 1] = px[source + 1]
-            out[o + 2] = px[source + 2]
+            base = image[row][col]
+            glow = layer[row][col]
+            out[row][col] = [min(255, base[0] + glow[0]),
+                             min(255, base[1] + glow[1]),
+                             min(255, base[2] + glow[2])]
 
+def negative(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            pixel = image[row][col]
+            out[row][col] = [255 - pixel[0], 255 - pixel[1], 255 - pixel[2]]
 
-def drop_blue(px, out, width, height):
-    for i in range(0, len(px), 4):
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = 0
+def grayscale(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            pixel = image[row][col]
+            gray = (pixel[0] + pixel[1] + pixel[2]) // 3
+            out[row][col] = [gray, gray, gray]
+
+def flip_vertical(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            out[row][col] = image[height - 1 - row][col]
+
+def drop_blue(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            pixel = image[row][col]
+            out[row][col] = [pixel[0], pixel[1], 0]
 ```
+
+Ảnh là mảng ba chiều `image[row][col][màu]`, giống hệt bên đảo Gương Vô Cực.
 
 `grayscale` là bài đáng dừng lại nhất: nhiều em ghi trung bình vào đúng một
 kênh rồi thắc mắc sao ảnh ngả đỏ. Người chấm phân biệt hai lỗi đó bằng hai câu

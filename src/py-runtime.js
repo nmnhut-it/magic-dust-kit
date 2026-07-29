@@ -13,6 +13,7 @@
 // không phải chép qua chép lại — đổi lại, khi Python chạy thì hình đứng yên
 // trong chốc lát, nên phần xử lý ảnh chạy cách khung (xem FRAME_EVERY).
 import { storedSource } from './student-store.js?v=3';
+import { toGrid, toFlat, blankGrid } from './notebook.js?v=3';   // cùng cách dịch ảnh với trang làm bài
 
 const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
 const GRADER = './pygrade/grader.py';        // bộ chấm dùng chung, học sinh không sửa
@@ -102,7 +103,7 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const cx = c.getContext('2d', { willReadFrequently: true });
     cx.drawImage(plate, 0, 0, W, H);
-    state.layer = Array.from(cx.getImageData(0, 0, W, H).data);
+    state.layer = toGrid(Array.from(cx.getImageData(0, 0, W, H).data), W, H);
   };
   plate.src = PLATE;
 
@@ -112,20 +113,23 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     if (state.frame++ % FRAME_EVERY) return;
     grabCtx.drawImage(video, 0, 0, W, H);
     const src = grabCtx.getImageData(0, 0, W, H);
-    const px = Array.from(src.data);
-    const out = new Array(px.length).fill(255);
+    // Học sinh làm việc với image[row][col] -> [đỏ, lá, dương], đúng như bên
+    // trang làm bài; canvas thì giữ một dãy số dài. Dịch qua lại bằng JS.
+    const image = toGrid(Array.from(src.data), W, H);
+    const out = blankGrid(W, H);
     state.busy = true;
     const result = state.mode === 'blend'
-      ? (state.layer ? call('blend', px, state.layer, out, W, H) : (say('Đang tải lớp hiệu ứng…'), null))
-      : call(state.mode, px, out, W, H);
+      ? (state.layer ? call('blend', image, state.layer, out, W, H) : (say('Đang tải lớp hiệu ứng…'), null))
+      : call(state.mode, image, out, W, H);
     state.busy = false;
     if (result === null && !state.py) return;
     if (ui.log.style.color === 'rgb(255, 180, 180)') { setMode(null); return; }   // hàm lỗi: tắt luôn, đừng nhấp nháy
     // Hàm chưa làm bài thì chạy êm ru và trả lại đúng ảnh cũ — học sinh tưởng
     // máy hỏng. Nói thẳng ra thay vì để màn hình im lặng.
-    if (unchanged(px, out)) say(`${state.mode}() chưa đổi gì trên ảnh — bạn đã viết phần "lượt của bạn" chưa?`);
+    if (unchanged(image, out)) say(`${state.mode}() chưa đổi gì trên ảnh — bạn đã viết phần "lượt của bạn" chưa?`);
+    const flat = toFlat(out, W, H);
     const frame = ctx.createImageData(W, H);
-    for (let i = 0; i < frame.data.length; i++) frame.data[i] = out[i];
+    for (let i = 0; i < frame.data.length; i++) frame.data[i] = flat[i];
     ctx.putImageData(frame, 0, 0);
   }
   requestAnimationFrame(tick);
@@ -149,10 +153,15 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
   return api;
 }
 
-// Chỉ dò vài trăm ô là đủ biết hàm có đụng vào ảnh hay không — quét cả 96×72
+// Chỉ dò vài chục ô là đủ biết hàm có đụng vào ảnh hay không — quét cả 96×72
 // mỗi khung hình thì tốn hơn chính phép xử lý.
-function unchanged(px, out) {
-  for (let i = 0; i < px.length; i += 397 * 4) if (px[i] !== out[i] || px[i + 1] !== out[i + 1] || px[i + 2] !== out[i + 2]) return false;
+function unchanged(image, out) {
+  for (let row = 0; row < image.length; row += 7) {
+    for (let col = 0; col < image[row].length; col += 11) {
+      const before = image[row][col], after = out[row][col];
+      if (before[0] !== after[0] || before[1] !== after[1] || before[2] !== after[2]) return false;
+    }
+  }
   return true;
 }
 

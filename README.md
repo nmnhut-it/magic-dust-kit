@@ -103,9 +103,15 @@ Bài này không cần ai chấm: giơ tay lên camera là thấy ngay mình đ�
 
 ## Nhóm 2 — ba phép xử lý ảnh (`image_spells.py`)
 
-Ở đảo gương bạn viết `flip` và `blend` bằng Python trên lưới nhỏ, đủ để nhìn
-từng con số. Ở đây **vẫn đúng phép tính đó**, nhưng máy gọi lại hàng chục lần
-mỗi giây trên hình từ camera.
+Ở đảo gương bạn viết `flip` và `blend` trên lưới số nhỏ. Ở đây **vẫn đúng phép
+tính đó và vẫn đúng cách viết đó** — ảnh là mảng ba chiều:
+
+```python
+image[row][col]      # -> [đỏ, xanh lá, xanh dương], mỗi số 0..255
+image[row][col][0]   # riêng màu đỏ của ô đó
+```
+
+Khác mỗi chỗ: máy gọi hàm của bạn hàng chục lần mỗi giây trên hình từ camera.
 
 | Hàm | Việc của nó | Phím thử |
 |---|---|---|

@@ -136,17 +136,56 @@ function runSpellCell(py, log, cell) {
   return { ok, message: ok ? cell.id : `${cell.id}: còn dòng ✖ ở bảng dưới`, rows };
 }
 
-// Chạy hàm của học sinh trên ẢNH THẬT đã thu nhỏ, trả về mảng pixel để vẽ ra.
+// Canvas giữ ảnh dưới dạng một dãy số dài (đỏ,lá,dương,đục lặp lại); học sinh
+// thì làm việc với image[row][col] -> [đỏ, lá, dương]. Hai hàm này dịch qua
+// lại. Dịch bằng JS nên rẻ; Python chỉ chạy đúng vòng lặp của các em.
+export function toGrid(flat, width, height) {
+  const grid = [];
+  for (let row = 0; row < height; row++) {
+    const line = [];
+    for (let col = 0; col < width; col++) {
+      const at = (row * width + col) * 4;
+      line.push([flat[at], flat[at + 1], flat[at + 2]]);
+    }
+    grid.push(line);
+  }
+  return grid;
+}
+
+export function toFlat(grid, width, height) {
+  const flat = new Array(width * height * 4).fill(255);
+  for (let row = 0; row < height; row++) {
+    for (let col = 0; col < width; col++) {
+      const pixel = grid[row][col];
+      const at = (row * width + col) * 4;
+      flat[at] = pixel[0]; flat[at + 1] = pixel[1]; flat[at + 2] = pixel[2];
+    }
+  }
+  return flat;
+}
+
+export function blankGrid(width, height) {
+  const grid = [];
+  for (let row = 0; row < height; row++) {
+    const line = [];
+    for (let col = 0; col < width; col++) line.push([0, 0, 0]);
+    grid.push(line);
+  }
+  return grid;
+}
+
+// Chạy hàm của học sinh trên ẢNH THẬT đã thu nhỏ, trả về dãy số để vẽ ra canvas.
 function runOnDemo(py, cell, demo) {
+  const { width, height } = demo;
   const args = cell.kind === 'blend'
-    ? `_px, _layer, _out, ${demo.width}, ${demo.height}`
-    : `_px, _out, ${demo.width}, ${demo.height}`;
-  py.globals.set('_px', py.toPy(baseFor(cell, demo)));
-  if (cell.kind === 'blend') py.globals.set('_layer', py.toPy(demo.layer));
-  py.globals.set('_out', py.toPy(new Array(baseFor(cell, demo).length).fill(255)));
+    ? `_image, _layer, _out, ${width}, ${height}`
+    : `_image, _out, ${width}, ${height}`;
+  py.globals.set('_image', py.toPy(toGrid(baseFor(cell, demo), width, height)));
+  if (cell.kind === 'blend') py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
+  py.globals.set('_out', py.toPy(blankGrid(width, height)));
   try {
     py.runPython(`${cell.id}(${args})`);
-    return py.globals.get('_out').toJs();
+    return toFlat(py.globals.get('_out').toJs(), width, height);
   } catch { return null; }                    // lỗi đã được bộ chấm nói rồi
 }
 

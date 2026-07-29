@@ -1,10 +1,15 @@
 # ============================================================================
 #  BỘ CHẤM — file của máy, học sinh không phải đọc.
 #  Một nguồn duy nhất cho ba chỗ chấm bài:
-#     · trang làm bài  (bai.html chấm từng hàm một)
-#     · đồ chơi        (phím T chấm cả bài)
+#     · trang làm bài  (index.html chấm từng hàm một)
+#     · sân khấu       (phím T chấm cả bài)
 #     · dòng lệnh      (cham.py, và serve.py gọi lúc khởi động)
 #  Nhờ vậy không có chuyện chỗ này báo đạt còn chỗ kia báo sai.
+#
+#  ẢNH Ở ĐÂY LÀ MẢNG HAI CHIỀU, giống hệt bên đảo Gương Vô Cực:
+#     image[row][col] -> [đỏ, xanh lá, xanh dương]
+#  (Bản cũ duỗi thẳng thành một danh sách dài và bắt học sinh tự tính
+#   (row * width + col) * 4 — khó hiểu quá nên đã bỏ.)
 # ============================================================================
 
 TASKS = ("flip", "blur", "blend", "negative", "grayscale", "flip_vertical", "drop_blue")
@@ -13,143 +18,134 @@ EXTRA_TASKS = ("negative", "grayscale", "flip_vertical", "drop_blue")
 
 def solid(width, height, red, green, blue):
     """Ảnh mà mọi ô đều cùng một màu."""
-    px = []
-    for _ in range(width * height):
-        px.append(red)
-        px.append(green)
-        px.append(blue)
-        px.append(255)
-    return px
+    image = []
+    for _ in range(height):
+        row = []
+        for _ in range(width):
+            row.append([red, green, blue])
+        image.append(row)
+    return image
+
+
+def blank(width, height):
+    """Ảnh trống để học sinh ghi kết quả vào."""
+    return solid(width, height, 0, 0, 0)
 
 
 def column_stripes(width, height, step):
     """Mỗi cột một sắc đỏ khác nhau — để thấy ảnh có bị lật ngang không."""
-    px = []
+    image = []
     for row in range(height):
+        line = []
         for col in range(width):
-            px.append(col * step)
-            px.append(row)
-            px.append(7)
-            px.append(255)
-    return px
+            line.append([col * step, row, 7])
+        image.append(line)
+    return image
 
 
 def row_stripes(width, height, step):
     """Mỗi hàng một sắc đỏ khác nhau — để thấy ảnh có bị lật dọc không."""
-    px = []
+    image = []
     for row in range(height):
+        line = []
         for col in range(width):
-            px.append(row * step)
-            px.append(col)
-            px.append(7)
-            px.append(255)
-    return px
+            line.append([row * step, col, 7])
+        image.append(line)
+    return image
 
 
 def white_dot(side):
     """Ảnh đen với đúng một ô trắng ở giữa — để thấy blur có lan sáng không."""
-    px = []
+    image = []
     middle = side // 2
     for row in range(side):
+        line = []
         for col in range(side):
             if row == middle and col == middle:
-                light = 255
+                line.append([255, 255, 255])
             else:
-                light = 0
-            px.append(light)
-            px.append(light)
-            px.append(light)
-            px.append(255)
-    return px
+                line.append([0, 0, 0])
+        image.append(line)
+    return image
 
 
 def _check_flip(fn):
-    px = column_stripes(3, 2, 10)
-    out = [255] * len(px)
-    fn(px, out, 3, 2)
-    expected = []
+    image = column_stripes(3, 2, 10)
+    out = blank(3, 2)
+    fn(image, out, 3, 2)
     for row in range(2):
         for col in range(3):
-            expected.append((2 - col) * 10)
-            expected.append(row)
-            expected.append(7)
-            expected.append(255)
-    if out == expected:
-        return True, "flip"
-    return False, "flip: ô cột col phải lấy màu của cột width - 1 - col"
+            if list(out[row][col]) != [(2 - col) * 10, row, 7]:
+                return False, "flip: ô cột col phải lấy màu của ô cột width - 1 - col"
+    return True, "flip"
 
 
 def _check_blur(fn):
-    px = white_dot(3)
-    out = [255] * len(px)
-    fn(px, out, 3, 3)
-    middle = out[(1 * 3 + 1) * 4]
-    corner = out[0]
-    if middle >= 250:
+    image = white_dot(3)
+    out = blank(3, 3)
+    fn(image, out, 3, 3)
+    if out[1][1][0] >= 250:
         return False, "blur: ô giữa vẫn trắng nguyên — chưa lấy trung bình với hàng xóm"
-    if corner == 0:
+    if out[0][0][0] == 0:
         return False, "blur: ô góc vẫn đen — ánh sáng chưa lan sang hàng xóm"
     flat = solid(3, 3, 90, 90, 90)
-    out = [255] * len(flat)
+    out = blank(3, 3)
     fn(flat, out, 3, 3)
-    if out[0] != 90:
-        return False, "blur: ảnh phẳng phải giữ nguyên — ô sát mép chia cho số hàng xóm thật, không chia cứng cho 9"
+    if out[0][0][0] != 90:
+        return False, ("blur: ảnh phẳng phải giữ nguyên — ô sát mép chia cho số hàng xóm"
+                       " thật, không chia cứng cho 9")
     return True, "blur"
 
 
 def _check_blend(fn):
-    px = solid(2, 1, 200, 10, 0)
-    layer = [0, 0, 0, 255, 100, 100, 100, 255]      # ô đầu đen, ô sau xám sáng
-    out = [255] * len(px)
-    fn(px, layer, out, 2, 1)
-    if out[0] != 200 or out[1] != 10:
+    image = solid(2, 1, 200, 10, 0)
+    layer = [[[0, 0, 0], [100, 100, 100]]]      # ô đầu đen, ô sau xám sáng
+    out = blank(2, 1)
+    fn(image, layer, out, 2, 1)
+    if list(out[0][0]) != [200, 10, 0]:
         return False, "blend: ô đen của lớp hiệu ứng phải giữ nguyên nền"
-    if out[4] != 255:
+    if out[0][1][0] != 255:
         return False, "blend: ô sáng phải cộng vào nền rồi kẹp ở 255"
     return True, "blend"
 
 
 def _check_negative(fn):
-    px = solid(2, 1, 0, 100, 255)
-    out = [255] * len(px)
-    fn(px, out, 2, 1)
-    if out[0:3] == [255, 155, 0]:
+    image = solid(2, 1, 0, 100, 255)
+    out = blank(2, 1)
+    fn(image, out, 2, 1)
+    if list(out[0][0]) == [255, 155, 0]:
         return True, "negative"
     return False, "negative: mỗi kênh phải là 255 trừ đi giá trị cũ"
 
 
 def _check_grayscale(fn):
-    px = solid(2, 1, 30, 60, 90)
-    out = [255] * len(px)
-    fn(px, out, 2, 1)
-    if out[0] == out[1] == out[2] == 60:
+    image = solid(2, 1, 30, 60, 90)
+    out = blank(2, 1)
+    fn(image, out, 2, 1)
+    pixel = list(out[0][0])
+    if pixel == [60, 60, 60]:
         return True, "grayscale"
-    if out[0] == out[1] == out[2]:
+    if pixel[0] == pixel[1] == pixel[2]:
         return False, "grayscale: ba kênh đã bằng nhau nhưng chưa phải trung bình cộng"
     return False, "grayscale: ảnh đen trắng thì ba kênh màu phải bằng nhau"
 
 
 def _check_flip_vertical(fn):
-    px = row_stripes(2, 3, 40)
-    out = [255] * len(px)
-    fn(px, out, 2, 3)
-    expected = []
+    image = row_stripes(2, 3, 40)
+    out = blank(2, 3)
+    fn(image, out, 2, 3)
     for row in range(3):
         for col in range(2):
-            expected.append((2 - row) * 40)
-            expected.append(col)
-            expected.append(7)
-            expected.append(255)
-    if out == expected:
-        return True, "flip_vertical"
-    return False, "flip_vertical: ô hàng row phải lấy màu của hàng height - 1 - row"
+            if list(out[row][col]) != [(2 - row) * 40, col, 7]:
+                return False, "flip_vertical: ô hàng row phải lấy màu của ô hàng height - 1 - row"
+    return True, "flip_vertical"
 
 
 def _check_drop_blue(fn):
-    px = solid(2, 1, 200, 150, 100)
-    out = [255] * len(px)
-    fn(px, out, 2, 1)
-    if out[0:3] == [200, 150, 0]:
+    image = solid(2, 1, 200, 150, 100)
+    out = blank(2, 1)
+    fn(image, out, 2, 1)
+    if list(out[0][0]) == [200, 150, 0]:
         return True, "drop_blue"
     return False, "drop_blue: giữ nguyên đỏ và xanh lá, chỉ kênh xanh dương bằng 0"
 

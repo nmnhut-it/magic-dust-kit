@@ -4,6 +4,11 @@
 // ra gì), đoạn code có sẵn để học sinh sửa, và đáp án kèm lời giải thích —
 // đáp án bị khoá bằng mật khẩu để bố mẹ mở ra giảng khi con bí.
 //
+// ẢNH LÀ MẢNG HAI CHIỀU: image[row][col] cho ra [đỏ, xanh lá, xanh dương].
+// Bản đầu duỗi ảnh thành một danh sách dài và bắt học sinh tự tính
+// (row * width + col) * 4 — nhanh hơn chút nhưng trẻ con không hình dung nổi,
+// nên đã bỏ. Đo tại chỗ: 55ms so với 70ms mỗi khung hình, đổi lấy sự dễ hiểu.
+//
 // Ảnh demo: cảnh sân cổng Kotopia cho hầu hết các phép (nhiều màu, hai bên
 // khác hẳn nhau nên lật là thấy ngay). Riêng `blend` dùng nền TỐI, vì cộng một
 // lớp sáng lên nền vốn đã sáng thì trắng xoá, chẳng nhìn ra gì.
@@ -11,74 +16,75 @@ export const SCENE = './lessons/assets/storybook/portal-courtyard-v3.webp';
 export const DARK_SCENE = './lessons/assets/camera-effects/plates/fx-boss.webp';
 export const LAYER = './lessons/assets/camera-effects/plates/fx-dragon.webp';
 
-// Khối chú thích dán đầu mỗi bài ảnh, để học sinh không phải nhớ px là gì.
-const PIXEL_HEADER = `# px  = ảnh MÁY ĐƯA CHO BẠN — một danh sách số rất dài, chỉ đọc, đừng sửa
-# out = ảnh BẠN DỰNG RA — cùng độ dài, ban đầu trống, bạn ghi màu vào đây
+// Khối chú thích dán đầu mỗi bài ảnh, để học sinh không phải nhớ image là gì.
+const PIXEL_HEADER = `# image = ảnh MÁY ĐƯA CHO BẠN. Chỉ đọc, đừng sửa.
+# out   = ảnh BẠN DỰNG RA. Ban đầu toàn màu đen, bạn ghi màu vào đây.
 #
-# Mỗi ô ảnh chiếm 4 số liền nhau: đỏ, xanh lá, xanh dương, độ đục.
-# Ô ở hàng row, cột col bắt đầu tại:  o = (row * width + col) * 4
-#   px[o] đỏ · px[o + 1] xanh lá · px[o + 2] xanh dương · px[o + 3] độ đục`;
+# Ảnh là bảng ô vuông xếp theo HÀNG và CỘT, đánh số từ 0:
+#
+#     image[row][col]  ->  [đỏ, xanh lá, xanh dương]     mỗi số từ 0 tới 255
+#
+#     image[0][0]      ô góc trên bên trái
+#     image[0][1]      ô kế bên phải nó
+#     image[1][0]      ô ngay bên dưới ô đầu
+#
+# Lấy riêng một màu thì thêm một dấu ngoặc nữa:
+#     image[row][col][0] là đỏ · [1] xanh lá · [2] xanh dương
+#
+# width = số cột · height = số hàng`;
 
 export const CELLS = [
   {
     id: 'flip', kind: 'image', title: 'flip — soi gương trái phải',
     idea: `Lật ảnh KHÔNG phải xoay tấm ảnh. Máy chỉ chép màu sang chỗ khác: ô ngoài cùng
 bên trái lấy màu của ô ngoài cùng bên phải, ô thứ hai từ trái lấy màu ô thứ hai
-từ phải, cứ thế đổi chỗ từng cặp. Hàng thì giữ nguyên — chỉ cột đảo lại.`,
-    input: 'Một tấm ảnh trong `px`, rộng `width` ô, cao `height` ô.',
-    job: 'Với mỗi ô, tìm ô đối xứng của nó qua trục dọc giữa ảnh rồi chép ba kênh màu sang `out`.',
+từ phải, cứ thế đổi chỗ từng cặp. Hàng giữ nguyên — chỉ số CỘT đảo lại.`,
+    input: 'Ảnh `image` rộng `width` cột, cao `height` hàng.',
+    job: 'Với mỗi ô, chép màu của ô đối xứng với nó qua trục dọc giữa ảnh sang `out`.',
     output: 'Ảnh trong gương: cảnh bên trái nhảy sang phải và ngược lại.',
     stub: `${PIXEL_HEADER}
 #
 # Ô ở cột col phải lấy màu của ô cột  width - 1 - col  trong CÙNG hàng.
-# Ví dụ ảnh rộng 5: cột 0 lấy cột 4, cột 1 lấy cột 3, cột 2 lấy chính nó.
-def flip(px, out, width, height):
+# Ảnh rộng 5 cột: cột 0 lấy cột 4 · cột 1 lấy cột 3 · cột 2 lấy chính nó.
+def flip(image, out, width, height):
     for row in range(height):
         for col in range(width):
-            o = (row * width + col) * 4          # chỗ GHI trong out
-            # lượt của bạn: tính chỗ LẤY màu trong px rồi chép ba kênh sang out
-            out[o] = px[o]
-            out[o + 1] = px[o + 1]
-            out[o + 2] = px[o + 2]
+            # lượt của bạn: sửa cột bên phải dấu bằng cho đúng
+            out[row][col] = image[row][col]
 `,
-    answer: `def flip(px, out, width, height):
+    answer: `def flip(image, out, width, height):
     for row in range(height):
         for col in range(width):
-            o = (row * width + col) * 4                       # chỗ ghi
-            source = (row * width + (width - 1 - col)) * 4    # chỗ lấy màu
-            out[o] = px[source]
-            out[o + 1] = px[source + 1]
-            out[o + 2] = px[source + 2]
+            out[row][col] = image[row][width - 1 - col]
 `,
-    why: `Hai công thức chỉ khác nhau ở chỗ cột: chỗ ghi dùng \`col\`, chỗ lấy dùng
-\`width - 1 - col\`. Nhân 4 vì mỗi ô chiếm 4 số. Phải đọc \`px\` và ghi \`out\` —
-nếu ghi đè lên \`px\` thì nửa ảnh sau sẽ lấy nhầm phần vừa bị sửa.`,
+    why: `Chỉ một dòng. Bên trái dấu bằng là chỗ GHI (\`out[row][col]\`), bên phải là chỗ
+LẤY màu (\`image[row][width - 1 - col]\`). Hàng \`row\` giống nhau ở cả hai bên vì
+lật ngang không đụng tới hàng. Thử số cho dễ tin: ảnh rộng 5, ô cột 0 lấy
+\`5 - 1 - 0\` = cột 4, đúng là ô ngoài cùng bên phải.`,
   },
   {
     id: 'blur', kind: 'image', title: 'blur — làm mờ',
     idea: `Ảnh nét là vì hai ô cạnh nhau có màu chênh nhau nhiều. Muốn mờ thì kéo các ô
-lại gần nhau: mỗi ô lấy màu trung bình của chính nó và tám ô hàng xóm quanh nó.
+lại gần nhau: mỗi ô lấy màu trung bình của chính nó và các ô hàng xóm quanh nó.
 Chênh lệch bị san phẳng, mắt đọc ra là nhoè.`,
-    input: 'Ảnh trong `px`; mỗi ô có tối đa 8 hàng xóm (ít hơn nếu nó nằm sát mép).',
+    input: 'Ảnh `image`; mỗi ô có tối đa 8 hàng xóm, ít hơn nếu nó nằm sát mép.',
     job: 'Cộng màu của ô và các hàng xóm CÓ THẬT, đếm xem cộng được mấy ô, rồi chia cho đúng con số đó.',
     output: 'Ảnh nhoè đi, cạnh vật thể không còn sắc.',
     stub: `${PIXEL_HEADER}
 #
-# Hai chỗ dễ sai:
-#   1. Ô sát mép chỉ có 4 hoặc 6 hàng xóm. Chia cứng cho 9 thì viền ảnh tối sầm.
-#      Phải ĐẾM số ô cộng được rồi chia cho con số đó.
+# Hàng xóm của ô [row][col] là các ô [row + dr][col + dc] với dr, dc chạy
+# -1, 0, 1. Hai chỗ dễ sai:
+#   1. Ô sát mép chỉ có 4 hoặc 6 hàng xóm. Chia cứng cho 9 thì viền ảnh tối
+#      sầm. Phải ĐẾM số ô cộng được rồi chia cho con số đó.
 #   2. Hàng xóm rơi ra ngoài ảnh thì bỏ qua bằng continue. Chỉ số âm trong
-#      Python KHÔNG báo lỗi — nó đếm ngược từ cuối danh sách, ảnh sẽ mọc vệt lạ.
-def blur(px, out, width, height):
+#      Python KHÔNG báo lỗi — nó đếm ngược từ cuối, ảnh sẽ mọc vệt lạ ở mép.
+def blur(image, out, width, height):
     for row in range(height):
         for col in range(width):
-            o = (row * width + col) * 4
             # lượt của bạn: cộng màu các ô quanh đây rồi chia trung bình
-            out[o] = px[o]
-            out[o + 1] = px[o + 1]
-            out[o + 2] = px[o + 2]
+            out[row][col] = image[row][col]
 `,
-    answer: `def blur(px, out, width, height):
+    answer: `def blur(image, out, width, height):
     for row in range(height):
         for col in range(width):
             red = green = blue = count = 0
@@ -90,170 +96,167 @@ def blur(px, out, width, height):
                     near_col = col + col_step
                     if near_col < 0 or near_col >= width:
                         continue
-                    i = (near_row * width + near_col) * 4
-                    red += px[i]
-                    green += px[i + 1]
-                    blue += px[i + 2]
-                    count += 1
-            o = (row * width + col) * 4
-            out[o] = red // count
-            out[o + 1] = green // count
-            out[o + 2] = blue // count
+                    pixel = image[near_row][near_col]
+                    red = red + pixel[0]
+                    green = green + pixel[1]
+                    blue = blue + pixel[2]
+                    count = count + 1
+            out[row][col] = [red // count, green // count, blue // count]
 `,
-    why: `Hai vòng lặp trong (\`row_step\`, \`col_step\` chạy -1, 0, 1) đi hết 9 ô của khối
-vuông quanh ô đang xét. \`continue\` bỏ qua ô nằm ngoài ảnh, nên \`count\` là số ô
-thật sự cộng được: giữa ảnh là 9, cạnh là 6, góc là 4. Chia cho \`count\` chứ
-không chia cho 9 — đó là lý do viền ảnh không bị tối.`,
+    why: `Hai vòng lặp trong (\`row_step\`, \`col_step\` chạy -1, 0, 1) đi hết khối vuông 9 ô
+quanh ô đang xét. \`continue\` bỏ qua ô nằm ngoài ảnh, nên \`count\` là số ô THẬT
+SỰ cộng được: giữa ảnh 9, cạnh 6, góc 4. Chia cho \`count\` chứ không chia cho 9
+— đó là lý do viền ảnh không bị tối. \`//\` là chia lấy phần nguyên, vì màu phải
+là số nguyên.`,
   },
   {
     id: 'blend', kind: 'blend', title: 'blend — ghép lớp hiệu ứng',
     idea: `Ghép hai ảnh KHÔNG phải dán đè, mà là CỘNG ÁNH SÁNG. Chỗ nào của lớp hiệu ứng
-màu đen thì giá trị gần 0, cộng vào nền gần như không đổi gì — nền tự hiện ra
-qua. Chỗ nào sáng thì đẩy nền sáng lên. Đó là lý do video hiệu ứng phải quay
-trên nền đen: nền đen tự biến mất, khỏi cần cắt.`,
-    input: 'Ảnh nền `px` và lớp hiệu ứng `layer`, cùng kích thước, cùng cách xếp số.',
-    job: 'Cộng từng kênh màu của hai ảnh. Tổng vượt quá 255 thì kẹp lại bằng `min(255, ...)`, kẹp riêng từng kênh.',
+màu đen thì ba số gần 0, cộng vào nền gần như không đổi gì — nền hiện ra qua.
+Chỗ nào sáng thì đẩy nền sáng lên. Đó là lý do video hiệu ứng phải quay trên
+nền đen: nền đen tự biến mất, khỏi cần cắt.`,
+    input: 'Ảnh nền `image` và lớp hiệu ứng `layer`, cùng kích thước.',
+    job: 'Cộng từng màu của hai ô cùng vị trí. Tổng vượt quá 255 thì kẹp lại bằng `min(255, ...)`, kẹp riêng từng màu.',
     output: 'Con rồng phát sáng nằm đè lên nền, nền vẫn nhìn thấy qua chỗ tối của lớp.',
     stub: `${PIXEL_HEADER}
 #
-# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với px.
-# Vì cả hai ảnh xếp số y như nhau nên duyệt thẳng từng ô, khỏi cần row/col.
-# Số màu chỉ chạy từ 0 tới 255: cộng quá thì kẹp bằng min(255, ...).
-def blend(px, layer, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn: cộng px[i] với layer[i] rồi kẹp bằng min(255, ...)
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
+# layer = lớp hiệu ứng quay trên nền đen, cùng kích thước với image.
+# Số màu chỉ chạy từ 0 tới 255, cộng quá thì kẹp bằng min(255, ...).
+#
+# Gợi ý: đặt tên cho hai ô trước cho dễ đọc, rồi mới cộng.
+#     base = image[row][col]
+#     glow = layer[row][col]
+def blend(image, layer, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn: cộng ô của image với ô của layer rồi kẹp ở 255
+            out[row][col] = image[row][col]
 `,
-    answer: `def blend(px, layer, out, width, height):
-    for i in range(0, len(px), 4):
-        out[i] = min(255, px[i] + layer[i])
-        out[i + 1] = min(255, px[i + 1] + layer[i + 1])
-        out[i + 2] = min(255, px[i + 2] + layer[i + 2])
+    answer: `def blend(image, layer, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            base = image[row][col]
+            glow = layer[row][col]
+            out[row][col] = [min(255, base[0] + glow[0]),
+                             min(255, base[1] + glow[1]),
+                             min(255, base[2] + glow[2])]
 `,
-    why: `\`range(0, len(px), 4)\` nhảy 4 số một bước, tức mỗi vòng đúng một ô ảnh.
-\`min(255, a + b)\` giữ kết quả trong khoảng cho phép. Phải kẹp RIÊNG từng kênh:
-nếu chỉ kẹp một lần rồi dùng chung, ba màu bị cắt lệch nhau và điểm ảnh đổi màu
-chứ không chỉ sáng lên.`,
+    why: `\`base\` và \`glow\` chỉ là tên gọi cho hai ô cùng vị trí, đặt tên xong đọc dễ hơn
+hẳn. \`min(255, a + b)\` giữ kết quả trong khoảng cho phép. Phải kẹp RIÊNG từng
+màu: nếu tính một lần rồi dùng chung cho cả ba, ba màu bị cắt lệch nhau và điểm
+ảnh đổi màu chứ không chỉ sáng lên.`,
   },
   {
     id: 'negative', kind: 'image', title: 'negative — âm bản', extra: true,
-    idea: `Mỗi kênh màu là một con số từ 0 (tối thui) tới 255 (sáng nhất). Âm bản là lật
-cái thang đó: 0 thành 255, 255 thành 0, 100 thành 155. Chỗ nào đang sáng hoá
-tối, chỗ tối hoá sáng — đúng như phim chụp ảnh ngày xưa.`,
-    input: 'Ảnh trong `px`.',
-    job: 'Với mỗi kênh màu, ghi vào `out` giá trị 255 trừ đi giá trị cũ.',
+    idea: `Mỗi màu là một con số từ 0 (tối thui) tới 255 (sáng nhất). Âm bản là lật cái
+thang đó: 0 thành 255, 255 thành 0, 100 thành 155. Chỗ đang sáng hoá tối, chỗ
+tối hoá sáng — đúng như phim chụp ảnh ngày xưa.`,
+    input: 'Ảnh `image`.',
+    job: 'Với mỗi màu của mỗi ô, ghi vào `out` giá trị 255 trừ đi giá trị cũ.',
     output: 'Ảnh âm bản: trời sáng thành trời tối, cỏ xanh thành tím.',
     stub: `${PIXEL_HEADER}
 #
-# Lật thang sáng: giá trị mới = 255 - giá trị cũ, làm cho cả ba kênh màu.
-def negative(px, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
+# Lật thang sáng: giá trị mới = 255 - giá trị cũ, làm cho cả ba màu.
+# Đặt tên ô trước cho gọn:  pixel = image[row][col]
+def negative(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn
+            out[row][col] = image[row][col]
 `,
-    answer: `def negative(px, out, width, height):
-    for i in range(0, len(px), 4):
-        out[i] = 255 - px[i]
-        out[i + 1] = 255 - px[i + 1]
-        out[i + 2] = 255 - px[i + 2]
+    answer: `def negative(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            pixel = image[row][col]
+            out[row][col] = [255 - pixel[0], 255 - pixel[1], 255 - pixel[2]]
 `,
-    why: `Không cần \`min\` hay \`max\` ở đây: giá trị cũ nằm trong 0..255 nên
-\`255 - giá trị\` cũng luôn nằm trong 0..255. Kênh thứ tư (độ đục) để nguyên,
-đụng vào là ảnh trong suốt.`,
+    why: `Không cần \`min\` hay \`max\`: giá trị cũ nằm trong 0..255 nên \`255 - giá trị\`
+cũng luôn nằm trong 0..255. Viết \`out[row][col] = [ ... ]\` là dựng một ô mới
+gồm ba số, chứ không sửa vào ô của \`image\` — đó là điều bắt buộc, vì mấy phép
+khác còn phải đọc lại ảnh gốc.`,
   },
   {
     id: 'grayscale', kind: 'image', title: 'grayscale — đen trắng', extra: true,
-    idea: `Mắt thấy MÀU là vì ba kênh chênh nhau: nhiều đỏ ít xanh thì ra đỏ. Khi cả ba
-kênh BẰNG NHAU, màu biến mất và chỉ còn độ sáng — đó chính là ảnh xám. Vậy
-muốn đen trắng thì tính một con số đại diện rồi ghi con số đó vào cả ba kênh.`,
-    input: 'Ảnh màu trong `px`.',
-    job: 'Tính trung bình cộng của ba kênh, rồi ghi CÙNG con số đó vào cả ba kênh của `out`.',
+    idea: `Mắt thấy MÀU là vì ba số chênh nhau: nhiều đỏ ít xanh thì ra đỏ. Khi cả ba
+BẰNG NHAU, màu biến mất và chỉ còn độ sáng — đó chính là ảnh xám. Vậy muốn đen
+trắng thì tính một con số đại diện rồi ghi con số đó vào cả ba.`,
+    input: 'Ảnh màu `image`.',
+    job: 'Tính trung bình cộng ba màu của ô, rồi ghi CÙNG con số đó vào cả ba màu của ô trong `out`.',
     output: 'Ảnh xám như báo cũ, vẫn còn chỗ sáng chỗ tối nhưng hết màu.',
     stub: `${PIXEL_HEADER}
 #
-# Ba kênh phải BẰNG NHAU thì mắt mới thấy là ảnh xám.
+# Ba số phải BẰNG NHAU thì mắt mới thấy là ảnh xám.
 # Tính trung bình MỘT lần rồi dùng ba lần, đừng tính lại ba lần.
-def grayscale(px, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
+# Chia lấy phần nguyên bằng //, vì màu phải là số nguyên.
+def grayscale(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn
+            out[row][col] = image[row][col]
 `,
-    answer: `def grayscale(px, out, width, height):
-    for i in range(0, len(px), 4):
-        gray = (px[i] + px[i + 1] + px[i + 2]) // 3
-        out[i] = gray
-        out[i + 1] = gray
-        out[i + 2] = gray
+    answer: `def grayscale(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            pixel = image[row][col]
+            gray = (pixel[0] + pixel[1] + pixel[2]) // 3
+            out[row][col] = [gray, gray, gray]
 `,
-    why: `\`//\` là phép chia lấy phần nguyên — màu phải là số nguyên, \`/\` sẽ cho ra số
-lẻ như 84.6667. Lỗi hay gặp: chỉ ghi \`gray\` vào một kênh, hai kênh kia vẫn màu
-cũ, nên ảnh ngả đỏ chứ không xám.`,
+    why: `\`//\` là chia lấy phần nguyên; \`/\` sẽ cho ra số lẻ như 84.6667 và màu không
+nhận số lẻ. Lỗi hay gặp: chỉ ghi \`gray\` vào một chỗ, hai chỗ kia vẫn màu cũ,
+nên ảnh ngả đỏ chứ không xám. Người chấm phân biệt đúng hai lỗi đó bằng hai câu
+khác nhau.`,
   },
   {
     id: 'flip_vertical', kind: 'image', title: 'flip_vertical — lộn đầu xuống chân', extra: true,
-    idea: `Giống hệt \`flip\`, chỉ đổi trục: lần này HÀNG đảo còn cột giữ nguyên. Hàng
+    idea: `Giống hệt \`flip\`, chỉ đổi trục: lần này số HÀNG đảo còn cột giữ nguyên. Hàng
 trên cùng lấy màu hàng dưới cùng, như nhìn bóng mình dưới mặt hồ.`,
-    input: 'Ảnh trong `px`, cao `height` hàng.',
+    input: 'Ảnh `image` cao `height` hàng.',
     job: 'Ô ở hàng `row` lấy màu của ô hàng `height - 1 - row`, cùng cột.',
     output: 'Ảnh lộn ngược từ trên xuống dưới.',
     stub: `${PIXEL_HEADER}
 #
-# So với flip: chỗ nào dùng col thì giờ dùng row, còn cột giữ nguyên.
-def flip_vertical(px, out, width, height):
+# So với flip: lần này chỗ đảo nằm ở HÀNG, còn cột thì giữ nguyên.
+def flip_vertical(image, out, width, height):
     for row in range(height):
         for col in range(width):
-            o = (row * width + col) * 4
             # lượt của bạn
-            out[o] = px[o]
-            out[o + 1] = px[o + 1]
-            out[o + 2] = px[o + 2]
+            out[row][col] = image[row][col]
 `,
-    answer: `def flip_vertical(px, out, width, height):
+    answer: `def flip_vertical(image, out, width, height):
     for row in range(height):
         for col in range(width):
-            o = (row * width + col) * 4
-            source = ((height - 1 - row) * width + col) * 4
-            out[o] = px[source]
-            out[o + 1] = px[source + 1]
-            out[o + 2] = px[source + 2]
+            out[row][col] = image[height - 1 - row][col]
 `,
-    why: `Chỉ một chỗ khác \`flip\`: \`height - 1 - row\` thay cho \`width - 1 - col\`.
-Làm được cả hai là bạn đã hiểu công thức \`(row * width + col) * 4\` — muốn đổi
-trục nào thì thay đúng phần đó.`,
+    why: `Chỉ một chỗ khác \`flip\`: \`height - 1 - row\` nằm ở ngoặc ĐẦU (chọn hàng), còn
+\`col\` ở ngoặc sau giữ nguyên. Làm được cả hai bài là bạn đã nắm được ý chính:
+ngoặc đầu chọn hàng, ngoặc sau chọn cột.`,
   },
   {
     id: 'drop_blue', kind: 'image', title: 'drop_blue — tắt kênh xanh dương', extra: true,
     idea: `Ba con số của một ô không phải "một màu chia ba", mà là ba nguồn sáng riêng
 trộn lại. Tắt hẳn một nguồn là thấy ngay điều đó: bỏ xanh dương thì trời hết
 xanh, cả ảnh ngả vàng cam vì chỉ còn đỏ và xanh lá.`,
-    input: 'Ảnh màu trong `px`.',
-    job: 'Chép nguyên kênh đỏ và kênh xanh lá; riêng kênh xanh dương ghi 0.',
+    input: 'Ảnh màu `image`.',
+    job: 'Chép nguyên đỏ và xanh lá; riêng xanh dương ghi 0.',
     output: 'Ảnh ám vàng cam, mất sạch sắc xanh dương.',
     stub: `${PIXEL_HEADER}
 #
-# Giữ nguyên đỏ và xanh lá, cho kênh xanh dương bằng 0.
-def drop_blue(px, out, width, height):
-    for i in range(0, len(px), 4):
-        # lượt của bạn
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = px[i + 2]
+# Giữ nguyên đỏ và xanh lá, cho xanh dương bằng 0.
+def drop_blue(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            # lượt của bạn
+            out[row][col] = image[row][col]
 `,
-    answer: `def drop_blue(px, out, width, height):
-    for i in range(0, len(px), 4):
-        out[i] = px[i]
-        out[i + 1] = px[i + 1]
-        out[i + 2] = 0
+    answer: `def drop_blue(image, out, width, height):
+    for row in range(height):
+        for col in range(width):
+            pixel = image[row][col]
+            out[row][col] = [pixel[0], pixel[1], 0]
 `,
-    why: `Bài này ngắn nhất nhưng dạy điều quan trọng nhất: ba số là ba màu riêng.
-Muốn nghịch tiếp thì thử đổi chỗ \`px[i]\` với \`px[i + 2]\` — đỏ và xanh dương
-hoán vị, cả thế giới đổi màu.`,
+    why: `Bài ngắn nhất nhưng dạy điều quan trọng nhất: ba số là ba màu riêng. Muốn
+nghịch tiếp thì đổi chỗ \`pixel[0]\` với \`pixel[2]\` — đỏ và xanh dương hoán vị,
+cả thế giới đổi màu.`,
   },
   {
     id: 'on_fingers', kind: 'fingers', title: 'on_fingers — giơ mấy ngón thì ra phép gì',
