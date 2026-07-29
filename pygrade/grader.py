@@ -188,3 +188,109 @@ def check_all(namespace=None):
         else:
             lines.append("✖ " + message)
     return "\n".join(lines)
+
+
+# ── kể lại bài test cho học sinh xem ────────────────────────────────────────
+# Không chỉ nói đúng/sai: chạy hàm trên một ảnh tí hon rồi đưa cả ba thứ ra
+# màn hình — ảnh vào, kết quả mong đợi, kết quả của em. Học sinh nhìn số là
+# hiểu mình lệch chỗ nào.
+
+def _pixels(image):
+    """Đọc ảnh nhỏ thành chuỗi kiểu '[10,0,7] [0,0,7]' cho dễ nhìn."""
+    parts = []
+    for row in image:
+        cells = []
+        for pixel in row:
+            cells.append("[" + ",".join(str(int(v)) for v in pixel) + "]")
+        parts.append(" ".join(cells))
+    return " / ".join(parts)
+
+
+def _run(fn, image, width, height, layer=None):
+    out = blank(width, height)
+    if layer is None:
+        fn(image, out, width, height)
+    else:
+        fn(image, layer, out, width, height)
+    return out
+
+
+# Mỗi bài test: mô tả · dựng ảnh vào · dựng lớp hiệu ứng (nếu có) · cỡ ảnh ·
+# dựng kết quả mong đợi. Viết bằng hàm thường, không lambda, không
+# comprehension — vì học sinh có thể mở file này ra đọc.
+
+def _case_flip():
+    image = column_stripes(3, 2, 10)
+    expected = []
+    for row in range(2):
+        line = []
+        for col in range(3):
+            line.append([(2 - col) * 10, row, 7])
+        expected.append(line)
+    return "ảnh 3 cột 2 hàng, mỗi cột một sắc đỏ", image, None, 3, 2, expected
+
+
+def _case_flip_vertical():
+    image = row_stripes(2, 3, 40)
+    expected = []
+    for row in range(3):
+        line = []
+        for col in range(2):
+            line.append([(2 - row) * 40, col, 7])
+        expected.append(line)
+    return "ảnh 2 cột 3 hàng, mỗi hàng một sắc đỏ", image, None, 2, 3, expected
+
+
+def _case_negative():
+    return "một ô màu [0,100,255]", solid(1, 1, 0, 100, 255), None, 1, 1, [[[255, 155, 0]]]
+
+
+def _case_grayscale():
+    return "một ô màu [30,60,90]", solid(1, 1, 30, 60, 90), None, 1, 1, [[[60, 60, 60]]]
+
+
+def _case_drop_blue():
+    return "một ô màu [200,150,100]", solid(1, 1, 200, 150, 100), None, 1, 1, [[[200, 150, 0]]]
+
+
+def _case_blend():
+    layer = [[[0, 0, 0], [100, 100, 100]]]
+    return ("nền [200,10,0]; lớp hiệu ứng ô đen rồi ô [100,100,100]",
+            solid(2, 1, 200, 10, 0), layer, 2, 1, [[[200, 10, 0], [255, 110, 100]]])
+
+
+def _case_blur():
+    # ô giữa trắng, tám ô quanh đen: ô giữa còn 255/9, ô cạnh và ô góc nhận
+    # phần sáng chia theo số hàng xóm của riêng nó
+    # ô góc chỉ có 4 ô để chia (255 // 4 = 63), ô cạnh có 6 (42), ô giữa có 9 (28)
+    expected = [[[63, 63, 63], [42, 42, 42], [63, 63, 63]],
+                [[42, 42, 42], [28, 28, 28], [42, 42, 42]],
+                [[63, 63, 63], [42, 42, 42], [63, 63, 63]]]
+    return "ảnh 3x3 đen, riêng ô giữa trắng", white_dot(3), None, 3, 3, expected
+
+
+CASES = {
+    "flip": _case_flip,
+    "flip_vertical": _case_flip_vertical,
+    "negative": _case_negative,
+    "grayscale": _case_grayscale,
+    "drop_blue": _case_drop_blue,
+    "blend": _case_blend,
+    "blur": _case_blur,
+}
+
+
+def explain(name, namespace=None):
+    """Kể lại bài test: [mô tả, ảnh vào, mong đợi, kết quả của em]."""
+    if namespace is None:
+        namespace = globals()
+    fn = namespace.get(name)
+    make_case = CASES.get(name)
+    if fn is None or make_case is None:
+        return []
+    label, image, layer, width, height, expected = make_case()
+    try:
+        got = _run(fn, image, width, height, layer)
+    except Exception as err:
+        return [label, _pixels(image), _pixels(expected), f"{type(err).__name__}: {err}"]
+    return [label, _pixels(image), _pixels(expected), _pixels(got)]

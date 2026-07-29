@@ -87,6 +87,17 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 .ans-pass{padding:8px 10px;border-radius:7px;border:1px solid var(--line);background:#050810;color:var(--ink);
   font:400 13px/1.3 ui-monospace,monospace}
 .ans-msg{font:400 12px/1.4 ui-monospace,monospace;color:var(--bad)}
+.testcase{width:calc(100% - 32px);margin:4px 16px 16px}
+.testcase th{width:130px;color:var(--dim);font-weight:400;vertical-align:top;text-align:left}
+.testcase td{font:400 12px/1.5 ui-monospace,monospace;word-break:break-all}
+#lab{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:18px}
+#lab h2{margin:0 0 6px;font-size:17px}
+.lab-note{margin:0 0 12px;color:var(--dim);font-size:13.5px}
+.lab-picks{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.lab-picks button{font:400 12px/1 ui-monospace,monospace}
+.lab-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lab-msg{font:400 12.5px/1.5 ui-monospace,monospace;color:var(--dim)}
+.lab-shots{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
 </style>
 
 <header>
@@ -105,7 +116,7 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 // duyệt giữ notebook.js cũ trong 4 tiếng. Sửa file trong src/ thì bump số này.
 import { mountCodeBox } from './src/highlight.js?v=3';
 import { CELLS, cellSource, saveCell, publishFiles, bootPython, runCell, loadDemo, paintPixels,
-         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor } from './src/notebook.js?v=3';
+         loadPassed, savePassed, scoreOf, studentName, passwordOk, baseFor, runChain } from './src/notebook.js?v=3';
 
 const statusEl = document.getElementById('status');
 const host = document.getElementById('cells');
@@ -117,6 +128,7 @@ let runtime = null, demo = null;
 
 const views = CELLS.map(build);
 const gate = buildGate();
+const lab = buildLab();
 const card = buildCard();
 gate.update();
 
@@ -183,10 +195,28 @@ function build(cell) {
   function draw(result) {
     shots.innerHTML = '';
     if (result.rows) return drawTable(result.rows);
-    if (!demo || !result.pixels) return;
-    frame('ẢNH VÀO', baseFor(cell, demo));
-    if (cell.kind === 'blend') frame('LỚP HIỆU ỨNG', demo.layer);
-    frame('ẢNH RA — code của bạn dựng', result.pixels);
+    if (demo && result.pixels) {
+      frame('ẢNH VÀO', baseFor(cell, demo));
+      if (cell.kind === 'blend') frame('LỚP HIỆU ỨNG', demo.layer);
+      frame('ẢNH RA — code của bạn dựng', result.pixels);
+    }
+    if (result.test?.length) drawTest(result.test);
+  }
+
+  // Bài test bằng số: học sinh thấy đúng cái máy vừa kiểm, không phải tin suông.
+  function drawTest(test) {
+    const [label, input, expected, got] = test;
+    const table = document.createElement('table');
+    table.className = 'testcase';
+    const rows = [['máy đưa vào', label], ['ảnh vào', input], ['phải ra', expected], ['code bạn cho ra', got]];
+    for (const [name, value] of rows) {
+      const tr = document.createElement('tr');
+      const th = document.createElement('th'); th.textContent = name;
+      const td = document.createElement('td'); td.textContent = value;
+      if (name === 'code bạn cho ra') td.className = expected === got ? 'ok' : 'no';
+      tr.append(th, td); table.appendChild(tr);
+    }
+    shots.appendChild(table);
   }
 
   function frame(label, pixels) {
@@ -273,6 +303,66 @@ function askPassword(host, done) {
   host.querySelector('.ans-go').onclick = submit;
   field.onkeydown = event => { if (event.key === 'Enter') submit(); };
   field.focus();
+}
+
+
+// XƯỞNG THỬ — bấm mấy phép mình đã viết rồi xem chúng chồng lên nhau. Đây là
+// lần đầu học sinh dùng lại chính đồ mình vừa làm, thay vì chỉ nộp bài.
+function buildLab() {
+  const el = document.createElement('section');
+  el.id = 'lab';
+  el.innerHTML = `
+    <h2>Xưởng thử — ghép các phép bạn vừa viết</h2>
+    <p class="lab-note">Bấm chọn theo thứ tự bạn muốn máy chạy, ví dụ <code>grayscale</code>
+    rồi <code>flip</code>. Ảnh ra của phép trước thành ảnh vào của phép sau.</p>
+    <div class="lab-picks"></div>
+    <div class="lab-bar">
+      <button class="run lab-run">▶ CHẠY CHUỖI</button>
+      <button class="lab-clear">↺ bỏ chọn</button>
+      <span class="lab-msg"></span>
+    </div>
+    <div class="lab-shots"></div>`;
+  host.appendChild(el);
+
+  const picks = [];
+  const picksEl = el.querySelector('.lab-picks');
+  const msg = el.querySelector('.lab-msg');
+  const shots = el.querySelector('.lab-shots');
+  const chosen = el.querySelector('.lab-bar');
+
+  const show = () => { msg.textContent = picks.length ? `chuỗi: ${picks.join(' → ')}` : 'chưa chọn phép nào'; };
+
+  for (const cell of CELLS) {
+    if (cell.kind !== 'image' && cell.kind !== 'blend') continue;
+    const button = document.createElement('button');
+    button.textContent = cell.id;
+    button.onclick = () => { picks.push(cell.id); show(); };
+    picksEl.appendChild(button);
+  }
+
+  el.querySelector('.lab-clear').onclick = () => { picks.length = 0; show(); shots.textContent = ''; };
+  el.querySelector('.lab-run').onclick = () => {
+    if (!runtime || !demo) { msg.textContent = 'Python chưa sẵn sàng.'; return; }
+    if (!picks.length) { msg.textContent = 'Chọn ít nhất một phép đã.'; return; }
+    msg.textContent = 'đang chạy…';
+    requestAnimationFrame(() => setTimeout(() => {
+      const result = runChain(runtime, picks, demo);
+      shots.textContent = '';
+      if (!result.ok) { msg.textContent = `✖ ${result.message}`; return; }
+      msg.textContent = `✓ ${picks.join(' → ')}`;
+      for (const [label, pixels] of [['ẢNH GỐC', demo.base], [picks.join(' → '), result.pixels]]) {
+        const box = document.createElement('div');
+        box.className = 'shot';
+        const caption = document.createElement('span'); caption.textContent = label;
+        const canvas = document.createElement('canvas');
+        box.append(caption, canvas);
+        shots.appendChild(box);
+        paintPixels(canvas, pixels, demo.width, demo.height);
+      }
+    }, 0));
+  };
+  show();
+  return { el };
 }
 
 // Bảng điểm: nằm cuối trang, luôn hiện, để chụp màn hình gửi bố mẹ.

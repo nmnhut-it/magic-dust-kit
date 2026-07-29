@@ -16,7 +16,8 @@ const PYODIDE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
 const KEY = 'magicdust.kit.';
 const CELL_KEY = 'magicdust.kit.cell.';
 const DEMO_W = 160, DEMO_H = 120;
-const SPELL_PREAMBLE = 'from magic_stage import play_effect, say\n\n';
+const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button\n\n';
+
 
 const FINGER_TASKS = [[1, 'dragon'], [2, 'phoenix'], [3, 'sakura']];
 const VOICE_TASKS = [['rồng', 'dragon'], ['hoa', 'sakura'], ['mưa', 'rain']];
@@ -67,7 +68,7 @@ export function saveCell(cell, source) {
 export function publishFiles() {
   const pick = kinds => CELLS.filter(c => kinds.includes(c.kind)).map(c => cellSource(c).trimEnd()).join('\n\n\n');
   try {
-    localStorage.setItem(KEY + 'spells.py', SPELL_PREAMBLE + pick(['fingers', 'voice']) + '\n');
+    localStorage.setItem(KEY + 'spells.py', SPELL_PREAMBLE + pick(['fingers', 'voice', 'setup']) + '\n');
     localStorage.setItem(KEY + 'image_spells.py', pick(['image', 'blend']) + '\n');
     return true;
   } catch { return false; }
@@ -87,6 +88,7 @@ export async function bootPython(onStatus) {
     play_effect: name => { log.push(['fx', String(name)]); return true; },
     cast: name => { log.push(['fx', String(name)]); return true; },
     say: text => { log.push(['say', String(text)]); return true; },
+    add_button: (label, effect) => { log.push(['button', String(label), String(effect)]); return true; },
   });
   // Ô on_fingers/on_voice chỉ chứa đúng một hàm, không có dòng import ở đầu —
   // nên nhập sẵn hai lệnh đó vào namespace, đúng như file spells.py vẫn làm.
@@ -102,11 +104,30 @@ export function runCell({ py, log }, cell, source, demo) {
   catch (err) { return { ok: false, message: pyError(err) }; }
 
   if (cell.kind === 'fingers' || cell.kind === 'voice') return runSpellCell(py, log, cell);
+  if (cell.kind === 'setup') return runSetupCell(py, log);
 
   const verdict = py.runPython(`check_one(${JSON.stringify(cell.id)}, globals())`).toJs();
   const [ok, message] = verdict;
   const pixels = demo ? runOnDemo(py, cell, demo) : null;
-  return { ok, message, pixels };
+  // Kể luôn bài test cho học sinh xem: máy đưa ảnh gì vào, chờ ra gì, và hàm
+  // của em cho ra gì. Đúng/sai mà không thấy số thì chẳng học được gì.
+  const test = py.runPython(`explain(${JSON.stringify(cell.id)}, globals())`).toJs();
+  return { ok, message, pixels, test };
+}
+
+// Ô setup: gọi setup() rồi xem các em đã gắn được mấy nút. Ở trang làm bài
+// add_button chỉ ghi vào nhật ký, sân khấu mới dựng nút thật.
+function runSetupCell(py, log) {
+  log.length = 0;
+  try { py.runPython('setup()'); }
+  catch (err) { return { ok: false, message: pyError(err) }; }
+  const buttons = log.filter(entry => entry[0] === 'button');
+  const rows = buttons.map(entry => ({ input: entry[1], wanted: 'một nút', hit: true, got: `play_effect("${entry[2]}")` }));
+  if (buttons.length < 3) {
+    rows.push({ input: '(còn thiếu)', wanted: 'ít nhất 3 nút', hit: false, got: `mới có ${buttons.length}` });
+    return { ok: false, message: `setup: mới gắn ${buttons.length} nút, đề bài cần ít nhất 3`, rows };
+  }
+  return { ok: true, message: 'setup', rows };
 }
 
 function runSpellCell(py, log, cell) {
@@ -242,4 +263,29 @@ export function pyError(err) {
   const last = lines[lines.length - 1] || text;
   const where = lines.find(line => /File "<exec>", line \d+/.test(line));
   return `${last}${where ? ` (${where.trim().replace('File "<exec>", ', '')})` : ''}`;
+}
+
+// XƯỞNG THỬ: chạy liên tiếp mấy hàm học sinh đã viết trên cùng một tấm ảnh.
+// Đây là chỗ các em thấy hàm của mình là đồ dùng thật, ghép được với nhau.
+export function runChain({ py }, names, demo) {
+  const { width, height } = demo;
+  // Nạp lại đúng bài học sinh đang giữ cho từng phép: mở trang mới thì Python
+  // chưa biết hàm nào cả, và ta muốn chạy bản MỚI NHẤT các em vừa gõ.
+  for (const name of names) {
+    const cell = CELLS.find(item => item.id === name);
+    if (!cell) continue;
+    try { py.runPython(cellSource(cell)); }
+    catch (err) { return { ok: false, message: `${name}: ${pyError(err)}` }; }
+  }
+  py.globals.set('_image', py.toPy(toGrid(demo.base, width, height)));
+  py.globals.set('_layer', py.toPy(toGrid(demo.layer, width, height)));
+  try {
+    for (const name of names) {
+      py.globals.set('_out', py.toPy(blankGrid(width, height)));
+      const args = name === 'blend' ? `_image, _layer, _out, ${width}, ${height}` : `_image, _out, ${width}, ${height}`;
+      py.runPython(`${name}(${args})`);
+      py.runPython('_image = _out');       // kết quả bước này là ảnh vào của bước sau
+    }
+    return { ok: true, pixels: toFlat(py.globals.get('_image').toJs(), width, height) };
+  } catch (err) { return { ok: false, message: pyError(err) }; }
 }

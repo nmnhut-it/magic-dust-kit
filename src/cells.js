@@ -259,6 +259,35 @@ nghịch tiếp thì đổi chỗ \`pixel[0]\` với \`pixel[2]\` — đỏ và 
 cả thế giới đổi màu.`,
   },
   {
+    id: 'setup', kind: 'setup', title: 'setup — tự dựng bảng phép của bạn', extra: true,
+    idea: `Tới đây bạn đã điều khiển phép bằng tay và bằng giọng nói. Còn một cách nữa:
+tự dựng NÚT BẤM cho mình. Máy gọi \`setup()\` đúng một lần mỗi khi nạp mã, và
+trong đó bạn gọi \`add_button("chữ trên nút", "tên phép")\` bao nhiêu lần tuỳ
+thích — mỗi lời gọi mọc ra một nút thật ở góc phải sân khấu.`,
+    input: 'Không có gì đưa vào. Hàm này chạy một lần lúc máy nạp mã của bạn.',
+    job: 'Gọi `add_button(...)` cho ít nhất ba phép bạn thích, mỗi phép một nút.',
+    output: 'Bảng nút của riêng bạn hiện ở sân khấu; bấm nút nào ra phép đó.',
+    stub: `# Máy gọi setup() một lần sau khi nạp mã của bạn.
+#     add_button("Rồng Lửa", "dragon")   -> mọc một nút, bấm là ra rồng
+#
+# Tên phép dùng được: dragon · koto · rose · phoenix · butterfly · sakura
+#                     smoke · rain · flower · magic · lightning
+# và cả hiệu ứng video bạn tự bỏ vào ở sân khấu.
+def setup():
+    # lượt của bạn: gọi add_button(...) cho mấy phép bạn thích
+    pass
+`,
+    answer: `def setup():
+    add_button("Rồng Lửa", "dragon")
+    add_button("Phượng Hoàng", "phoenix")
+    add_button("Hoa Anh Đào", "sakura")
+    add_button("Mưa Giông", "rain")
+`,
+    why: `\`setup()\` chạy một lần, khác hẳn \`on_fingers\` chạy mỗi lần bạn đổi số ngón
+tay. Chữ đầu là nhãn hiện trên nút, chữ sau là tên phép — hai thứ khác nhau,
+nên nhãn cứ đặt tiếng Việt có dấu thoải mái. Muốn thêm nút thì thêm một dòng.`,
+  },
+  {
     id: 'on_fingers', kind: 'fingers', title: 'on_fingers — giơ mấy ngón thì ra phép gì',
     idea: `Máy nhìn camera, đếm số ngón tay bạn giơ lên, rồi GỌI hàm này và đưa con số đó
 vào \`count\`. Việc của bạn là quyết định mỗi con số ứng với phép nào. Chuỗi

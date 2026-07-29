@@ -774,8 +774,11 @@ if(SpeechRecognitionImpl){
     voiceStatEl.textContent=`voice: heard “${alternatives[0].trim()}”`;
     const now=performance.now();
     if(now-lastVoiceActionAt<1200)return;
-    student.voice(alternatives[0].trim().toLowerCase());   // BÀI TẬP 1: on_voice() trong student/spells.py
-    const spokenSpell=alternatives.map(voiceSpell).find(Boolean);
+    // BÀI TẬP 1: on_voice() trong student/spells.py được nghe TRƯỚC. Nếu mã của
+    // các em đã gọi phép rồi thì thôi, đừng bắn thêm hiệu ứng mặc định đè lên —
+    // học sinh phải thấy đúng cái mình vừa viết.
+    const handled=student.voice(alternatives[0].trim().toLowerCase());
+    const spokenSpell=handled?null:alternatives.map(voiceSpell).find(Boolean);
     if(spokenSpell){
       lastVoiceActionAt=now;
       runVoiceSpell(spokenSpell);

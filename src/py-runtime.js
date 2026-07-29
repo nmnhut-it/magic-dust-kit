@@ -44,9 +44,12 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     // Những lệnh học sinh gọi được từ Python. Tên đặt đúng như bên đảo Gương
     // Vô Cực để các em không phải học lại: play_effect, say.
     state.py.registerJsModule('magic_stage', {
-      play_effect: name => { playEffect(String(name)); return true; },
-      cast: name => { cast(String(name)); return true; },
-      say: text => { say(`Python: ${text}`); return true; },
+      play_effect: name => { state.acted = true; playEffect(String(name)); return true; },
+      cast: name => { state.acted = true; cast(String(name)); return true; },
+      say: text => { state.acted = true; say(`Python: ${text}`); return true; },
+      // Học sinh tự dựng bảng điều khiển của mình: mỗi lời gọi là một nút thật
+      // trên màn hình. Gọi trong hàm setup() ở student/spells.py.
+      add_button: (label, effect) => { addButton(String(label), String(effect)); return true; },
     });
     await reload();
   }
@@ -66,6 +69,10 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     try {
       const sources = await Promise.all([readFile(GRADER), ...FILES.map(readFile)]);
       for (const source of sources) state.py.runPython(source);
+      // setup() là chỗ học sinh tự gắn nút cho phép của mình. Xoá bảng cũ
+      // trước, nếu không mỗi lần bấm R lại mọc thêm một bộ nút trùng.
+      ui.buttons.textContent = '';
+      if (state.py.globals.get('setup')) call('setup');
       say('Python sẵn sàng — sửa file trong student/ rồi bấm R để nạp lại');
       return true;
     } catch (err) { say(pyError(err), true); return false; }
@@ -88,7 +95,14 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
       state.lastFingers = count;
       if (count > 0) call('on_fingers', count);
     },
-    voice(word) { if (state.py) call('on_voice', String(word)); },
+    // Trả về true nếu mã của học sinh đã làm gì đó với từ này, để sân khấu
+    // không bắn thêm hiệu ứng mặc định đè lên phép của các em.
+    voice(word) {
+      if (!state.py) return false;
+      state.acted = false;
+      call('on_voice', String(word));
+      return state.acted;
+    },
     ready: () => !!state.py,
     reload,                                    // BÀN VIẾT gọi lại sau khi học sinh bấm CHẠY
     grade: () => call('check_all'),
@@ -149,6 +163,27 @@ export function mountPython({ video, playEffect, cast, onStatus }) {
     if (MODES[key]) setMode(MODES[key]);
   });
 
+  // Nút do học sinh gọi add_button() dựng ra. Bấm là chạy đúng hiệu ứng các em
+  // gán, không qua bảng phép mặc định.
+  function addButton(label, effect) {
+    const button = document.createElement('button');
+    button.className = 'py-btn';
+    button.textContent = label;
+    button.title = `play_effect("${effect}")`;
+    button.onclick = () => { playEffect(effect); say(`${label} · play_effect("${effect}")`); };
+    ui.buttons.appendChild(button);
+  }
+
+  // Gõ một từ rồi Enter là gọi thẳng on_voice() — học được phần giọng nói kể cả
+  // khi máy không có micro hoặc lớp quá ồn.
+  ui.word.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    const word = ui.word.value.trim().toLowerCase();
+    if (!word) return;
+    ui.word.value = '';
+    if (!api.voice(word)) say(`on_voice("${word}") chạy xong nhưng không gọi phép nào — nhánh else của bạn nói gì?`);
+  });
+
   boot().catch(err => say(`Không tải được Python: ${err.message}`, true));
   return api;
 }
@@ -183,12 +218,20 @@ function buildPanel() {
     borderRadius: '12px', border: '1px solid rgba(120,178,165,.5)', zIndex: 40, display: 'none',
     background: '#0b0f18', boxShadow: '0 8px 30px rgba(0,0,0,.45)', imageRendering: 'pixelated',
   });
+  // Hàng nút do chính học sinh dựng bằng add_button(), và ô thử giọng nói cho
+  // máy không có micro (hoặc phòng quá ồn).
+  const buttons = document.createElement('div');
+  buttons.className = 'py-buttons';
+  const voiceBox = document.createElement('div');
+  voiceBox.className = 'py-voicebox';
+  voiceBox.innerHTML = '<input class="py-word" placeholder="gõ một từ rồi Enter — thử on_voice()" maxlength="24">';
+
   const log = document.createElement('div');
   Object.assign(log.style, {
-    position: 'fixed', right: '14px', bottom: '236px', zIndex: 41, maxWidth: '320px',
+    position: 'fixed', right: '14px', bottom: '278px', zIndex: 41, maxWidth: '320px',
     font: '700 12px/1.45 ui-monospace,Menlo,monospace', letterSpacing: '.5px', color: '#eaf4ff',
     background: 'rgba(11,15,24,.85)', padding: '7px 10px', borderRadius: '9px', whiteSpace: 'pre-wrap',
   });
-  document.body.append(canvas, log);
-  return { canvas, log };
+  document.body.append(canvas, buttons, voiceBox, log);
+  return { canvas, log, buttons, word: voiceBox.querySelector('.py-word') };
 }
