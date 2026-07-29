@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magic Dust · Hand Gesture Spellcasting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--c:#78b2a5;--g:rgba(120,178,165,.35)}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#183f49}
+/* HUD text is TEAL on a live camera frame. Rajdhani at .42rem with wide
+   tracking was mush at HUD sizes, so small UI text uses a system UI stack
+   (crisp at 10-12px, no extra network round-trip); Cinzel stays for the
+   title, which is a display mark rather than something to read. */
+:root{--txt:#9fe3d2;--txt-dim:#7cc4b6;--txt-shadow:0 1px 3px rgba(4,14,18,.95)}
+body{font-family:ui-sans-serif,system-ui,'Segoe UI',Roboto,sans-serif;cursor:none}
+#camlayer{position:fixed;inset:0;z-index:0;overflow:hidden;background:#183f49}
+#camlayer video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1) scale(1.02);
+  filter:blur(var(--studio-blur,0px)) brightness(var(--studio-light,1)) contrast(var(--studio-contrast,1)) saturate(var(--studio-saturation,1));
+  transition:filter .55s}
+#camlayer video.studio-blur{--studio-blur:12px}
+body.studio-flip #camlayer video{transform:scaleX(1) scale(1.02)}
+body.studio-flip #camlayer canvas{transform:scaleX(1)}
+body.studio-lumos{--studio-light:1.34;--studio-contrast:1.07;--studio-saturation:1.08}
+body.studio-nox{--studio-light:.46;--studio-contrast:1.12;--studio-saturation:.76}
+body.studio-lumos #camlayer{box-shadow:inset 0 0 120px rgba(255,236,176,.2)}
+body.studio-nox #camlayer{box-shadow:inset 0 0 180px rgba(2,8,20,.58)}
+#camdark{position:absolute;inset:0;background:rgba(24,63,73,.18);pointer-events:none}
+#camlayer canvas{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}
+#cv{position:fixed;inset:0;z-index:2;mix-blend-mode:screen}
+.spell-video-overlay{position:fixed;inset:0;z-index:3;width:100%;height:100%;object-fit:cover;pointer-events:none;
+  opacity:0;mix-blend-mode:screen;filter:contrast(1.28) brightness(1.06) saturate(1.2);
+  transition:opacity .28s;background:transparent}
+.spell-video-overlay.visible{opacity:.92}
+/* FOREGROUND plates sit ABOVE the cut-out person (z 4), so petals and dust
+   drift BETWEEN the caster and the lens while the stag stays behind them.
+   That near/far split is what gives the composite actual depth. */
+.spell-video-overlay.front{z-index:5}
+.spell-video-overlay[data-spell="smoke"]{opacity:0;filter:contrast(1.42) brightness(.92) saturate(1.18)}
+.spell-video-overlay[data-spell="smoke"].visible{opacity:.78}
+.spell-video-overlay[data-spell="rain"]{mix-blend-mode:normal;filter:contrast(1.08) brightness(.88) saturate(.82)}
+.spell-video-overlay[data-spell="rain"].visible{opacity:.66}
+.spell-video-overlay[data-spell="flower"].visible{opacity:.9}
+.magic-3d-layer{position:fixed;inset:0;z-index:4;width:100%;height:100%;pointer-events:none;opacity:0;transition:opacity .3s}
+.magic-3d-layer.visible{opacity:1}
+#vig{position:fixed;inset:0;z-index:6;pointer-events:none;background:radial-gradient(ellipse at 50% 38%,transparent 68%,rgba(24,63,73,.35) 100%)}
+#screenglow{position:fixed;inset:0;z-index:6;pointer-events:none;box-shadow:inset 0 0 70px var(--g);opacity:.45;transition:box-shadow .45s}
+#flash{position:fixed;inset:0;z-index:7;pointer-events:none;opacity:0;transition:opacity .07s}
+#photoCountdown{position:fixed;left:50%;top:50%;z-index:80;transform:translate(-50%,-50%) scale(.7);opacity:0;
+  width:112px;height:112px;border-radius:50%;display:grid;place-items:center;font:900 48px 'Cinzel',serif;color:#fffdf5;
+  border:2px solid rgba(255,253,245,.7);background:rgba(24,63,73,.5);box-shadow:0 0 38px var(--g),inset 0 0 30px var(--g);
+  backdrop-filter:blur(8px);pointer-events:none;transition:opacity .18s,transform .18s}
+#photoCountdown.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#photoCountdown.flash{background:#fff;color:#183f49;box-shadow:0 0 0 100vmax rgba(255,255,255,.32)}
+#dot{position:fixed;width:7px;height:7px;border-radius:50%;background:var(--c);z-index:9999;pointer-events:none;transform:translate(-50%,-50%);box-shadow:0 0 10px 4px var(--g);transition:background .3s,box-shadow .3s;mix-blend-mode:screen}
+#topbar{position:fixed;top:0;left:0;right:0;height:2px;background:var(--c);box-shadow:0 0 12px var(--c);z-index:20;transition:background .45s,box-shadow .45s}
+#ui{position:fixed;top:0;left:0;right:0;display:flex;flex-direction:column;align-items:center;padding-top:16px;pointer-events:none;z-index:20}
+.title{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(1.4rem,4vw,2.4rem);letter-spacing:.18em;background:linear-gradient(180deg,#d8fff4 10%,var(--txt-dim) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hdiv{margin-top:8px;width:clamp(180px,28vw,300px);height:1px;background:linear-gradient(90deg,transparent,rgba(255,253,245,.12),transparent)}
+#sname{margin-top:10px;font-size:clamp(.8rem,2vw,1.15rem);font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:var(--c);text-shadow:0 0 18px var(--g),0 0 42px var(--g);transition:color .45s,text-shadow .45s;min-height:1.3em;text-align:center}
+#f4c85ar{margin-top:11px;display:flex;align-items:center;gap:9px}
+#elbl{font-size:.62rem;font-weight:600;letter-spacing:.14em;color:var(--txt-dim);text-shadow:var(--txt-shadow)}
+#etrack{position:relative;width:clamp(100px,14vw,155px);height:2px;background:rgba(255,253,245,.06);overflow:hidden}
+#efill{position:absolute;inset:0;width:0%;background:var(--c);box-shadow:0 0 8px var(--g);transition:width .8s cubic-bezier(.4,0,.2,1),background .45s,box-shadow .45s}
+#panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none;display:flex;flex-direction:column;align-items:center;padding-bottom:14px}
+#pill{margin-bottom:7px;display:inline-flex;align-items:center;gap:7px;padding:4px 14px;border-radius:99px;border:1px solid rgba(255,253,245,.08);background:rgba(24,63,73,.5);backdrop-filter:blur(6px)}
+#pdot{width:5px;height:5px;border-radius:50%;background:rgba(255,253,245,.18);transition:background .3s,box-shadow .3s}
+#ptxt{font-size:.66rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--txt);text-shadow:var(--txt-shadow);transition:color .3s}
+#mute{position:fixed;top:12px;right:13px;z-index:30;pointer-events:auto;cursor:pointer;font-size:.7rem;font-weight:600;letter-spacing:.06em;color:var(--txt);background:rgba(9,28,34,.75);border:1px solid color-mix(in srgb,var(--txt) 35%,transparent);border-radius:6px;padding:5px 10px}
+/* Compact spell legend: two columns of one-line chips instead of 16 tall
+   cards, which used to run the whole screen height and bury the camera. Only
+   the active spell expands to show its description. 'g' hides it entirely. */
+#guide{position:fixed;top:46px;right:13px;z-index:20;pointer-events:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px;width:236px;transition:opacity .25s,transform .25s}
+#guide.hidden{opacity:0;transform:translateX(12px);pointer-events:none}
+.gi{display:flex;align-items:center;gap:5px;padding:3px 7px;border-radius:6px;border:1px solid rgba(255,253,245,.12);background:rgba(9,28,34,.72);backdrop-filter:blur(6px);transition:border-color .3s,background .3s;min-width:0}
+.gi .gk{flex:none;font-size:.64rem;font-weight:700;line-height:1;padding:2px 5px;border-radius:3px;color:#062018;background:var(--txt-dim)}
+.gi.active .gk{color:#183f49;background:var(--c)}
+.gi .gn{font-size:.7rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gi.active .gn{color:var(--c)}
+.gi.active{border-color:var(--c);background:rgba(24,63,73,.72);box-shadow:0 0 14px var(--g);grid-column:1/-1;flex-wrap:wrap}
+.gi .gd{display:none;font-size:.64rem;font-weight:400;letter-spacing:.01em;line-height:1.45;color:var(--txt-dim);flex-basis:100%}
+.gi.active .gd{display:block}
+#perf{position:fixed;top:12px;left:13px;z-index:30;pointer-events:none;font-size:.6rem;font-weight:700;letter-spacing:.12em;color:var(--txt-dim);text-shadow:var(--txt-shadow)}
+#testpanel{position:fixed;bottom:14px;left:13px;z-index:30;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+#testcastbtn{pointer-events:auto;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.06em;color:var(--txt);background:rgba(9,28,34,.78);border:1px solid color-mix(in srgb,var(--txt) 40%,transparent);border-radius:7px;padding:7px 14px}
+#testcastbtn:active{background:rgba(255,253,245,.16)}
+#voicestat{font-size:.68rem;font-weight:600;letter-spacing:.02em;color:var(--txt);text-shadow:var(--txt-shadow);pointer-events:auto;cursor:pointer}
+#voicestat.listening{color:#78b2a5}
+#testhelp{font-size:.66rem;font-weight:500;letter-spacing:.01em;color:var(--txt-dim);text-shadow:var(--txt-shadow);max-width:270px;line-height:1.55}
+#loading{position:fixed;inset:0;z-index:500;background:#183f49;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity 1s ease}
+.ld-k{font-family:'Cinzel',serif;font-weight:900;font-size:clamp(1.8rem,5vw,3rem);letter-spacing:.14em;color:var(--txt);animation:ldp 1.5s ease-in-out infinite alternate}
+@keyframes ldp{from{text-shadow:0 0 16px rgba(120,178,165,.2)}to{text-shadow:0 0 50px rgba(120,178,165,.65),0 0 80px rgba(120,178,165,.2)}}
+.ld-bar{width:170px;height:1px;background:rgba(255,253,245,.05)}
+.ld-fill{height:100%;width:0%;background:#78b2a5;transition:width .18s;box-shadow:0 0 8px #78b2a588}
+.ld-sub{font-size:.6rem;font-weight:600;letter-spacing:.28em;color:var(--txt-dim)}
+/* Kotopia Storybook shell: keep the camera spell interaction intact while
+   replacing the severe black/neon presentation with warm painted fantasy. */
+:root{--c:#78b2a5;--g:rgba(120,178,165,.32)}
+html,body{background:#183f49}
+#camdark{background:linear-gradient(180deg,rgba(24,63,73,.08),rgba(24,63,73,.28))}
+#vig{background:radial-gradient(ellipse at 50% 38%,transparent 62%,rgba(24,63,73,.48) 100%)}
+#screenglow{box-shadow:inset 0 0 80px rgba(244,200,90,.18)}
+.title{font-family:'Cinzel',serif;background:linear-gradient(180deg,#fffaf0 10%,#f4c85a 100%);-webkit-background-clip:text;
+  filter:drop-shadow(0 3px 0 rgba(45,100,37,.5))}
+#pill,.gi,#mute,#testcastbtn{background:rgba(255,250,240,.82);border-color:rgba(255,240,220,.64);color:#183f49;
+  box-shadow:0 8px 28px rgba(24,63,73,.22);backdrop-filter:blur(10px)}
+.gi .gl{color:#2d6425}.gi .gd,#ptxt{color:#4f6f73}.gi.active{background:rgba(255,250,240,.94);border-color:#f4c85a}
+#loading{background:linear-gradient(rgba(24,63,73,.2),rgba(24,63,73,.72)),url(lessons/assets/storybook/kotopia-world-v2.webp) center/cover}
+.ld-k{color:#fffaf0;text-shadow:0 4px 0 rgba(24,63,73,.55),0 0 38px rgba(244,200,90,.7)}
+.ld-bar{height:4px;border-radius:4px;background:rgba(255,253,245,.25);overflow:hidden}.ld-fill{background:#ffe6a0;box-shadow:0 0 12px #ffe6a0}
+.ld-sub{color:rgba(255,250,240,.78);text-shadow:0 2px 8px rgba(24,63,73,.5)}
+/* Contrast pass. The storybook theme repainted the chips CREAM but the text
+   inside them still inherited the old neon-on-black mint (--txt/--txt-dim/--c),
+   i.e. pale mint on cream — around 1.5:1, unreadable. Anything sitting ON a
+   cream chip gets ink; anything floating over the raw camera gets its own dark
+   plate instead of relying on a text-shadow the video can out-shout. */
+.gi .gn{color:#183f49}.gi.active .gn{color:#2d6425}
+.gi .gk{color:#fffaf0;background:#2d6425}.gi.active .gk{color:#183f49;background:#f4c85a}
+#perf,#testhelp,#voicestat,#elbl{color:#fffaf0;text-shadow:0 1px 3px rgba(9,28,34,.9);
+  background:rgba(9,28,34,.72);border-radius:6px;padding:4px 8px;backdrop-filter:blur(6px)}
+#voicestat.listening{color:#ffe6a0}
+/* the spell name keeps its spell-coloured glow, but a bright video plate can
+   sit right behind it — a dark halo underneath is what keeps it legible */
+#sname{text-shadow:0 0 2px rgba(9,28,34,.95),0 1px 3px rgba(9,28,34,.95),0 2px 10px rgba(9,28,34,.8),0 0 22px var(--g)}
+#f4c85ar{gap:7px}
+/* KHUNG HIỆU ỨNG CỦA BẠN — chọn mp4 nền đen, gọi bằng play_effect("ten") */
+.fx-toggle{position:fixed;left:14px;bottom:14px;z-index:60;border:0;cursor:pointer;
+  font:700 12px/1 ui-monospace,Menlo,monospace;letter-spacing:.6px;padding:10px 14px;
+  border-radius:9px;color:#0b0f18;background:#9fe8d5;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+.fx-panel{position:fixed;left:14px;bottom:60px;z-index:59;width:min(420px,calc(100vw - 28px));display:none;
+  flex-direction:column;gap:10px;padding:14px;border-radius:12px;background:rgba(11,15,24,.95);
+  border:1px solid rgba(120,178,165,.45);box-shadow:0 12px 40px rgba(0,0,0,.55);color:#eaf4ff}
+.fx-panel.open{display:flex}
+.fx-help{margin:0;font:400 12px/1.6 ui-sans-serif,system-ui,sans-serif;color:#9fb4c8}
+.fx-help b{color:#eaf4ff}
+.fx-add{display:flex;gap:8px}
+.fx-name{flex:1;padding:8px 10px;border-radius:7px;border:1px solid rgba(120,178,165,.35);
+  background:#070b12;color:#eaf4ff;font:400 12px/1.3 ui-monospace,monospace}
+.fx-pick{cursor:pointer;padding:9px 12px;border-radius:7px;color:#0b0f18;background:#9fe8d5;
+  font:700 11px/1 ui-monospace,monospace;white-space:nowrap}
+.fx-list{display:flex;flex-direction:column;gap:6px}
+.fx-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;background:rgba(120,178,165,.12)}
+.fx-row code{flex:1;font:400 11.5px/1.4 ui-monospace,monospace;color:#9fe8d5}
+.fx-row button{border:0;cursor:pointer;border-radius:5px;padding:4px 7px;color:#ffb4b4;background:rgba(255,180,180,.14)}
+.fx-empty{margin:0;font:400 11.5px/1.4 ui-monospace,monospace;color:#7f95a8}
+</style>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script src="./src/vendor/effekseer/effekseer.min.js"></script>
+</head>
+<body>
+
+<div id="loading">
+  <div class="ld-k">MAGIC DUST</div>
+  <div class="ld-bar"><div class="ld-fill" id="ldf"></div></div>
+  <div class="ld-sub">GATHERING ARCANE ENERGY</div>
+</div>
+
+<div id="camlayer">
+  <video class="input_video" playsinline muted></video>
+  <div id="camdark"></div>
+  <canvas id="ocv"></canvas>
+</div>
+
+<div id="vig"></div>
+<div id="screenglow"></div>
+<div id="flash"></div>
+<div id="photoCountdown">3</div>
+<div id="dot"></div>
+<div id="topbar"></div>
+<span id="perf">—</span>
+<div id="mute">SOUND: ON</div>
+<div id="guide"></div>
+
+<div id="ui">
+  <div class="title">Magic Dust</div>
+  <div class="hdiv"></div>
+  <div id="sname">NO SPELL ACTIVE</div>
+  <div id="ebar">
+    <span id="elbl">POWER</span>
+    <div id="etrack"><div id="efill"></div></div>
+  </div>
+</div>
+
+<div id="panel">
+  <div id="pill"><div id="pdot"></div><span id="ptxt">NO HAND DETECTED</span></div>
+</div>
+
+<div id="testpanel">
+  <button id="testcastbtn" type="button">TEST CAST</button>
+  <span id="voicestat" title="Bấm để bật lại microphone">voice: show index finger, then say a spell</span>
+  <span id="testhelp">1/2 hold = fingers · Space = cast · 3-0 + D/R = spells · P = photo · M = depth mode · K = backdrop · G = hide list</span>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

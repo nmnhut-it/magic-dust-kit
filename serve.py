@@ -72,7 +72,8 @@ def main():
     grade_student_files()
     server = ThreadingHTTPServer(("", port), partial(Handler, directory="."))
     print(f"Magic Dust chay o http://localhost:{port}")
-    print(f"  do choi  -> http://localhost:{port}/index.html")
+    print(f"  lam bai   -> http://localhost:{port}/index.html")
+    print(f"  san khau  -> http://localhost:{port}/san-khau.html")
     print(f"  dao guong -> http://localhost:{port}/lessons/islandFXFORGE.html")
     print("Ctrl+C de dung.")
     try:

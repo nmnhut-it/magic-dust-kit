@@ -141,6 +141,40 @@ lại cho biết máy nghe ra gì. Nhớ dấu tiếng Việt — "rong" không 
 const FINGER_TASKS = [[1, 'dragon'], [2, 'phoenix'], [3, 'sakura']];
 const VOICE_TASKS = [['rồng', 'dragon'], ['hoa', 'sakura'], ['mưa', 'rain']];
 
+// ── điểm ────────────────────────────────────────────────────────────────────
+// Năm ô bắt buộc 1.4 điểm mỗi ô (7.0), bốn ô thêm 0.75 (3.0) — vừa tròn 10.
+// Chia như vậy để làm xong phần bắt buộc đã là điểm khá, và bài thêm là phần
+// thưởng thật chứ không phải trang trí.
+const PASS_KEY = 'magicdust.kit.passed';
+const NAME_KEY = 'magicdust.kit.name';
+export const POINT_REQUIRED = 1.4, POINT_EXTRA = 0.75;
+
+export function loadPassed() {
+  try { return new Set(JSON.parse(localStorage.getItem(PASS_KEY) || '[]')); } catch { return new Set(); }
+}
+
+export function savePassed(passed) {
+  try { localStorage.setItem(PASS_KEY, JSON.stringify([...passed])); } catch { /* localStorage bị khoá */ }
+}
+
+export function studentName(value) {
+  try {
+    if (value === undefined) return localStorage.getItem(NAME_KEY) || '';
+    localStorage.setItem(NAME_KEY, value);
+  } catch { /* localStorage bị khoá */ }
+  return value || '';
+}
+
+export function scoreOf(passed) {
+  let required = 0, extra = 0;
+  for (const cell of CELLS) {
+    if (!passed.has(cell.id)) continue;
+    if (cell.extra) extra += 1; else required += 1;
+  }
+  const points = required * POINT_REQUIRED + extra * POINT_EXTRA;
+  return { required, extra, points: Math.round(points * 10) / 10 };
+}
+
 export function cellSource(cell) {
   try { return localStorage.getItem(CELL_KEY + cell.id) ?? cell.stub; } catch { return cell.stub; }
 }

@@ -41,7 +41,8 @@ if errorlevel 1 goto :caitay
 
 echo   Dang mo trinh duyet...
 echo(
-echo     do choi   : http://localhost:8123/index.html
+echo     lam bai   : http://localhost:8123/index.html
+echo     san khau  : http://localhost:8123/san-khau.html
 echo     dao guong : http://localhost:8123/lessons/islandFXFORGE.html
 echo(
 echo   Bam Ctrl+C o cua so nay de dung.

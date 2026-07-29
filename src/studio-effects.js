@@ -32,15 +32,23 @@ export class StudioEffects{
     };
     this.videoOverlays={};
     for(const [kind,src] of Object.entries(sources)){
-      const video=document.createElement('video');
-      video.className='spell-video-overlay';video.dataset.spell=kind;
       // ambient atmospheres loop; a creature that makes ONE entrance (the stag,
       // the phoenix rising) plays through and clears itself
       const loops=kind==='smoke'||kind==='flower'||kind==='magic'||kind==='butterfly'||kind==='sakura';
-      video.src=src;video.muted=true;video.playsInline=true;video.preload='auto';video.loop=loops;
-      document.body.appendChild(video);this.videoOverlays[kind]=video;
-      if(!loops)video.addEventListener('ended',()=>this.stopOverlay());
+      this.addOverlay(kind,src,loops);
     }
+  }
+
+  // Học sinh tự thêm clip lúc đang chạy (xem my-fx-panel.js): dựng thêm một
+  // <video> đúng như mấy clip có sẵn, nên playOverlay không cần biết khác biệt.
+  addOverlay(kind,src,loops=false){
+    this.videoOverlays[kind]?.remove();
+    const video=document.createElement('video');
+    video.className='spell-video-overlay';video.dataset.spell=kind;
+    video.src=src;video.muted=true;video.playsInline=true;video.preload='auto';video.loop=loops;
+    document.body.appendChild(video);this.videoOverlays[kind]=video;
+    if(!loops)video.addEventListener('ended',()=>this.stopOverlay());
+    return video;
   }
 
   // front: draw this plate ABOVE the cut-out person (petals/dust near the lens)

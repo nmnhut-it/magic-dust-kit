@@ -12,6 +12,7 @@ import { Efk } from './effekseer.js';
 import { StudioEffects } from './studio-effects.js';
 import { Segmentation } from './segmentation.js';
 import { mountPython } from './py-runtime.js';
+import { mountFxPanel } from './my-fx-panel.js';
 import { Lotus3DEngine } from '../lessons/weather-lab/lotus-3d.js';
 
 const $=id=>document.getElementById(id);
@@ -510,6 +511,12 @@ const student=mountPython({video:videoEl,
 window.student=student;   // console: student.fingers(2) · student.voice('mưa')
 const studio=new StudioEffects({THREE,scene,camera:cam3,renderer,video:videoEl,handCanvas:ocv,statusEl:ptxtEl});
 const lotus3d=new Lotus3DEngine(document.body);
+// Hiệu ứng học sinh tự bỏ vào (cất trong IndexedDB, xem my-fx-panel.js). Đăng ký
+// xong là gọi được ngay bằng play_effect("ten") trong Python, như clip có sẵn.
+mountFxPanel({
+  register:(name,url)=>{studio.addOverlay(name,url,true);if(!OVERLAY_SPELLS.includes(name))OVERLAY_SPELLS.push(name);},
+  say:(text,bad)=>{voiceStatEl.textContent=text;voiceStatEl.style.color=bad?'#ffb4b4':'';},
+}).catch(err=>console.warn('không mở được kho hiệu ứng:',err));
 const studioGestureTrigger=new StableGestureTrigger({holdMs:700,releaseMs:220});
 let pendingStudioSpell=null,lotusClearTimer=null;
 

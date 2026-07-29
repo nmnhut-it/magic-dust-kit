@@ -1,7 +1,7 @@
 // student-store.js — chỗ giữ bài của học sinh trong chính trình duyệt các em.
 //
-// Trang làm bài (`bai.html`) ghi vào đây khi làm xong; sân khấu thật
-// (`index.html`) đọc ra và chạy. Nhờ vậy máy nào không cài được Python vẫn học
+// Trang làm bài (`index.html`) ghi vào đây khi làm xong; sân khấu thật
+// (`san-khau.html`) đọc ra và chạy. Nhờ vậy máy nào không cài được Python vẫn học
 // được: mở link, làm bài, ra sân khấu — không tài khoản, không GitHub.
 //
 // Máy nào có sẵn thư mục `student/` trên đĩa thì file trên đĩa vẫn được dùng

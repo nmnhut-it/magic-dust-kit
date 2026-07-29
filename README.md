@@ -7,12 +7,12 @@ Trong này có ba trang:
 
 | | |
 |---|---|
-| `bai.html` | **Trang làm bài — vào đây trước.** Chín ô kiểu sổ tay: gõ Python, bấm CHẠY, máy chấm ngay và dựng ẢNH VÀO / ẢNH RA bằng chính code bạn vừa viết. Xong bảy ô bắt buộc thì cổng sang sân khấu mở |
-| `index.html` | **Sân khấu thật** — camera bật lên, tay bạn hiện trong khung, và mã Python bạn vừa viết quyết định phép nào hiện ra |
+| `index.html` (trang chủ) | **Trang làm bài — vào đây trước.** Chín ô kiểu sổ tay: gõ Python, bấm CHẠY, máy chấm ngay và dựng ẢNH VÀO / ẢNH RA bằng chính code bạn vừa viết. Xong năm ô bắt buộc thì cổng sang sân khấu mở. Cuối trang có BẢNG ĐIỂM trên 10 để chụp màn hình gửi bố mẹ |
+| `san-khau.html` | **Sân khấu thật** — camera bật lên, tay bạn hiện trong khung, và mã Python bạn vừa viết quyết định phép nào hiện ra |
 | `lessons/islandFXFORGE.html` | **Đảo GƯƠNG VÔ CỰC** — nơi bạn học lật ảnh, ghép lớp, chỉnh sáng trên lưới số nhỏ |
 
 **Không cài Python cũng học được.** Python chạy sẵn trong trình duyệt (Pyodide),
-bài lưu trong `localStorage` của chính máy bạn. Mở `bai.html`, làm, rồi bấm nút
+bài lưu trong `localStorage` của chính máy bạn. Mở trang chủ, làm, rồi bấm nút
 ra sân khấu — code đi theo. Ai muốn sửa file trên đĩa như thợ thật thì vẫn sửa
 `student/*.py` được, hai đường dùng chung một bộ chấm.
 
@@ -31,13 +31,13 @@ python serve.py
 
 Rồi mở:
 
-- làm bài → <http://localhost:8123/bai.html>
-- sân khấu → <http://localhost:8123/index.html>
+- làm bài → <http://localhost:8123/>
+- sân khấu → <http://localhost:8123/san-khau.html>
 - đảo gương → <http://localhost:8123/lessons/islandFXFORGE.html>
 
 Dùng **Chrome** hoặc **Edge** nhé.
 
-> **Đừng nhấp đúp vào `index.html`.** Mở kiểu `file://` thì trình duyệt không
+> **Đừng nhấp đúp vào file `.html`.** Mở kiểu `file://` thì trình duyệt không
 > cho dùng camera. Cũng đừng dùng Live Server của VS Code — đảo gương cần hai
 > dòng tiêu đề đặc biệt mà chỉ `serve.py` gửi kèm.
 
@@ -50,7 +50,7 @@ Lần đầu mở, trang phải tải Python về máy nên hơi lâu. Xong sẽ
 
 Chín hàm, chia làm hai nhóm. Có hai cách làm, chọn cách nào cũng được:
 
-**Cách 1 — trong trang `bai.html` (khuyên dùng).** Mỗi hàm một ô riêng, có tô
+**Cách 1 — ngay trên trang chủ (khuyên dùng).** Mỗi hàm một ô riêng, có tô
 màu code, có nút CHẠY & CHẤM. Chạy xong máy nói ngay đúng hay sai và vẽ luôn
 ảnh mà code bạn dựng ra — sai thì sửa rồi chạy lại. Không cần cài gì, không
 cần biết thư mục nằm ở đâu.
@@ -61,7 +61,12 @@ trang bấm phím `R`. Hợp với ai đã quen dùng VS Code.
 Bài làm ở cách 1 được ưu tiên: khi trong máy đã có bài bạn gõ trên trang, sân
 khấu chạy bài đó chứ không đọc file trên đĩa nữa.
 
-## Bài 1 — `student/spells.py`: chọn phép bằng tay và bằng giọng nói
+**Điểm.** Mỗi bài bắt buộc 1,4 điểm (5 bài = 7,0), mỗi bài thêm 0,75 (4 bài =
+3,0) — vừa tròn 10. Bảng điểm nằm cuối trang, có ô điền tên và ngày tháng, tự
+cập nhật mỗi lần bạn chạy một ô. Ô nào đã xanh thì hôm sau mở lại vẫn xanh.
+Máy chấm bằng cách CHẠY THẬT code của bạn trên mấy ảnh mẫu, không phải so chữ.
+
+## Nhóm 1 — chọn phép bằng tay và bằng giọng nói (`spells.py`)
 
 Hai hàm, cả hai đều là bài `if / elif / else`. Máy đã viết sẵn khung, việc của
 bạn là điền phần trong ruột.
@@ -94,7 +99,7 @@ Trong hàm bạn gọi `play_effect("dragon")` để mở một lớp hiệu ứ
 
 Bài này không cần ai chấm: giơ tay lên camera là thấy ngay mình đúng hay sai.
 
-## Bài 2 — `student/image_spells.py`: ba phép xử lý ảnh
+## Nhóm 2 — ba phép xử lý ảnh (`image_spells.py`)
 
 Ở đảo gương bạn viết `flip` và `blend` bằng Python trên lưới nhỏ, đủ để nhìn
 từng con số. Ở đây **vẫn đúng phép tính đó**, nhưng máy gọi lại hàng chục lần
@@ -175,11 +180,20 @@ lên trước thì mấy `elif` phía sau không bao giờ tới lượt.
 
 ## Mức 2 — video hiệu ứng của riêng bạn
 
-**Bước 1.** Kiếm hoặc tự tạo một video **quay trên nền đen**, bỏ vào
-`assets/my-fx/`, ví dụ `rong-lua.mp4`.
+**Cách nhanh (không cần chép file vào đâu cả).** Ở sân khấu, bấm nút
+**＋ HIỆU ỨNG CỦA BẠN** góc dưới bên trái: đặt tên, chọn file video, xong. Trang
+tự cất clip vào kho riêng của trình duyệt (IndexedDB — `localStorage` quá nhỏ
+cho video), nên tắt máy mở lại vẫn còn, và nó hiện luôn dòng lệnh để bạn chép:
 
-**Bước 2.** Khai báo một dòng trong `src/my-spells.js`. Đây là file khai báo,
-không phải bài lập trình — cứ chép mẫu rồi đổi chữ:
+```python
+play_effect("rong_lua")
+```
+
+Tên có dấu hoặc có khoảng trắng sẽ được đổi thành chữ thường không dấu, vì đó
+là tên bạn gõ trong Python. "Rồng Lửa của Bảo" thành `rong_lua_cua_bao`.
+
+**Cách của thợ (máy nhà, sửa file thoải mái).** Bỏ video vào `assets/my-fx/` rồi
+khai một dòng trong `src/my-spells.js`:
 
 ```js
 export const MY_FX = {
@@ -190,8 +204,7 @@ export const MY_FX = {
 `ronglua` là tên bạn gọi từ Python · `n` là tên hiện trên bảng thần chú ·
 `hotkey` là phím bấm thử cho nhanh (chọn phím chưa ai dùng).
 
-**Bước 3.** Gọi nó từ `student/spells.py`, dùng đúng cái tên bên trái dấu hai
-chấm:
+Cách nào cũng gọi giống nhau từ `student/spells.py`:
 
 ```python
     if count == 1:
