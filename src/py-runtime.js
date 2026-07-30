@@ -54,6 +54,10 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   // Handler riêng (hàm Python) của mấy nút add_button — giữ để huỷ đúng lúc,
   // xem ghi chú ở add_button/reload().
   const buttonHandlers = [];
+  // Nhãn nút đã gắn — setup() và stage() là hai bài RIÊNG, cả hai đều tự gọi
+  // add_button(), nên học sinh làm xong cả hai dễ thấy nút trùng tên hai lần
+  // (VD "Rồng Lửa" từ cả hai bài). Cùng một nhãn thì chỉ hiện MỘT nút.
+  const buttonLabels = new Set();
 
   // ── nạp Pyodide + hai file của học sinh ────────────────────────────────────
   async function boot() {
@@ -161,6 +165,7 @@ def _magic_cancel_loop():
       // proxy của hàm cũ (nếu nút nào dùng handler riêng) kẻo rò bộ nhớ.
       for (const handler of buttonHandlers) handler.destroy?.();
       buttonHandlers.length = 0;
+      buttonLabels.clear();
       ui.buttons.textContent = '';
       state.pick = { behind: null, front: null };
       if (state.py.globals.get('setup')) call('setup');
@@ -409,6 +414,8 @@ def _magic_cancel_loop():
   // (chuỗi) thì bấm là chạy play_effect(effect); là HÀM của chính học sinh thì
   // bấm là chạy đúng hàm đó — nút của em có thể làm bất cứ gì mã Python cho phép.
   function addButton(label, effect) {
+    if (buttonLabels.has(label)) return;   // đã có nút cùng tên rồi — khỏi mọc thêm
+    buttonLabels.add(label);
     const isHandler = typeof effect === 'function';
     if (isHandler) buttonHandlers.push(effect);
     const button = document.createElement('button');
