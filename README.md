@@ -104,11 +104,15 @@ Nói suông không ra phép — phải bắt đúng thế tay rồi mới niệm
 Trong hàm bạn gọi `play_effect("dragon")` để mở một lớp hiệu ứng, `say("...")`
 để hiện chữ, và `fingers_now()` để hỏi đang giơ mấy ngón.
 
-**Sân khấu cố ý để trống.** Máy chỉ dọn sẵn nền, micro và bốn hiệu ứng mà đề
-bài dùng (`dragon`, `phoenix`, `sakura`, `rain`) — phần còn lại là của bạn: gán
-phép trong `on_fingers`/`on_voice`, gắn nút bằng `setup()`, bỏ video của mình
-vào. Mấy hiệu ứng khác (`koto`, `rose`, `butterfly`, `smoke`, `flower`, `magic`)
-vẫn gọi được bằng `play_effect("tên")`, chỉ là không bày sẵn ra bảng.
+**Sân khấu cố ý để trống — không còn phím tắt hay từ khoá nào tự bắn ra
+rồng/phượng/hoa/mưa cả.** Trước đây bốn hiệu ứng này còn có phím D/5/7/3 và
+giọng nói demo sẵn, bấm/nói là ra dù bạn chưa viết code — vậy nên gỡ hết:
+bốn cái tên đó giờ CHỈ là tên hiệu ứng (`play_effect("dragon")`,
+`play_effect("phoenix")`,...), muốn thấy chúng thì phải tự viết đúng
+`on_fingers`/`on_voice` (hoặc `main_loop`, xem bên dưới). Gắn nút bằng
+`setup()`, bỏ video của mình vào cũng vậy — tất cả là của bạn. Mấy hiệu ứng
+khác (`koto`, `rose`, `butterfly`, `smoke`, `flower`, `magic`) vẫn gọi được
+bằng `play_effect("tên")`, chỉ là không bày sẵn ra bảng.
 
 Bài này không cần ai chấm: giơ tay lên camera là thấy ngay mình đúng hay sai.
 
@@ -286,13 +290,52 @@ hai lớp hiệu ứng, và bảng nút hiện đúng như những gì bạn v�
 một bản xem trước giả.
 
 `set_background`/`set_behind`/`set_front` không chỉ nhận tên có sẵn
-(`rung`/`cong_kotopia`/`hai_dang` cho nền, các tên trong bảng phím ở trên cho
-lớp trước/sau) — chúng còn nhận đúng cái tên bạn vừa đặt cho video của mình ở
+(`rung`/`cong_kotopia`/`hai_dang` cho nền; `dragon`/`phoenix`/`sakura`/`rain`
+và mấy hiệu ứng video khác cho lớp trước/sau) — chúng còn nhận đúng cái tên bạn
+vừa đặt cho video của mình ở
 khung **"+ HIỆU ỨNG CỦA BẠN"**. Tải một clip `.mp4` quay trên nền đen lên,
 đặt tên `rong_tu_ve` chẳng hạn, rồi gọi thẳng `set_front("rong_tu_ve")` —
 video của chính bạn giờ là lớp phủ trước mặt, y hệt cách `play_effect()` đã
 dùng cái tên đó. `add_button` trong `stage()` cũng nhận hàm riêng như ở trên —
 ví dụ một nút gọi `combo()` để bắn liền hai hiệu ứng.
+
+## `main_loop` — bài thêm, tự viết vòng lặp chính đọc cảm biến
+
+Từ đầu tới giờ, MÁY là bên gọi `on_fingers`/`on_voice` hộ bạn — đúng lúc ngón
+tay đổi, đúng lúc micro nghe được gì, máy tự gọi đúng hàm của bạn. Bài này đảo
+ngược lại: BẠN tự viết một vòng lặp đi HỎI máy, đúng cấu trúc một chương trình
+thật (đọc cảm biến → quyết định → lặp lại), thay vì chỉ điền nội dung một hàm
+máy gọi sẵn.
+
+```python
+async def main_loop():
+    while True:
+        count = fingers_now()      # số ngón tay NGAY LÚC NÀY
+        word = heard_word()        # từ vừa nghe được, rỗng nếu chưa ai nói gì mới
+        if count == 1 and word in ("rồng", "dragon"):
+            play_effect("dragon")
+        # ... rẽ nhánh tuỳ bạn
+        await asyncio.sleep(0.15)   # BẮT BUỘC
+
+run_loop(main_loop)
+```
+
+**`await asyncio.sleep(...)` ở cuối mỗi vòng KHÔNG được thiếu.** Trình duyệt
+chạy Python thẳng trên luồng chính — không có luồng phụ nào khác vẽ hình, xử
+lý chuột, hay đọc camera. `await` là chỗ Python nhường lại một nhịp cho trình
+duyệt rồi mới tiếp tục; `while True` mà không có dòng đó thì không bao giờ
+nhường ai cả, và cả trang đứng hình. Bài chấm biết chuyện này: thiếu `while`
+thật hoặc thiếu `await asyncio.sleep(...)` là rớt ngay, không cần chạy thử.
+
+`heard_word()` đọc xong tự xoá (đọc lại ngay sau đó ra chuỗi rỗng), để một
+câu nói không lặp lại mãi trong vòng lặp poll — muốn phản ứng lại đúng một lần
+thì gọi nó đúng một lần mỗi vòng, cất vào biến rồi dùng lại biến đó.
+
+Việc khó — nhận diện tay, nhận diện người, ghép lớp cảnh — máy đã giấu sau
+`fingers_now()`/`heard_word()`/`play_effect()`/`set_background()` từ trước;
+bài này chỉ đòi bạn tự viết phần vòng lặp gọi đúng chúng, y hệt cách một app
+thật (đọc input → xử lý → gọi hành động) được dựng, chỉ có phần khó đã trừu
+tượng hoá sẵn để bạn được "nếm" cả pipeline mà không phải viết từ số 0.
 
 ## Máy chấm giúp ngay lúc bật máy chủ
 
@@ -473,8 +516,10 @@ gửi kèm hai dòng tiêu đề `COOP`/`COEP` mà đảo gương cần.
 
 ## Mấy phím tiện tay khác
 
-`1`/`2` giữ để giả bộ giơ 1–2 ngón · `Space` niệm luôn · `3`–`0`, `D`, `R` gọi
-hiệu ứng có sẵn · `G` thu gọn bảng thần chú · `M` đổi kiểu tách nền · `P` chụp ảnh.
+`1`/`2` giữ để giả bộ giơ 1–2 ngón (không cần camera) · `R` nạp lại
+`student/*.py` · `T` máy tự chấm · `G` thu gọn bảng · `M` đổi kiểu tách nền ·
+`P` chụp ảnh. Không còn phím số nào tự bắn hiệu ứng nữa — `play_effect(...)`
+chỉ chạy khi CHÍNH mã Python của bạn gọi nó.
 
 Muốn thử mà không giơ tay: mở Console gõ `student.fingers(2)` hoặc
 `student.voice("mưa")`.

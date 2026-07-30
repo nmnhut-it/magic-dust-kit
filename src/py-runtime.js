@@ -50,7 +50,7 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   // `pick` là sân khấu do học sinh chọn trong stage(); mặc định để trống, máy
   // chỉ dùng đồ có sẵn khi các em chưa chọn gì.
   const state = { py: null, mode: null, frame: 0, layer: null, lastFingers: -1, busy: false,
-                  pick: { behind: null, front: null } };
+                  pick: { behind: null, front: null }, lastWord: '' };
   // Handler riêng (hàm Python) của mấy nút add_button — giữ để huỷ đúng lúc,
   // xem ghi chú ở add_button/reload().
   const buttonHandlers = [];
@@ -90,7 +90,47 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       set_background: name => { pickBackdrop(String(name)); return true; },
       set_behind: name => { state.pick.behind = String(name); return true; },
       set_front: name => { state.pick.front = String(name); return true; },
+      // Bài main_loop: đọc từ vừa nghe được (rỗng nếu chưa ai nói/gõ gì mới),
+      // đọc xong là XOÁ luôn — một câu nói không lặp lại mãi trong vòng lặp poll.
+      heard_word: () => { const w = state.lastWord; state.lastWord = ''; return w; },
+      // Học sinh tự viết async def main_loop(): rồi gọi run_loop(main_loop) MỘT
+      // LẦN để bắt đầu. Việc thật (ensure_future/cancel) làm ở PHÍA PYTHON qua
+      // _magic_start_loop (xem loopPreamble bên dưới) — gọi coroFn() ngay ở
+      // JS rồi đưa coroutine đó cho asyncio TỪ JS sẽ văng "Object has already
+      // been destroyed" (Pyodide huỷ coroutine tạm ngay khi lượt gọi JS xong,
+      // trước khi asyncio kịp chạy nó ở tick sau) — nên JS chỉ chuyển tiếp hàm
+      // main_loop nguyên vẹn, để Python tự gọi và tự lên lịch nó.
+      run_loop: coroFn => { state.py.globals.get('_magic_start_loop')(coroFn); return true; },
+      // Lỗi bên trong vòng lặp (task async chạy nền) báo về qua đây — done
+      // callback ở phía Python bắt exception rồi gọi hàm này với text traceback.
+      _report_loop_error: text => { say(loopErrorMessage(String(text)), true); },
     });
+    // Quản lý task async main_loop HOÀN TOÀN ở phía Python: JS không giữ bất
+    // kỳ proxy coroutine/Task nào — chỉ gọi hai hàm mỏng này. Đây là cách né
+    // vòng đời proxy tạm của Pyodide (coroutine trả từ một lời gọi JS→Python
+    // bị huỷ ngay khi lượt gọi đó xong, trước khi asyncio kịp chạy nó).
+    state.py.runPython(`
+import asyncio as _magic_asyncio, traceback as _magic_tb
+from magic_stage import _report_loop_error as _magic_report_loop_error
+_magic_loop_task = None
+def _magic_start_loop(coro_func):
+    global _magic_loop_task
+    if _magic_loop_task is not None:
+        _magic_loop_task.cancel()
+    def _magic_on_done(t):
+        if t.cancelled():
+            return
+        exc = t.exception()
+        if exc is not None:
+            _magic_report_loop_error("".join(_magic_tb.format_exception(type(exc), exc, exc.__traceback__)))
+    _magic_loop_task = _magic_asyncio.ensure_future(coro_func())
+    _magic_loop_task.add_done_callback(_magic_on_done)
+def _magic_cancel_loop():
+    global _magic_loop_task
+    if _magic_loop_task is not None:
+        _magic_loop_task.cancel()
+        _magic_loop_task = None
+`);
     await loadCustomClips();
     await reload();
   }
@@ -109,6 +149,11 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
   async function reload() {
     try {
       await loadCustomClips();   // học sinh có thể vừa tải video mới lên trước khi bấm R
+      // Huỷ vòng lặp main_loop() cũ (nếu có) TRƯỚC khi chạy lại file — không
+      // thì bấm R là có thêm một vòng lặp chạy song song với vòng cũ. Việc
+      // huỷ làm ở phía Python (_magic_cancel_loop, định nghĩa trong boot()).
+      const cancelLoop = state.py.globals.get('_magic_cancel_loop');
+      if (cancelLoop) { try { cancelLoop(); } finally { cancelLoop.destroy?.(); } }
       const sources = await Promise.all([readFile(GRADER), ...FILES.map(readFile)]);
       for (const source of sources) state.py.runPython(source);
       // setup() là chỗ học sinh tự gắn nút cho phép của mình. Xoá bảng cũ
@@ -156,6 +201,10 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
       call('on_voice', String(word));
       return state.acted;
     },
+    // Ghi từ vừa nghe được vào một ô nhớ để heard_word() (bài main_loop) đọc
+    // được — kênh này KHÔNG gọi on_voice, chỉ nạp dữ liệu cho vòng lặp của
+    // học sinh tự poll lấy khi tới lượt nó.
+    hearWord(word) { state.lastWord = String(word); },
     ready: () => !!state.py,
     reload,                                    // BÀN VIẾT gọi lại sau khi học sinh bấm CHẠY
     grade: () => call('check_all'),
@@ -381,6 +430,7 @@ export function mountPython({ video, playEffect, cast, onStatus, segmentation })
     const word = ui.word.value.trim().toLowerCase();
     if (!word) return;
     ui.word.value = '';
+    state.lastWord = word;   // cho heard_word() (bài main_loop) đọc được luôn, kể cả không có mic
     if (!api.voice(word)) say(`on_voice("${word}") chạy xong nhưng không gọi phép nào — nhánh else của bạn nói gì?`);
   });
 
@@ -408,6 +458,16 @@ function pyError(err) {
   const last = lines[lines.length - 1] || text;
   const where = lines.find(l => /File "<exec>", line \d+/.test(l));
   return `✖ ${last}${where ? ` (${where.trim().replace('File "<exec>", ', '')})` : ''}`;
+}
+
+// Lỗi bên trong main_loop() chạy nền — Python tự bắt exception rồi gửi text
+// traceback thô sang đây (xem _magic_on_done trong boot()), không đi qua một
+// JS Error object như pyError() ở trên, nhưng cùng cách chọn dòng đáng đọc.
+function loopErrorMessage(text) {
+  const lines = text.trim().split('\n').filter(Boolean);
+  const last = lines[lines.length - 1] || text;
+  const where = lines.find(l => /File "<exec>", line \d+/.test(l));
+  return `✖ main_loop: ${last}${where ? ` (${where.trim().replace('File "<exec>", ', '')})` : ''}`;
 }
 
 function buildPanel() {

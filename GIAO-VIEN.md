@@ -36,7 +36,13 @@ sẽ khựng theo. Vì vậy phần ảnh chạy cách khung (`FRAME_EVERY = 2`)
 
 ## Thứ tự dạy đề nghị
 
-1. Chơi trước, chưa động vào code: xoè tay, giơ 1–2 ngón, bấm `3`–`0`.
+1. Chơi trước, chưa động vào code: xoè tay, giơ 1–2 ngón (test bằng phím `1`/`2`
+   nếu chưa có camera). **Lưu ý (2026-07):** không còn phím/từ khoá demo sẵn
+   nào bắn ra rồng/phượng/hoa/mưa nữa — các hiệu ứng đó CHỈ hiện khi học sinh
+   tự viết đúng `on_fingers`/`on_voice`/`main_loop`. Nếu muốn demo hiệu ứng cho
+   cả lớp xem trước khi vào code, dùng `python -c "..."` gọi thẳng
+   `play_effect` qua Console (`student.fingers(1)` rồi gõ code mẫu), không còn
+   cách bấm phím tắt nào nữa.
 2. `student/spells.py` → `on_fingers`. Đây là bài `if/elif/else` đầu tiên mà
    **điều kiện là bàn tay thật của các em**. Sai thì thấy ngay, không cần chấm.
 3. `on_voice` — cũng `if/elif/else`, nhưng so sánh chuỗi. Chỗ này lộ ra chuyện
@@ -46,6 +52,9 @@ sẽ khựng theo. Vì vậy phần ảnh chạy cách khung (`FRAME_EVERY = 2`)
    của cả buổi — **cùng một phép tính, khác cái máy chạy nó**.
 6. Video nền đen (`assets/my-fx/`) để cuối, coi như thưởng, và nó giải thích
    luôn vì sao `blend` phải cộng chứ không dán đè.
+7. `setup()` → `stage()` → `main_loop()`: ba bài thêm nối tiếp nhau — tự dựng
+   bảng nút, tự dựng cả sân khấu, rồi tự viết vòng lặp chính đọc cảm biến thay
+   vì để máy gọi hộ. Đây là mạch "càng về sau càng ít máy làm giùm."
 
 ## Đáp án
 
@@ -153,6 +162,33 @@ def stage():
 Đổi tên nền/hiệu ứng/nút thoải mái — miễn có ít nhất một `set_background` và
 một `add_button` là qua bài (xem "Chấm tự động" bên dưới).
 
+### `main_loop()` — bài thêm cuối cùng, tự viết vòng lặp chính
+
+```python
+async def main_loop():
+    while True:
+        count = fingers_now()
+        word = heard_word()
+        if count == 1 and word in ("rồng", "dragon"):
+            play_effect("dragon")
+        elif count == 2 and word in ("phượng", "phoenix"):
+            play_effect("phoenix")
+        elif count == 3 and word in ("hoa", "sakura"):
+            play_effect("sakura")
+        await asyncio.sleep(0.15)
+
+run_loop(main_loop)
+```
+
+Không có đáp án đúng về LOGIC bên trong (học sinh viết nhánh khác cũng được),
+nhưng **BẮT BUỘC** có `while` thật và `await asyncio.sleep(...)` — thiếu một
+trong hai là rớt ngay, không cần chạy thử (xem "Chấm tự động" bên dưới). Đây
+là bài duy nhất trong bộ dùng `asyncio`/`await` — máy chạy Python thẳng trên
+luồng chính của trình duyệt (không Worker), nên một vòng `while True` không
+nhường lại nhịp nào cho trình duyệt sẽ treo cứng cả trang. Cho học sinh hiểu
+rõ điều này trước khi các em tự ý xoá dòng `await asyncio.sleep(...)` "cho
+nhanh".
+
 `grayscale` là bài đáng dừng lại nhất: nhiều em ghi trung bình vào đúng một
 kênh rồi thắc mắc sao ảnh ngả đỏ. Người chấm phân biệt hai lỗi đó bằng hai câu
 khác nhau — "ba kênh phải bằng nhau" và "đã bằng nhau nhưng chưa phải trung
@@ -191,6 +227,15 @@ kết quả (`check_all()` nằm cuối `student/image_spells.py`).
 
 Chấm ở ba chỗ dùng chung một bộ đề, nên không có chuyện máy chủ nói đạt mà
 trang nói chưa.
+
+**`main_loop` chấm hai lớp, ở cả ba chỗ.** Lớp một soi thẳng MÃ NGUỒN thô tìm
+từ khoá `while` và chuỗi `await asyncio.sleep(` — thiếu một trong hai là rớt
+ngay, không chạy thử (tránh treo trình duyệt vì một `while True` không có
+`await`). Lớp hai mới thật sự CHẠY `main_loop()` — vì đây là vòng lặp vô hạn,
+cả `src/notebook.js` lẫn `cham.py` gọi nó qua `asyncio.wait_for(..., timeout=
+1.2)` và coi `TimeoutError` là kết quả MONG ĐỢI (không phải lỗi), rồi soi
+nhật ký xem `play_effect` có được gọi đúng với ngón tay/từ giả đặt trước hay
+không.
 
 **`add_button` nhận cả hàm riêng, không chỉ tên hiệu ứng.** `add_button(label,
 effect)` — nếu `effect` là một hàm Python (không phải chuỗi), bấm nút chạy

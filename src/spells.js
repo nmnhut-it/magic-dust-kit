@@ -82,25 +82,22 @@ export const FRONT_SPELLS=['sakura','flower','dust'];
 // CLAUDE.md's testing section) and 3 keeps the 'rain' binding it already had.
 // The digits ran out at 'magic', so the two newest plates take the letters of
 // their own name ('d'/'r') — same side channel, same routine.
-// CHỈ giữ mấy phép mà bài tập có dùng. Bộ đồ nghề này để học sinh TỰ gán phép
-// bằng code của mình; bày sẵn mười mấy phím thì phần các em viết chìm nghỉm, và
-// giơ tay lên là phép của máy nhảy ra đè phép của các em.
-// Mấy phép còn lại (koto, rose, butterfly, smoke, flower, magic…) vẫn gọi được
-// bằng play_effect("tên") trong Python, chỉ là không bày ra sẵn nữa.
-const BASE_KEYS={
-  '3':'rain', '5':'phoenix', '7':'sakura', 'd':'dragon',
-};
-export const SPELL_KEYS={...BASE_KEYS,
+// Bốn phép mẫu (rồng/phượng/hoa/mưa) KHÔNG còn phím tắt riêng — hồi trước có
+// bày sẵn 4 phím D/5/7/3 để demo, nhưng thế thì bấm phím là ra hiệu ứng dù học
+// sinh chưa viết code nào, làm mất hết ý nghĩa "hands-on" của on_fingers/
+// on_voice/main_loop. Giờ chỉ còn phím tắt cho hiệu ứng CHÍNH học sinh khai báo
+// (MY_FX.hotkey) — bốn phép mẫu chỉ gọi được qua play_effect("tên") từ Python
+// của chính các em.
+export const SPELL_KEYS={
   ...Object.fromEntries(Object.entries(MY_FX).filter(([,v])=>v.hotkey).map(([k,v])=>[v.hotkey,k]))};
 
 // Order here also defines the on-screen gesture-guide list order.
+// Bảng này KHÔNG còn liệt kê rồng/phượng/hoa/mưa — đó là tên hiệu ứng của bài
+// tập, đã giải thích ngay trong đề bài rồi, bày thêm ở đây thành ra vẫn là
+// "gợi ý sẵn" dù không có phím/giọng nói nào bắn nó ra nữa. Sân khấu chỉ còn
+// hiện đúng những gì CHÍNH học sinh gắn vào — nút do add_button() (một khung
+// riêng bên trái) và mấy dòng dưới đây (chỉ phép/hiệu ứng do các em tự khai).
 export const GUIDE=[
-  // Bảng này cố ý ngắn: bốn phép cơ bản mà đề bài dùng, cộng thêm phép do
-  // chính học sinh khai báo. Sân khấu là chỗ khoe đồ các em làm ra.
-  {key:'dragon', name:'Rồng',    hotkey:'D', label:'1 ngón + nói “rồng”',desc:'Phép mẫu — code của bạn quyết định khi nào nó hiện'},
-  {key:'phoenix', name:'Phượng hoàng', hotkey:'5', label:'2 ngón + nói “phượng”',desc:'Phép mẫu'},
-  {key:'sakura', name:'Hoa anh đào', hotkey:'7', label:'3 ngón + nói “hoa”',desc:'Phép mẫu'},
-  {key:'rain', name:'Mưa',     hotkey:'3', label:'Nói “mưa”',desc:'Phép mẫu'},
   {key:'photo', name:'Chụp ảnh',  label:'Chụm tay thành trái tim',desc:'Giữ hình trái tim để chụp một tấm'},
   // Thần chú và hiệu ứng bạn thêm ở my-spells.js tự hiện xuống cuối bảng này.
   ...Object.entries(MY_SPELLS).map(([key,spell])=>({key,name:spell.n,

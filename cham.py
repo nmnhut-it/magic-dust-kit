@@ -12,6 +12,7 @@ thẳng vào hai file của bạn, nên chấm được cả phần `if / elif` 
 import sys
 import types
 import pathlib
+import asyncio
 
 ROOT = pathlib.Path(__file__).parent
 STUDENT_DIR = ROOT / "student"
@@ -24,6 +25,7 @@ VOICE_TASKS = ((1, "rồng", "dragon"), (2, "phượng", "phoenix"), (3, "hoa", 
 VOICE_TRAPS = ((2, "rồng"), (1, "hoa"), (0, "dragon"))
 
 fingers_held = [0]          # số ngón tay giả cho fingers_now()
+word_now = [""]             # từ nghe được giả cho heard_word()
 
 calls = []          # nhật ký lệnh mà mã của học sinh đã gọi ra
 
@@ -58,6 +60,19 @@ def _record_stage_pick(role):
     return pick
 
 
+def _heard_word():
+    """Từ vừa nghe được — lúc chấm thì bộ chấm đặt trước mỗi lượt, đọc xong tự xoá."""
+    w = word_now[0]
+    word_now[0] = ""
+    return w
+
+
+def _run_loop(coro_func):
+    # cham.py không chạy nền — _check_loop_behavior() tự gọi main_loop() trực
+    # tiếp có kiểm soát thời gian, nên run_loop() ở đây chỉ là no-op.
+    return True
+
+
 def _new_image(width, height):
     """Tấm ảnh trống cho học sinh chứa kết quả tạm ở bài scene."""
     image = []
@@ -85,6 +100,8 @@ def _load():
     fake_stage.set_background = _record_stage_pick("background")
     fake_stage.set_behind = _record_stage_pick("behind")
     fake_stage.set_front = _record_stage_pick("front")
+    fake_stage.heard_word = _heard_word
+    fake_stage.run_loop = _run_loop
     sys.modules["magic_stage"] = fake_stage
 
     namespace = {"__name__": "student"}
@@ -137,7 +154,46 @@ def _check_spells(namespace):
         buttons = [entry for entry in calls if entry[0] == "button"]
         results.append(("background" in picks, "stage() đã set_background() chưa"))
         results.append((len(buttons) >= 1, "stage() đã add_button() ít nhất một nút chưa"))
+
+    # main_loop() BẮT BUỘC có while thật + await asyncio.sleep(...) — soi thẳng
+    # mã nguồn trước, y hệt checkLoopSyntax() bên trang làm bài.
+    loop_fn = namespace.get("main_loop")
+    if loop_fn is not None:
+        spells_source = (STUDENT_DIR / "spells.py").read_text(encoding="utf-8")
+        if "while" not in spells_source:
+            results.append((False, "main_loop: chưa thấy vòng lặp `while` thật nào trong mã của bạn."))
+        elif "await asyncio.sleep(" not in spells_source:
+            results.append((False,
+                "main_loop: chưa thấy `await asyncio.sleep(...)` — thiếu dòng này thì vòng lặp sẽ treo cứng trình duyệt."))
+        else:
+            results.append(_check_loop_behavior(loop_fn))
     return results
+
+
+async def _run_main_loop_once(loop_fn):
+    try:
+        await asyncio.wait_for(loop_fn(), timeout=1.2)
+    except asyncio.TimeoutError:
+        pass    # vòng lặp vô hạn không tự dừng — hết giờ là kết quả MONG ĐỢI
+
+
+def _check_loop_behavior(loop_fn):
+    """Đặt 1 ngón + nghe "dragon" giả, chạy main_loop() có giới hạn thời gian,
+    xem vòng lặp có thật sự đọc fingers_now()/heard_word() rồi phản ứng không."""
+    fingers_held[0] = 1
+    word_now[0] = "dragon"
+    del calls[:]
+    try:
+        asyncio.run(_run_main_loop_once(loop_fn))
+    except Exception as err:
+        return False, f"main_loop văng lỗi: {type(err).__name__}: {err}"
+    finally:
+        fingers_held[0] = 0
+        word_now[0] = ""
+    fired = any(entry[0] == "fx" for entry in calls)
+    if not fired:
+        return False, 'main_loop: đặt 1 ngón + nghe "dragon" mà vòng lặp không gọi play_effect nào cả'
+    return True, "main_loop: vòng lặp đọc cảm biến và phản ứng đúng"
 
 
 def _check_images(namespace):

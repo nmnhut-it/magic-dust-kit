@@ -1,4 +1,5 @@
-from magic_stage import play_effect, say, add_button, fingers_now, set_background, set_behind, set_front
+import asyncio
+from magic_stage import play_effect, say, add_button, fingers_now, set_background, set_behind, set_front, heard_word, run_loop
 
 # Máy gọi setup() một lần sau khi nạp mã của bạn.
 #     add_button("Rồng Lửa", "dragon")   -> mọc một nút, bấm là ra rồng
@@ -51,3 +52,16 @@ def on_fingers(count):
 def on_voice(word):
     say("nghe được: " + word)
     # lượt của bạn: viết if / elif / else, mỗi nhánh kết hợp tay AND lời
+
+
+# while True là vòng lặp THẬT — chạy mãi. await asyncio.sleep(...) ở cuối mỗi
+# vòng là BẮT BUỘC: nó nhường lại một nhịp cho trình duyệt, thiếu dòng đó thì
+# máy treo cứng (Python độc chiếm luồng chính, không ai vẽ hình được nữa).
+async def main_loop():
+    while True:
+        count = fingers_now()
+        word = heard_word()
+        # lượt của bạn: if/elif gọi play_effect(...) theo count/word
+        await asyncio.sleep(0.15)   # BẮT BUỘC — xoá dòng này là treo máy
+
+run_loop(main_loop)

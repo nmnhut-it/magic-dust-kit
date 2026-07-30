@@ -655,4 +655,57 @@ thứ hai)", nên nói mỗi từ tiếng Anh là ra phép dù tay sai.
 Nhánh \`else\` nói rõ đang thiếu vế nào — nghe đúng lời mà tay sai thì học sinh
 biết ngay phải giơ mấy ngón.`,
   },
+  {
+    id: 'main_loop', kind: 'loop', title: 'main_loop — tự viết vòng lặp đọc cảm biến', extra: true,
+    idea: `Từ đầu tới giờ, MÁY là bên gọi \`on_fingers\`/\`on_voice\` hộ bạn — đúng lúc ngón
+tay đổi, đúng lúc micro nghe được gì. Bài này đảo ngược lại: BẠN tự viết vòng
+lặp đi hỏi máy — đúng cấu trúc một chương trình thật: đọc cảm biến, quyết
+định, rồi lặp lại.
+
+\`fingers_now()\` cho số ngón tay ngay lúc này. \`heard_word()\` cho từ vừa nghe
+được (chuỗi rỗng nếu chưa ai nói gì mới). Việc khó — nhận diện tay, nhận diện
+người, ghép lớp cảnh — máy đã giấu sau mấy hàm đó và sau \`play_effect\`/
+\`set_background\` rồi; bạn chỉ cần tự viết vòng lặp gọi đúng chúng.`,
+    input: 'Không có tham số — vòng lặp tự đi hỏi `fingers_now()`/`heard_word()` mỗi lượt.',
+    job: 'Viết `async def main_loop():` với một vòng `while True:` THẬT — mỗi vòng đọc `fingers_now()`/`heard_word()`, rẽ nhánh `if/elif` gọi hiệu ứng, rồi kết thúc bằng `await asyncio.sleep(...)`. Gọi `run_loop(main_loop)` một lần để bắt đầu.',
+    output: 'Vòng lặp của bạn tự chạy, tự đọc cảm biến, tự quyết định — không còn máy gọi hộ.',
+    stub: `# while True là vòng lặp THẬT — chạy mãi. await asyncio.sleep(...) ở cuối mỗi
+# vòng là BẮT BUỘC: nó nhường lại một nhịp cho trình duyệt, thiếu dòng đó thì
+# máy treo cứng (Python độc chiếm luồng chính, không ai vẽ hình được nữa).
+async def main_loop():
+    while True:
+        count = fingers_now()
+        word = heard_word()
+        # lượt của bạn: if/elif gọi play_effect(...) theo count/word
+        await asyncio.sleep(0.15)   # BẮT BUỘC — xoá dòng này là treo máy
+
+run_loop(main_loop)
+`,
+    answer: `async def main_loop():
+    while True:
+        count = fingers_now()
+        word = heard_word()
+        if count == 1 and word in ("rồng", "dragon"):
+            play_effect("dragon")
+        elif count == 2 and word in ("phượng", "phoenix"):
+            play_effect("phoenix")
+        elif count == 3 and word in ("hoa", "sakura"):
+            play_effect("sakura")
+        await asyncio.sleep(0.15)
+
+run_loop(main_loop)
+`,
+    why: `Đây là đáp án CỦA TÔI — bạn viết logic khác (chỉ dùng tay, chỉ dùng lời, hay
+gọi thẳng \`set_background\`/\`set_front\` mỗi vòng) cũng được, miễn có \`while\`
+thật và \`await asyncio.sleep(...)\` ở cuối mỗi vòng.
+
+Vì sao BẮT BUỘC có \`await asyncio.sleep(...)\`: trình duyệt chạy Python ngay
+trên luồng chính — không có luồng phụ nào khác vẽ hình, xử lý chuột, hay đọc
+camera. \`await\` là chỗ Python "nhường micro" lại cho trình duyệt một chút rồi
+mới tiếp tục; thiếu nó, \`while True\` không bao giờ nhường ai cả, và cả trang
+đứng hình.
+
+\`heard_word()\` đọc xong tự xoá — gọi lại ngay sau đó sẽ ra chuỗi rỗng, để một
+câu nói không lặp lại mãi mãi trong vòng lặp.`,
+  },
 ];

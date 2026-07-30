@@ -747,15 +747,15 @@ if(SpeechRecognitionImpl){
     if(heard==='magic'||heard==='magik')return'magic';
     if(['fireball','firebol','firebal'].some(word=>heard.includes(word)))return'fireball';
     if(['lightning','lightening','lighting'].some(word=>heard.includes(word)))return'lightning';
-    if(['rain','reign','rane'].some(word=>heard.includes(word)))return'rain';
+    // rồng/phượng/hoa/mưa (dragon/phoenix/sakura/rain) KHÔNG có ở đây nữa — đó
+    // là bốn từ bài on_voice()/main_loop dạy học sinh tự nhận diện bằng CODE
+    // của các em; nếu máy tự nhận diện hộ thì học sinh không code cũng ra được
+    // hiệu ứng y hệt, mất hết ý nghĩa "hands-on" của bài tập.
     if(['blur','blurr','bler'].some(word=>heard.includes(word)))return'blur';
     if(['flip','flipped','fliping'].some(word=>heard.includes(word)))return'flip';
     if(['koto','kodo','coto','photo'].some(word=>heard===word||heard.startsWith(word)))return'koto';
-    if(['dragon','draggon','dragen','drag on'].some(word=>heard.includes(word)))return'dragon';
     if(['rose','rosa','roze','rows'].some(word=>heard===word||heard.startsWith(word)))return'rose';
-    if(['phoenix','phenix','feenix','fenix'].some(word=>heard.includes(word)))return'phoenix';
     if(['butterfly','butterflies','butter fly'].some(word=>heard.includes(word)))return'butterfly';
-    if(['sakura','sacura','sakawa','blossom'].some(word=>heard.includes(word)))return'sakura';
     if(['smoke','smok','smoked'].some(word=>heard.includes(word)))return'smoke';
     if(['summon','summons','someone'].some(word=>heard.includes(word)))return'dust';
     if(['stop','stopp','stap','top'].some(word=>heard===word||heard.startsWith(word)))return'stop';
@@ -780,7 +780,9 @@ if(SpeechRecognitionImpl){
     // BÀI TẬP 1: on_voice() trong student/spells.py được nghe TRƯỚC. Nếu mã của
     // các em đã gọi phép rồi thì thôi, đừng bắn thêm hiệu ứng mặc định đè lên —
     // học sinh phải thấy đúng cái mình vừa viết.
-    const handled=student.voice(alternatives[0].trim().toLowerCase());
+    const heard=alternatives[0].trim().toLowerCase();
+    student.hearWord(heard);   // bài main_loop: heard_word() đọc được từ mic thật, không chỉ ô gõ tay
+    const handled=student.voice(heard);
     const spokenSpell=handled?null:alternatives.map(voiceSpell).find(Boolean);
     if(spokenSpell){
       lastVoiceActionAt=now;

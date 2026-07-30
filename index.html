@@ -222,8 +222,8 @@ function build(cell) {
     saveCell(cell, box.value);
     verdict.textContent = 'đang chạy…'; verdict.className = 'verdict';
     // nhường một khung hình để chữ "đang chạy" kịp hiện trước khi Python khoá luồng
-    requestAnimationFrame(() => setTimeout(() => {
-      const result = runCell(runtime, cell, box.value, demo);
+    requestAnimationFrame(() => setTimeout(async () => {
+      const result = await runCell(runtime, cell, box.value, demo);
       verdict.textContent = (result.ok ? '✓ ' : '✖ ') + result.message;
       verdict.className = 'verdict ' + (result.ok ? 'ok' : 'no');
       el.classList.toggle('pass', result.ok);

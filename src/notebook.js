@@ -34,8 +34,9 @@ export function legacyWork() {
 }
 const DEMO_W = 160, DEMO_H = 120;
 const IMAGE_PREAMBLE = 'from magic_stage import new_image\n\n';
-const SPELL_PREAMBLE = 'from magic_stage import play_effect, say, add_button, fingers_now, '
-  + 'set_background, set_behind, set_front' + '\n\n';
+const SPELL_PREAMBLE = 'import asyncio\n'
+  + 'from magic_stage import play_effect, say, add_button, fingers_now, '
+  + 'set_background, set_behind, set_front, heard_word, run_loop' + '\n\n';
 
 
 const FINGER_TASKS = [[1, 'dragon'], [2, 'phoenix'], [3, 'sakura']];
@@ -94,7 +95,7 @@ export function saveCell(cell, source) {
 // Ô nào thuộc file nào. Khai một chỗ duy nhất — trước đây danh sách này nằm
 // rải trong lời gọi và tôi thêm bài mới mà quên sửa, thành ra sân khấu báo
 // "chưa thấy hàm compose" dù học sinh đã làm xong.
-const SPELL_KINDS = ['fingers', 'voice', 'setup', 'stage'];
+const SPELL_KINDS = ['fingers', 'voice', 'setup', 'stage', 'loop'];
 const IMAGE_KINDS = ['image', 'blend', 'blend_alpha', 'over', 'compose', 'scene'];
 
 // Ghép các ô thành đúng hai file mà sân khấu thật đọc.
@@ -112,6 +113,7 @@ const homeless = CELLS.filter(c => !SPELL_KINDS.includes(c.kind) && !IMAGE_KINDS
 if (homeless.length) console.warn('ô chưa được gán vào file nào:', homeless.map(c => c.id));
 
 const handHolds = { count: 0 };   // số ngón tay giả, dùng khi chấm ô on_voice
+const wordNow = { text: '' };      // từ nghe được giả, dùng khi chấm ô main_loop
 
 export async function bootPython(onStatus) {
   onStatus('Đang tải Python… lần đầu hơi lâu, chỉ lần này thôi.');
@@ -144,6 +146,12 @@ export async function bootPython(onStatus) {
     set_background: name => { log.push(['stage', 'background', String(name)]); return true; },
     set_behind: name => { log.push(['stage', 'behind', String(name)]); return true; },
     set_front: name => { log.push(['stage', 'front', String(name)]); return true; },
+    // Lúc chấm, từ nghe được do bộ chấm đặt trước mỗi lượt thử — đọc xong XOÁ,
+    // giống hệt cách heard_word() thật hoạt động ở py-runtime.js.
+    heard_word: () => { const w = wordNow.text; wordNow.text = ''; return w; },
+    // Trang làm bài TỰ chạy thử main_loop() có kiểm soát (xem runLoopCell) thay
+    // vì để nó chạy nền không ai canh được, nên run_loop() ở đây chỉ là no-op.
+    run_loop: () => true,
   });
   // Ô on_fingers/on_voice chỉ chứa đúng một hàm, không có dòng import ở đầu —
   // nên nhập sẵn hai lệnh đó vào namespace, đúng như file spells.py vẫn làm.
@@ -169,18 +177,25 @@ function loadNeeded(py, id) {
 
 // ── chạy một ô ──────────────────────────────────────────────────────────────
 // Trả về {ok, message, extra} — `extra` là dữ liệu để vẽ ảnh hoặc in nhật ký.
-export function runCell({ py, log, printed }, cell, source, demo) {
+export async function runCell({ py, log, printed }, cell, source, demo) {
   printed.length = 0;
   log.length = 0;
   // Bài cuối gọi lại blend/compose của chính học sinh, nên nạp hai bài đó trước.
   const missing = loadNeeded(py, cell.id);
   if (missing) return { ok: false, message: missing };
+  if (cell.kind === 'loop') {
+    // Bài main_loop cần soi CHÍNH MÃ NGUỒN trước khi chạy — while/await asyncio.sleep
+    // là điều kiện bắt buộc, không phải thứ để lộ ra bằng cách "chạy thử xem sao".
+    const missingSyntax = checkLoopSyntax(source);
+    if (missingSyntax) return { ok: false, message: missingSyntax };
+  }
   try { py.runPython(source); }
   catch (err) { return { ok: false, message: pyError(err) }; }
 
   if (cell.kind === 'fingers' || cell.kind === 'voice') return runSpellCell(py, log, cell, printed);
   if (cell.kind === 'setup') return runSetupCell(py, log, printed);
   if (cell.kind === 'stage') return runStageCell(py, log, printed);
+  if (cell.kind === 'loop') return runLoopCell(py, log, printed);
 
   const verdict = py.runPython(`check_one(${JSON.stringify(cell.id)}, globals())`).toJs();
   const [ok, message] = verdict;
@@ -232,6 +247,46 @@ function runStageCell(py, log, printed) {
   return { ok: true, message: 'stage', rows, picks, output: outputLines(log, printed) };
 }
 
+// Bài main_loop BẮT BUỘC có while thật + await asyncio.sleep(...) — không phải
+// hành vi máy đoán được bằng cách chạy thử, nên soi thẳng vào mã nguồn trước.
+function checkLoopSyntax(source) {
+  if (!/\bwhile\b/.test(source)) return 'main_loop: chưa thấy vòng lặp `while` thật nào trong mã của bạn.';
+  if (!/await\s+asyncio\.sleep\s*\(/.test(source)) {
+    return 'main_loop: chưa thấy `await asyncio.sleep(...)` — thiếu dòng này thì vòng lặp sẽ treo cứng trình duyệt.';
+  }
+  return null;
+}
+
+// Ô main_loop: gọi thẳng main_loop() với thời gian giới hạn (vòng lặp là while
+// True thật, không tự dừng) — TimeoutError là kết quả MONG ĐỢI, không phải lỗi.
+// Đặt sẵn số ngón tay + từ nghe được giả, rồi soi log xem vòng lặp có thật sự
+// đọc fingers_now()/heard_word() và phản ứng lại hay không.
+async function runLoopCell(py, log, printed) {
+  if (!py.globals.get('main_loop')) {
+    return { ok: false, message: 'main_loop: chưa thấy hàm `async def main_loop():` nào cả.' };
+  }
+  log.length = 0;
+  handHolds.count = 1;
+  wordNow.text = 'dragon';
+  try {
+    await py.runPythonAsync(`
+try:
+    await asyncio.wait_for(main_loop(), timeout=1.2)
+except asyncio.TimeoutError:
+    pass
+`);
+  } catch (err) { return { ok: false, message: pyError(err) }; }
+  finally { handHolds.count = 0; wordNow.text = ''; }
+  const rows = log.map(entry => ({ input: '1 ngón + "dragon"', wanted: 'bạn quyết định', hit: true,
+    got: entry[0] === 'fx' ? `play_effect("${entry[1]}")` : entry.join(' ') }));
+  const fired = log.some(entry => entry[0] === 'fx');
+  if (!fired) {
+    rows.push({ input: '1 ngón + "dragon"', wanted: 'gọi play_effect(...)', hit: false, got: '(im lặng)' });
+    return { ok: false, message: 'main_loop: đặt 1 ngón + nghe "dragon" mà vòng lặp không gọi play_effect nào cả — vòng lặp có thật sự đọc fingers_now()/heard_word() chưa?',
+             rows, output: outputLines(log, printed) };
+  }
+  return { ok: true, message: 'main_loop', rows, output: outputLines(log, printed) };
+}
 
 // Ô on_voice: đòi ĐÚNG thế tay VÀ ĐÚNG lời niệm. Chấm hai phần — làm được thì
 // phép hiện, và làm sai một vế thì phép KHÔNG được hiện.
