@@ -52,9 +52,10 @@ sẽ khựng theo. Vì vậy phần ảnh chạy cách khung (`FRAME_EVERY = 2`)
    của cả buổi — **cùng một phép tính, khác cái máy chạy nó**.
 6. Video nền đen (`assets/my-fx/`) để cuối, coi như thưởng, và nó giải thích
    luôn vì sao `blend` phải cộng chứ không dán đè.
-7. `setup()` → `stage()` → `main_loop()`: ba bài thêm nối tiếp nhau — tự dựng
-   bảng nút, tự dựng cả sân khấu, rồi tự viết vòng lặp chính đọc cảm biến thay
-   vì để máy gọi hộ. Đây là mạch "càng về sau càng ít máy làm giùm."
+7. `setup()` → `stage()` → `main_loop()` — cả ba đều BẮT BUỘC (2026-07-30) và
+   nối tiếp nhau: tự dựng bảng nút, tự dựng cả sân khấu, rồi tự viết vòng lặp
+   chính đọc cảm biến thay vì để máy gọi hộ. Đây là mạch "càng về sau càng ít
+   máy làm giùm."
 
 ## Đáp án
 
@@ -162,7 +163,7 @@ def stage():
 Đổi tên nền/hiệu ứng/nút thoải mái — miễn có ít nhất một `set_background` và
 một `add_button` là qua bài (xem "Chấm tự động" bên dưới).
 
-### `main_loop()` — bài thêm cuối cùng, tự viết vòng lặp chính
+### `main_loop()` — bài bắt buộc cuối cùng, tự viết vòng lặp chính
 
 ```python
 async def main_loop():

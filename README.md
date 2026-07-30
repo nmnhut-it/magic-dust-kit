@@ -67,10 +67,11 @@ trang bấm phím `R`. Hợp với ai đã quen dùng VS Code.
 Bài làm ở cách 1 được ưu tiên: khi trong máy đã có bài bạn gõ trên trang, sân
 khấu chạy bài đó chứ không đọc file trên đĩa nữa.
 
-**Điểm.** Mỗi bài bắt buộc 1,4 điểm (5 bài = 7,0), mỗi bài thêm 0,75 (4 bài =
-3,0) — vừa tròn 10. Bảng điểm nằm cuối trang, có ô điền tên và ngày tháng, tự
-cập nhật mỗi lần bạn chạy một ô. Ô nào đã xanh thì hôm sau mở lại vẫn xanh.
-Máy chấm bằng cách CHẠY THẬT code của bạn trên mấy ảnh mẫu, không phải so chữ.
+**Điểm.** 7 điểm chia đều cho các bài bắt buộc, 3 điểm chia đều cho bài
+thêm — vừa tròn 10, dù thêm/bớt bài thì tỉ lệ vẫn tự tính lại. Bảng điểm nằm
+cuối trang, có ô điền tên và ngày tháng, tự cập nhật mỗi lần bạn chạy một ô.
+Ô nào đã xanh thì hôm sau mở lại vẫn xanh. Máy chấm bằng cách CHẠY THẬT code
+của bạn trên mấy ảnh mẫu, không phải so chữ.
 
 ## Nhóm 1 — chọn phép bằng tay và bằng giọng nói (`spells.py`)
 
@@ -299,7 +300,7 @@ video của chính bạn giờ là lớp phủ trước mặt, y hệt cách `pl
 dùng cái tên đó. `add_button` trong `stage()` cũng nhận hàm riêng như ở trên —
 ví dụ một nút gọi `combo()` để bắn liền hai hiệu ứng.
 
-## `main_loop` — bài thêm, tự viết vòng lặp chính đọc cảm biến
+## `main_loop` — bài bắt buộc cuối cùng, tự viết vòng lặp chính đọc cảm biến
 
 Từ đầu tới giờ, MÁY là bên gọi `on_fingers`/`on_voice` hộ bạn — đúng lúc ngón
 tay đổi, đúng lúc micro nghe được gì, máy tự gọi đúng hàm của bạn. Bài này đảo

@@ -504,7 +504,7 @@ nghịch tiếp thì đổi chỗ \`pixel[0]\` với \`pixel[2]\` — đỏ và 
 cả thế giới đổi màu.`,
   },
   {
-    id: 'setup', kind: 'setup', title: 'setup — tự dựng bảng phép của bạn', extra: true,
+    id: 'setup', kind: 'setup', title: 'setup — tự dựng bảng phép của bạn',
     idea: `Tới đây bạn đã điều khiển phép bằng tay và bằng giọng nói. Còn một cách nữa:
 tự dựng NÚT BẤM cho mình. Máy gọi \`setup()\` đúng một lần mỗi khi nạp mã, và
 trong đó bạn gọi \`add_button("chữ trên nút", "tên phép")\` bao nhiêu lần tuỳ
@@ -533,7 +533,7 @@ tay. Chữ đầu là nhãn hiện trên nút, chữ sau là tên phép — hai 
 nên nhãn cứ đặt tiếng Việt có dấu thoải mái. Muốn thêm nút thì thêm một dòng.`,
   },
   {
-    id: 'stage', kind: 'stage', title: 'stage — tự dựng sân khấu của bạn', extra: true,
+    id: 'stage', kind: 'stage', title: 'stage — tự dựng sân khấu của bạn',
     idea: `Bài cuối cùng, và là bài duy nhất không có đáp án đúng. Máy gọi \`stage()\` đúng
 một lần khi sân khấu mở ra, và mọi thứ trong đó là quyết định của bạn: đứng
 trước cảnh nào, hiệu ứng nào bay sau lưng, hiệu ứng nào phủ trước mặt, bảng nút
@@ -656,7 +656,7 @@ Nhánh \`else\` nói rõ đang thiếu vế nào — nghe đúng lời mà tay s
 biết ngay phải giơ mấy ngón.`,
   },
   {
-    id: 'main_loop', kind: 'loop', title: 'main_loop — tự viết vòng lặp đọc cảm biến', extra: true,
+    id: 'main_loop', kind: 'loop', title: 'main_loop — tự viết vòng lặp đọc cảm biến',
     idea: `Từ đầu tới giờ, MÁY là bên gọi \`on_fingers\`/\`on_voice\` hộ bạn — đúng lúc ngón
 tay đổi, đúng lúc micro nghe được gì. Bài này đảo ngược lại: BẠN tự viết vòng
 lặp đi hỏi máy — đúng cấu trúc một chương trình thật: đọc cảm biến, quyết
