@@ -276,6 +276,13 @@ def _magic_cancel_loop():
   function makeClip(src) {
     const clip = document.createElement('video');
     clip.src = src; clip.muted = true; clip.loop = true; clip.playsInline = true;
+    // PHẢI gắn vào <body> (ẩn đi) — video chưa từng vào DOM thì nhiều trình
+    // duyệt lặng lẽ không chạy autoplay, .play() coi như thành công nhưng
+    // currentTime đứng yên ở 0 mãi mãi: nền/hiệu ứng thành một khung hình
+    // chết thay vì video thật. Phát hiện được vì đã tự tay kiểm currentTime
+    // có tăng theo thời gian không, chứ không chỉ nhìn ảnh tĩnh một lần.
+    clip.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none';
+    document.body.appendChild(clip);
     clip.play().catch(() => {});          // trình duyệt chặn autoplay: bấm một cái là chạy
     return clip;
   }
