@@ -169,13 +169,17 @@ def _magic_cancel_loop():
       ui.buttons.textContent = '';
       state.pick = { behind: null, front: null };
       if (state.py.globals.get('setup')) call('setup');
-      if (state.py.globals.get('stage')) {
-        call('stage');       // bài cuối: học sinh tự dựng sân khấu
-        // Sân khấu của bạn tự mở ngay — không cần bấm phím S để xem thành quả.
-        setMode('scene');
+      // stage() luôn TỒN TẠI (đề gốc cũng có def stage(): pass) — chỉ tự mở
+      // scene mode khi học sinh THẬT SỰ đã gọi set_background(...), không thì
+      // học sinh chưa tới bài này sẽ vô cớ thấy "chưa thấy mặt nạ người".
+      state.backdropChosen = false;
+      if (state.py.globals.get('stage')) call('stage');
+      if (state.backdropChosen) {
+        setMode('scene');       // sân khấu của bạn tự mở ngay — không cần bấm phím S
         say('Sân khấu bạn dựng — đang chạy');
+      } else {
+        say('Python sẵn sàng — sửa file trong student/ rồi bấm R để nạp lại');
       }
-      say('Python sẵn sàng — sửa file trong student/ rồi bấm R để nạp lại');
       return true;
     } catch (err) { say(pyError(err), true); return false; }
   }
@@ -266,6 +270,7 @@ def _magic_cancel_loop():
       state.backdropClip = null;
       backdrop.src = src;                    // onload phía trên dựng lại lưới
     }
+    state.backdropChosen = true;   // đánh dấu học sinh ĐÃ THẬT SỰ gọi set_background
     say(`Nền: ${name}`);
   }
 
