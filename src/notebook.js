@@ -153,9 +153,13 @@ export async function bootPython(onStatus) {
     // vì để nó chạy nền không ai canh được, nên run_loop() ở đây chỉ là no-op.
     run_loop: () => true,
   });
-  // Ô on_fingers/on_voice chỉ chứa đúng một hàm, không có dòng import ở đầu —
-  // nên nhập sẵn hai lệnh đó vào namespace, đúng như file spells.py vẫn làm.
+  // Mấy ô chỉ chứa đúng một hàm, không có dòng import ở đầu — nên nhập sẵn cả
+  // hai bộ lệnh vào namespace, đúng như spells.py/image_spells.py vẫn làm.
+  // Thiếu IMAGE_PREAMBLE thì blur_background/scene (dùng new_image()) chạy
+  // riêng lẻ sẽ vỡ NameError dù cham.py/sân khấu thật không sao — lỗi này chỉ
+  // lộ ra khi chấm TỪNG Ô một, không lộ khi chấm cả file gộp.
   py.runPython(SPELL_PREAMBLE);
+  py.runPython(IMAGE_PREAMBLE);
   onStatus('Python sẵn sàng.');
   return { py, log, printed };
 }
@@ -446,15 +450,28 @@ export async function loadDemo() {
     for (let col = 0; col < DEMO_W; col++) line.push(person[(row * DEMO_W + col) * 4 + 3]);
     mask.push(line);
   }
-  return { base, dark, layer, person, behind, mask, width: DEMO_W, height: DEMO_H };
+  // Cảnh CÓ người đứng trong đó — ghép person đè lên base theo đúng kênh
+  // alpha của person (phép over chuẩn). blur_background cần tấm này: dùng
+  // demo.base trơn (không người) thì mặt nạ chỉ vào một chỗ trống, học sinh
+  // không thấy được "người giữ nét, nền mờ" nghĩa là gì (phát hiện được khi
+  // tự tay chạy thử từng ô một, không phải đoán).
+  const sceneWithPerson = new Array(DEMO_W * DEMO_H * 4).fill(255);
+  for (let row = 0; row < DEMO_H; row++) {
+    for (let col = 0; col < DEMO_W; col++) {
+      const at = (row * DEMO_W + col) * 4;
+      const a = person[at + 3];
+      for (let c = 0; c < 3; c++) sceneWithPerson[at + c] = Math.round((person[at + c] * a + base[at + c] * (255 - a)) / 255);
+    }
+  }
+  return { base, dark, layer, person, behind, mask, sceneWithPerson, width: DEMO_W, height: DEMO_H };
 }
 
 // Ảnh vào của một ô: lend lấy nền tối, còn lại lấy cảnh sáng.
 export function baseFor(cell, demo) {
   if (cell.kind === 'blend') return demo.dark;
-  // blur_background chạy trên CẢNH, không phải trên ảnh nhân vật: nền của tấm
-  // nhân vật vốn đã trống trơn nên làm mờ nó chẳng thấy khác gì.
-  if (cell.id === 'blur_background') return demo.base;
+  // blur_background cần cảnh CÓ người trong đó, khớp với mặt nạ — xem
+  // sceneWithPerson ở loadDemo().
+  if (cell.id === 'blur_background') return demo.sceneWithPerson;
   if (cell.kind === 'compose' || cell.kind === 'scene') return demo.person;
   return demo.base;
 }
