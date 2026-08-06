@@ -343,8 +343,19 @@ try {
     kernelButton.click();
     await waitFor(() => Snapshot.message?.textContent.includes("Kernel gentle"),
       40_000, "same-photo kernel switch");
+    const gentleMessage = Snapshot.message.textContent;
+    const widestButton = [...document.querySelectorAll(".snapshot-kernels button")]
+      .find((button) => button.dataset.kernel === "widest");
+    if (!widestButton) throw new Error("Missing the widest 9×9 kernel button");
+    const widestStarted = Date.now();
+    widestButton.click();
+    await waitFor(() => Snapshot.message?.textContent.includes("Kernel widest"),
+      40_000, "9 × 9 kernel switch");
     const kernelEvidence = {
       message: Snapshot.message.textContent,
+      gentleMessage,
+      widestSeconds: (Date.now() - widestStarted) / 1000,
+      labels: [...document.querySelectorAll(".snapshot-kernels button")].map((button) => button.textContent),
       streamStillStopped: Snapshot.stream === null,
       barVisible: !document.querySelector(".snapshot-kernels").classList.contains("hidden"),
     };
@@ -389,9 +400,16 @@ try {
       !evidence.photoEvidence.message.includes("OUTPUT changed")) {
     throw new Error(`One-photo processing did not finish correctly: ${JSON.stringify(evidence.photoEvidence)}`);
   }
-  if (!evidence.kernelEvidence.message.includes("Kernel gentle ran") ||
+  if (!evidence.kernelEvidence.gentleMessage.includes("Kernel gentle ran") ||
+      !evidence.kernelEvidence.message.includes("Kernel widest ran") ||
+      !evidence.kernelEvidence.labels.includes("widest 9×9") ||
       !evidence.kernelEvidence.streamStillStopped || !evidence.kernelEvidence.barVisible) {
     throw new Error(`Same-photo kernel switching failed: ${JSON.stringify(evidence.kernelEvidence)}`);
+  }
+  // Kernel 9 × 9 chạy 81 phép nhân cho mỗi điểm ảnh; nếu nó vượt 20 giây thì nút
+  // so-sánh-tại-chỗ hết còn là thao tác "bấm rồi xem" của học sinh.
+  if (evidence.kernelEvidence.widestSeconds > 20) {
+    throw new Error(`The 9 × 9 kernel took ${evidence.kernelEvidence.widestSeconds}s to re-run one photo.`);
   }
   if (!evidence.answerKey.includes(":skin-answers:v3") || !evidence.practiceSaveStillPresent) {
     throw new Error("Practice and answer routes do not use separate localStorage records.");
@@ -415,6 +433,7 @@ try {
   console.log(
     `Browser OK (${REMOTE_BASE ? "live" : "local"}): autosave resumed by stable ID; ` +
     `eight mechanisms persisted; one photo captured and camera stopped; answer grader 5/5; ` +
+    `9 × 9 kernel re-ran the same photo in ${evidence.kernelEvidence.widestSeconds.toFixed(1)}s; ` +
     `${evidence.images} illustrations; mobile fits; ` +
     `main route ${original.cells} cells.`,
   );

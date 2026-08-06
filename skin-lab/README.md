@@ -25,9 +25,15 @@ Lesson structure (one continuous trail for young learners):
 - After the one-photo capture, kernel buttons under the result re-run the
   pipeline on the same captured image (`Snapshot.renderPipeline` +
   `magic_mirror._set_snapshot_kernel`), so students compare `gentle/balanced/
-  strong 3×3` against `wide 5×5` hands-on without reopening the camera; a
-  custom `kernel_options` entry typed in the settings cell wins over the
-  canonical weights.
+  strong 3×3` against `wide 5×5` and `widest 9×9` hands-on without reopening the
+  camera; a custom `kernel_options` entry typed in the settings cell wins over
+  the canonical weights. `magic_mirror.KERNEL_SHAPES` is the single list of
+  accepted sizes — `(3, 3)`, `(5, 5)`, `(9, 9)` — read by both the button
+  handler and the capstone settings check. One 9 × 9 re-run of the whole
+  pipeline takes about 0.5 s in the browser at 320 × 240, so the button stays a
+  press-and-look comparison; the lesson states plainly that at
+  `skin_smooth_strength = 0.55` the measured gap between 5 × 5 and 9 × 9 is
+  small, and asks students to judge it by the changed-pixel count.
 
 Source files:
 

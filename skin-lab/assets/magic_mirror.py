@@ -1438,7 +1438,23 @@ SNAPSHOT_KERNELS = {
         (1, 1, 1, 1, 1),
         (1, 1, 1, 1, 1),
     ),
+    "widest": (
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+    ),
 }
+
+# Học sinh sửa được trọng số, nhưng chỉ trong ba cỡ lưới lẻ này — mọi chỗ kiểm
+# tra hình dạng kernel đều đọc từ đây để không lệch nhau.
+KERNEL_SHAPES = ((3, 3), (5, 5), (9, 9))
+KERNEL_SHAPE_TEXT = "3 x 3, 5 x 5, or 9 x 9"
 
 
 def _set_snapshot_kernel(name):
@@ -1449,12 +1465,12 @@ def _set_snapshot_kernel(name):
     """
     if name not in SNAPSHOT_KERNELS:
         raise MagicMirrorError(
-            "Unknown kernel '%s'. Choose gentle, balanced, strong, or wide." % name)
+            "Unknown kernel '%s'. Choose %s." % (name, ", ".join(SNAPSHOT_KERNELS)))
     kernel = SNAPSHOT_KERNELS[name]
     custom = getattr(__main__, "kernel_options", None)
     if isinstance(custom, dict) and name in custom:
         candidate = np.asarray(custom[name], dtype=np.float32)
-        if candidate.shape in ((3, 3), (5, 5)):
+        if candidate.shape in KERNEL_SHAPES:
             kernel = custom[name]
     __main__.kernel_choice = name
     __main__.SOFTEN_KERNEL = kernel
@@ -1476,8 +1492,8 @@ def _pipeline_number(name, default, minimum, maximum):
 def _pipeline_settings():
     """Validate the kernel and strengths that learners may edit in the capstone cell."""
     kernel = np.asarray(getattr(__main__, "SOFTEN_KERNEL", SKIN_SOFTEN_KERNEL), dtype=np.float32)
-    if kernel.shape not in ((3, 3), (5, 5)):
-        raise MagicMirrorError("SOFTEN_KERNEL must be a 3 x 3 or 5 x 5 grid of weights.")
+    if kernel.shape not in KERNEL_SHAPES:
+        raise MagicMirrorError("SOFTEN_KERNEL must be a %s grid of weights." % KERNEL_SHAPE_TEXT)
     if not np.isfinite(kernel).all() or (kernel < 0).any() or float(kernel.sum()) <= 0:
         raise MagicMirrorError("The SOFTEN_KERNEL weights must be non-negative and their total must exceed 0.")
     return {

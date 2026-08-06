@@ -13,7 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HERE = pathlib.Path(__file__).resolve().parent
-COURSE_VERSION = "2026.08.06.10"
+COURSE_VERSION = "2026.08.07.1"
 PRACTICE_FILE = "Skin_Lab.ipynb"
 SOLUTION_FILE = "Skin_Lab_Answers.ipynb"
 TASK_ORDER = (
@@ -620,10 +620,16 @@ Follow two pixels through those five steps:
 
 ### How far does a kernel reach?
 
-One pass of a 3 × 3 kernel mixes each pixel only with neighbours **one step away**. Run it `n` times and information
-travels about `n` steps. A red blotch on a real photograph can be ten steps wide, so:
+One pass of a 3 × 3 kernel mixes each pixel only with neighbours **one step away**. A 5 × 5 kernel reaches two steps, and
+a 9 × 9 kernel reaches four. Run any of them `n` times and information travels about `n` × that reach. A red blotch on a
+real photograph can be ten steps wide, so:
 
-- more `skin_kernel_passes`, or the **wide 5 × 5 kernel**, increase how far the smoothing reaches;
+- more `skin_kernel_passes`, or a wider kernel (`wide` 5 × 5, `widest` 9 × 9), increase how far the smoothing reaches;
+- reach costs arithmetic: a 9 × 9 window averages 81 pixels for every output value instead of 9, so the same cell does
+  about nine times the multiplying and adding a 3 × 3 does;
+- reach is not the whole story. With `skin_smooth_strength` at `0.55` and detail protection switched on, the measured
+  difference between 5 × 5 and 9 × 9 on one 320 × 240 photograph is small. Raise the strength and the pass count if you
+  want that difference to become obvious, and judge it by the changed-pixel count rather than by first impression;
 - reach alone still cannot fix colour — averaging inside a red blotch only produces more red. That is why the red
   region is also pulled toward the surrounding skin colour, not merely blurred.
 
@@ -641,10 +647,12 @@ The kernel decides the candidate smooth colour. `skin_smooth_strength` decides h
 
 ### Capstone task — choose and defend your settings
 
-- **Given:** four kernels — `gentle`, `balanced`, `strong` (3 × 3) and `wide` (5 × 5) — and safe ranges for all settings.
+- **Given:** five kernels — `gentle`, `balanced`, `strong` (3 × 3), `wide` (5 × 5) and `widest` (9 × 9) — and safe ranges
+  for all settings.
 - **INPUT:** the next cell uses the bundled acne photograph, where the effect is easy to see; the final cell accepts one
   captured or uploaded photograph.
-- **PROCESS:** change `kernel_choice`, then test one or more strengths, brightness, pass count, or the nine kernel weights.
+- **PROCESS:** change `kernel_choice`, then test one or more strengths, brightness, pass count, or the weights inside the
+  chosen kernel.
 - **OUTPUT:** the report must name the kernel, weight total, strengths, and changed-pixel count. The five-panel figure must
   show input, skin region, red region, magnified difference, and final output.
 
@@ -652,8 +660,9 @@ Change one setting at a time. Use the difference panel and changed-pixel count�
 effect of your change.
 """
 
-PIPELINE_SETTINGS_CODE = """# Choose "gentle", "balanced", "strong", or "wide".
+PIPELINE_SETTINGS_CODE = """# Choose "gentle", "balanced", "strong", "wide", or "widest".
 # "wide" reaches two steps per pass, so its smoothing is clearly visible.
+# "widest" reaches four steps and averages 81 pixels per output value.
 kernel_choice = "wide"
 
 # You may also edit the weights of any kernel.
@@ -680,6 +689,17 @@ kernel_options = {
         (1, 1, 1, 1, 1),
         (1, 1, 1, 1, 1),
     ),
+    "widest": (
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1, 1, 1, 1, 1),
+    ),
 }
 
 SOFTEN_KERNEL = kernel_options[kernel_choice]
@@ -701,8 +721,10 @@ PHOTO = """## Run the pipeline once on a photograph
 - **OUTPUT:** five panels show the input, allowed skin region, stronger red region, magnified colour difference, and final
   result. The report states how many pixels were selected, protected, and changed, plus your kernel and settings.
 - **Hands-on comparison:** after the result appears, press the kernel buttons under it — `gentle 3×3`, `balanced 3×3`,
-  `strong 3×3`, `wide 5×5`. Each press re-runs the whole pipeline on the **same** photograph, so the only thing that
-  changed is the kernel. Compare the reports and the difference panels: how much farther does a 5 × 5 kernel reach?
+  `strong 3×3`, `wide 5×5`, `widest 9×9`. Each press re-runs the whole pipeline on the **same** photograph, so the only
+  thing that changed is the kernel. Compare the reports and the difference panels, and write down the changed-pixel
+  count for each: how much farther does a 5 × 5 reach than a 3 × 3, and does `widest 9×9` change that number as much as
+  its 81 weights suggest it should?
 
 The image stays only in this cell's visible output. It is not written to `localStorage`, and it disappears after a reload.
 Your code and progress remain. Processing uses 320 × 240 pixels and displays at 480 × 360 for a clear still-image result.

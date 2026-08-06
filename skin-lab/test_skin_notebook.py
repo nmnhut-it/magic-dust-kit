@@ -29,12 +29,12 @@ class TestSkinNotebook(unittest.TestCase):
         practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
         answer_page = (ROOT / "dap-an.html").read_text(encoding="utf-8")
         self.assertIn('notebook: "Skin_Lab.ipynb"', practice_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.10", practice_page)
-        self.assertIn("assets/skin-mechanisms.js?v=2026.08.06.10", practice_page)
+        self.assertIn("assets/notebook.js?v=2026.08.07.1", practice_page)
+        self.assertIn("assets/skin-mechanisms.js?v=2026.08.07.1", practice_page)
         self.assertIn('href="dap-an.html"', practice_page)
         self.assertIn('href="../index.html"', practice_page)
         self.assertIn('notebook: "Skin_Lab_Answers.ipynb"', answer_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.10", answer_page)
+        self.assertIn("assets/notebook.js?v=2026.08.07.1", answer_page)
         self.assertIn('href="./"', answer_page)
         self.assertIn('href="../index.html"', answer_page)
 
@@ -255,7 +255,7 @@ class TestSkinNotebook(unittest.TestCase):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)
             self.assertEqual(notebook["metadata"]["course"]["id"], "skin-lab")
-            self.assertRegex(notebook["metadata"]["course"]["version"], r"^2026\.08\.06\.")
+            self.assertRegex(notebook["metadata"]["course"]["version"], r"^2026\.08\.07\.")
             for cell in notebook["cells"]:
                 self.assertEqual(cell["metadata"]["stable_id"], cell["id"])
                 if cell["cell_type"] == "code":
@@ -337,6 +337,24 @@ class TestSkinNotebook(unittest.TestCase):
             "How far does a kernel reach?",
         ):
             self.assertIn(phrase, lesson)
+
+    def test_capstone_offers_a_nine_by_nine_kernel_with_its_cost_explained(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
+        settings = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-pipeline-settings")
+        self.assertIn('"widest": (', source(settings))
+        self.assertEqual(source(settings).count("(1, 1, 1, 1, 1, 1, 1, 1, 1),"), 9)
+        for phrase in (
+            'Choose "gentle", "balanced", "strong", "wide", or "widest".',
+            "a 9 × 9 kernel reaches four",
+            "averages 81 pixels for every output value instead of 9",
+            "difference between 5 × 5 and 9 × 9 on one 320 × 240 photograph is small",
+            "`widest 9×9`",
+        ):
+            self.assertIn(phrase, lesson)
+        self.assertIn('["widest", "widest 9×9"]', runtime)
+        self.assertIn("KERNEL_SHAPES = ((3, 3), (5, 5), (9, 9))", helpers)
 
     def test_convolution_transfer_check_is_unsolved_only_in_practice(self):
         practice = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-convolution-transfer")

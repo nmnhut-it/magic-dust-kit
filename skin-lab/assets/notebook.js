@@ -988,7 +988,8 @@ const Snapshot = {
     kernels.appendChild(Object.assign(document.createElement("span"),
       { textContent: "Try another kernel on the same photo:" }));
     [["gentle", "gentle 3×3"], ["balanced", "balanced 3×3"],
-      ["strong", "strong 3×3"], ["wide", "wide 5×5"]].forEach(([name, label]) => {
+      ["strong", "strong 3×3"], ["wide", "wide 5×5"],
+      ["widest", "widest 9×9"]].forEach(([name, label]) => {
       const pick = document.createElement("button");
       pick.type = "button"; pick.className = "btn";
       pick.dataset.kernel = name; pick.textContent = label;

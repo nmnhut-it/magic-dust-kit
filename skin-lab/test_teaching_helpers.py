@@ -283,8 +283,31 @@ class TestTeachingHelpers(unittest.TestCase):
             self.assertEqual(main_module.SOFTEN_KERNEL, custom_gentle)
             magic_mirror._set_snapshot_kernel("wide")
             self.assertEqual(np.asarray(main_module.SOFTEN_KERNEL).shape, (5, 5))
+            magic_mirror._set_snapshot_kernel("widest")
+            self.assertEqual(np.asarray(main_module.SOFTEN_KERNEL).shape, (9, 9))
         with self.assertRaises(magic_mirror.MagicMirrorError):
             magic_mirror._set_snapshot_kernel("mystery")
+
+    def test_every_snapshot_kernel_is_a_supported_odd_square_of_weights(self):
+        self.assertEqual(
+            tuple(magic_mirror.SNAPSHOT_KERNELS),
+            ("gentle", "balanced", "strong", "wide", "widest"))
+        for name, kernel in magic_mirror.SNAPSHOT_KERNELS.items():
+            weights = np.asarray(kernel, dtype=np.float32)
+            self.assertIn(weights.shape, magic_mirror.KERNEL_SHAPES, name)
+            self.assertGreater(float(weights.sum()), 0, name)
+            self.assertTrue((weights >= 0).all(), name)
+
+    def test_capstone_settings_accept_a_nine_by_nine_kernel_and_reject_other_shapes(self):
+        main_module = sys.modules["__main__"]
+        with patch.object(
+            main_module, "SOFTEN_KERNEL", magic_mirror.SNAPSHOT_KERNELS["widest"], create=True
+        ):
+            self.assertEqual(magic_mirror._pipeline_settings()["kernel"].shape, (9, 9))
+        with patch.object(main_module, "SOFTEN_KERNEL", np.ones((7, 7)), create=True):
+            with self.assertRaises(magic_mirror.MagicMirrorError) as caught:
+                magic_mirror._pipeline_settings()
+        self.assertIn("3 x 3, 5 x 5, or 9 x 9", str(caught.exception))
 
     def test_grader_translates_unfilled_blanks_into_plain_instructions(self):
         def unfilled():
