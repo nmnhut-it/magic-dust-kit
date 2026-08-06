@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skin Lab — Tích chập không training</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%F0%9F%94%AC</text></svg>">
+<link rel="stylesheet" href="assets/notebook.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand">
+      <div class="logo">🔬</div>
+      <div>
+        <h1>Skin Lab — Tích chập viết tay</h1>
+        <small>Tìm vùng da và làm mềm chấm đỏ, không model, không training</small>
+      </div>
+    </div>
+    <a class="btn" href="dap-an.html" title="Xem bài giải mẫu">🔑 Bài giải</a>
+    <a class="btn" href="../index.html" title="Về Xưởng Mật Ngữ">⌂ Trang chính</a>
+    <button class="btn icon" id="openBtn" title="Mở file .ipynb đã lưu từ máy">📂</button>
+    <button class="btn primary" id="runAllBtn" disabled>▶ Chạy tất cả</button>
+    <button class="btn icon" id="restartBtn" disabled title="Khởi động lại Python và xóa hết kết quả">⟳</button>
+    <button class="btn icon" id="saveBtn" title="Tải bài em vừa làm về máy">⬇</button>
+    <button class="btn icon" id="resetBtn" title="Bỏ hết code đã sửa, quay về đề bài gốc">↺</button>
+    <span class="kernel" id="kernelPill" data-state="loading"><span class="dot"></span><span id="kernelText">Đang khởi động…</span></span>
+    <span class="save-state" id="saveState">Chưa có thay đổi</span>
+  </div>
+</header>
+
+<main>
+  <div class="banner hidden" id="banner"></div>
+  <div id="notebook"><div class="boot"><div class="spin"></div>Đang tải Skin Lab…</div></div>
+  <div class="hint">
+    <span><kbd>Shift</kbd>+<kbd>Enter</kbd> chạy ô rồi xuống ô kế</span>
+    <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> chạy tại chỗ</span>
+    <span>Nháy đúp vào phần chữ để sửa</span>
+    <span>Bài của em được lưu tự động trong trình duyệt</span>
+  </div>
+</main>
+
+<input type="file" id="filePicker" accept=".ipynb" hidden>
+
+<script>window.MM_PAGE = { notebook: "Skin_Lab.ipynb", mode: "skin", courseVersion: "2026.08.06.1" };</script>
+<script src="assets/notebook.js"></script>
+</body>
+</html>

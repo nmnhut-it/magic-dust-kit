@@ -1,0 +1,140 @@
+import json
+import re
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parent
+TASKS = (
+    "convolve_layer",
+    "skin_evidence",
+    "detect_skin",
+    "detect_pimples",
+    "remove_pimples",
+)
+
+
+def source(cell):
+    value = cell.get("source", "")
+    return "".join(value) if isinstance(value, list) else value
+
+
+class TestSkinNotebook(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.practice = json.loads((ROOT / "Skin_Lab.ipynb").read_text(encoding="utf-8"))
+        cls.answers = json.loads((ROOT / "Skin_Lab_Answers.ipynb").read_text(encoding="utf-8"))
+
+    def test_skin_routes_are_relative_and_keep_the_main_route_available(self):
+        practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
+        answer_page = (ROOT / "dap-an.html").read_text(encoding="utf-8")
+        self.assertIn('notebook: "Skin_Lab.ipynb"', practice_page)
+        self.assertIn('href="dap-an.html"', practice_page)
+        self.assertIn('href="../index.html"', practice_page)
+        self.assertIn('notebook: "Skin_Lab_Answers.ipynb"', answer_page)
+        self.assertIn('href="./"', answer_page)
+        self.assertIn('href="../index.html"', answer_page)
+
+    def test_each_task_is_a_stable_autoload_cell_with_the_matching_function(self):
+        for notebook, code_path in (
+            (self.practice, ROOT / "skin_filters.py"),
+            (self.answers, ROOT / "skin_filters_solution.py"),
+        ):
+            module_source = code_path.read_text(encoding="utf-8")
+            cells_by_tag = {
+                tag.removeprefix("task:"): cell
+                for cell in notebook["cells"]
+                for tag in cell.get("metadata", {}).get("tags", [])
+                if tag.startswith("task:")
+            }
+            self.assertEqual(set(cells_by_tag), set(TASKS))
+            for task in TASKS:
+                cell = cells_by_tag[task]
+                self.assertIn("autoload", cell["metadata"]["tags"])
+                self.assertEqual(cell["id"], "task-" + task.replace("_", "-"))
+                self.assertRegex(source(cell), rf"def\s+{task}\s*\(")
+                self.assertIn(f"def {task}(", module_source)
+
+    def test_lesson_shows_the_exact_number_substitutions(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        for phrase in (
+            "8 × 10 + 90 = 170",
+            "170 / 9 = 18.89",
+            "brightness = (183 + 127 + 103) // 3 = 413 // 3 = 137",
+            "(8 × 255 + 0) / 9 = 2040 / 9 = 226.67",
+            "226.67",
+            "141.67",
+            "89.28",
+            "(194, 111, 94)",
+        ):
+            self.assertIn(phrase, lesson)
+
+    def test_lesson_has_a_small_optional_numpy_extension(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        for phrase in ("np.asarray", ".shape", "np.where", "np.clip", "boolean mask"):
+            self.assertIn(phrase, lesson)
+        self.assertIn("không thuộc 5 phần bắt buộc", lesson)
+
+    def test_tasks_name_given_input_process_and_output(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        for task in TASKS:
+            task_text = next(
+                source(cell)
+                for cell in self.practice["cells"]
+                if cell["id"] == "skin-task-" + {
+                    "convolve_layer": "convolve-note",
+                    "skin_evidence": "evidence-note",
+                    "detect_skin": "detect-note",
+                    "detect_pimples": "pimple-note",
+                    "remove_pimples": "remove-note",
+                }[task]
+            )
+            self.assertRegex(task_text, r"(?i)giá trị cho sẵn|given")
+            self.assertIn("INPUT", task_text)
+            self.assertIn("PROCESS", task_text)
+            self.assertIn("OUTPUT", task_text)
+        self.assertIn("Ảnh camera không được lưu", lesson)
+
+    def test_route_has_no_training_dependency_or_diagnostic_claim(self):
+        code = (ROOT / "skin_filters_solution.py").read_text(encoding="utf-8").lower()
+        for dependency in ("tensorflow", "torch", "sklearn", "keras", "model.fit"):
+            self.assertNotIn(dependency, code)
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        self.assertIn("không phải công cụ chẩn đoán hay đánh giá làn da", lesson)
+        self.assertIn("ảnh tổng hợp", lesson)
+
+    def test_notebooks_have_matching_stable_ids_and_clean_outputs(self):
+        practice_ids = [cell["id"] for cell in self.practice["cells"]]
+        answer_ids = [cell["id"] for cell in self.answers["cells"]]
+        self.assertEqual(practice_ids, answer_ids)
+        self.assertEqual(len(practice_ids), len(set(practice_ids)))
+        self.assertEqual(len(practice_ids), 43)
+        for notebook in (self.practice, self.answers):
+            self.assertEqual(notebook["nbformat"], 4)
+            self.assertEqual(notebook["nbformat_minor"], 5)
+            self.assertEqual(notebook["metadata"]["course"]["id"], "skin-lab")
+            self.assertRegex(notebook["metadata"]["course"]["version"], r"^2026\.08\.06\.")
+            for cell in notebook["cells"]:
+                self.assertEqual(cell["metadata"]["stable_id"], cell["id"])
+                if cell["cell_type"] == "code":
+                    self.assertEqual(cell["outputs"], [])
+                    self.assertIsNone(cell["execution_count"])
+
+    def test_runtime_saves_by_stable_id_and_never_persists_camera_images(self):
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        self.assertIn("magic-dust-kit:skin-lab:", runtime)
+        self.assertIn("cells: {}, passed: [], lastCellId: null", runtime)
+        self.assertIn("Object.fromEntries(Nb.cells.map", runtime)
+        self.assertIn('user: cell.id.startsWith("user-")', runtime)
+        self.assertIn("Ô do học sinh tự thêm", runtime)
+        self.assertIn('tags.includes("autoload")', runtime)
+        self.assertIn("Tiếp tục từ chỗ đang học", runtime)
+        self.assertIn("window.confirm", runtime)
+        persistence = re.search(r"persist\(\) \{(.+?)\n  \},", runtime, re.DOTALL)
+        self.assertIsNotNone(persistence)
+        for forbidden in ("Cam.stream", "toDataURL", "canvas", "imageData"):
+            self.assertNotIn(forbidden, persistence.group(1))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

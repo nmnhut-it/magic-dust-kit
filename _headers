@@ -16,6 +16,10 @@
 /pygrade/*
   Cache-Control: no-store
 
+# Skin Lab có notebook và runtime riêng; luôn lấy đúng phiên bản vừa deploy.
+/skin-lab/*
+  Cache-Control: no-store
+
 # Mã trang: mặc định của Pages là giữ 4 tiếng, nên sau khi cập nhật, trình duyệt
 # vẫn nạp file cũ và vỡ ngay chỗ import (đúng lỗi đã gặp: "does not provide an
 # export named baseFor" trong khi file trên máy chủ đã có).

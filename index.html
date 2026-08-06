@@ -115,6 +115,10 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
 #stale{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:rgba(200,162,74,.12);
   border:1px solid rgba(200,162,74,.4);color:#e2c072;font-size:13px}
 #fresh{margin-top:10px;background:rgba(120,178,165,.18)}
+.course-nav{margin-top:14px;display:flex;flex-wrap:wrap;gap:10px}
+.course-nav a{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid rgba(159,232,213,.5);
+  border-radius:10px;color:var(--go);background:rgba(159,232,213,.08);font-weight:700;text-decoration:none}
+.course-nav small{color:var(--dim);font-weight:400}
 </style>
 
 <header>
@@ -123,6 +127,9 @@ td.no{color:var(--bad)}td.ok{color:var(--go)}
   dựng luôn ẢNH VÀO / ẢNH RA bằng chính đoạn code bạn vừa viết. Sai thì sửa rồi
   chạy lại. Làm xong năm ô bắt buộc, cổng sang sân khấu thật mới mở.</p>
   <p id="status">Đang khởi động…</p>
+  <nav class="course-nav" aria-label="Các phòng học">
+    <a href="./skin-lab/">🧪 Skin Lab <small>lọc ảnh, mask và NumPy vừa đủ →</small></a>
+  </nav>
 </header>
 <main id="cells"></main>
 
