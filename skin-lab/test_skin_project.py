@@ -10,6 +10,7 @@ import importlib
 import os
 import unittest
 
+import numpy as np
 from PIL import Image
 
 
@@ -31,26 +32,35 @@ class TestSkinProject(unittest.TestCase):
         layer = [[0 for _ in range(5)] for _ in range(5)]
         layer[2][2] = 9
         result = skin.convolve_layer(layer, skin.SKIN_VOTE_KERNEL, 9)
-        self.assertEqual(result[2][2], 1)
-        self.assertEqual(result[0][0], 0, "viền phải được giữ nguyên")
+        self.assertIsInstance(result, np.ndarray)
+        self.assertEqual(result.shape, (5, 5))
+        self.assertEqual(result[2, 2], 1)
+        self.assertEqual(result[0, 0], 0, "mode nearest phải giữ nền phẳng ở viền")
         self.assertEqual(layer[2][2], 9, "không được ghi đè lên input")
 
     def test_skin_evidence_handles_two_tones_and_rejects_blue(self):
         self.assertEqual(skin.skin_evidence(*SKIN), skin.MASK_ON)
         self.assertEqual(skin.skin_evidence(92, 61, 49), skin.MASK_ON)
         self.assertEqual(skin.skin_evidence(*BACKGROUND), skin.MASK_OFF)
+        channels = np.array([[SKIN, BACKGROUND]], dtype=np.int16)
+        votes = skin.skin_evidence(channels[:, :, 0], channels[:, :, 1], channels[:, :, 2])
+        self.assertIsInstance(votes, np.ndarray)
+        self.assertEqual(votes.dtype, np.uint8)
+        self.assertEqual(votes.tolist(), [[skin.MASK_ON, skin.MASK_OFF]])
 
     def test_neighbour_votes_keep_skin_across_a_red_spot(self):
         mask = skin.detect_skin(skin_patch())
-        self.assertEqual(mask[4][4], skin.MASK_ON)
+        self.assertIsInstance(mask, np.ndarray)
+        self.assertEqual(mask.dtype, np.uint8)
+        self.assertEqual(mask[4, 4], skin.MASK_ON)
         blue = Image.new("RGB", (9, 9), BACKGROUND)
-        self.assertEqual(skin.detect_skin(blue)[4][4], skin.MASK_OFF)
+        self.assertEqual(skin.detect_skin(blue)[4, 4], skin.MASK_OFF)
 
     def test_pimple_detector_uses_local_red_contrast(self):
         image = skin_patch()
         mask = skin.detect_pimples(image, skin.detect_skin(image))
-        self.assertEqual(mask[4][4], skin.MASK_ON)
-        self.assertEqual(mask[0][0], skin.MASK_OFF)
+        self.assertEqual(mask[4, 4], skin.MASK_ON)
+        self.assertEqual(mask[0, 0], skin.MASK_OFF)
 
     def test_removal_reduces_red_spot_and_keeps_far_pixels(self):
         image = skin_patch()

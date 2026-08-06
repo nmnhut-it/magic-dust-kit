@@ -8,7 +8,8 @@ Nguồn chuẩn:
 - `build_notebooks.py`: nội dung và thứ tự các ô notebook.
 - `skin_filters.py`: code bài tập.
 - `skin_filters_solution.py`: code đáp án.
-- `assets/magic_mirror.py`: minh hoạ, dữ liệu ảnh tổng hợp và bộ chấm.
+- `assets/magic_mirror.py`: minh hoạ có số + hình + giải thích, dữ liệu ảnh và bộ chấm.
+- `assets/photos/`: ba ảnh CC0 được lưu cục bộ cùng ghi chú nguồn; không hotlink.
 - `assets/notebook.js`: giao diện notebook và autosave bằng `localStorage`.
 
 Sau khi sửa nguồn, sinh lại notebook và kiểm tra:

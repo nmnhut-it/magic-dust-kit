@@ -1,4 +1,4 @@
-/* Bộ máy notebook Magic Mirror: kernel Pyodide + camera đếm ngón tay.
+/* Bộ máy notebook Magic Mirror: kernel Pyodide + camera + MediaPipe.
  * Trang gọi nó phải khai báo trước:  window.MM_PAGE = { notebook, mode }
  * mode "student" | "answers" chỉ đổi màu nhấn và chỗ lưu bài, không đổi logic.
  */
@@ -10,17 +10,26 @@ const CFG = {
       "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/",
       "https://cdn.jsdelivr.net/pyodide/v0.25.0/full/",
     ],
-    packages: ["numpy", "pillow"],
+    packages: ["numpy", "pillow", "scipy"],
     moduleDir: "/home/pyodide",
     modulePath: "/home/pyodide/magic_mirror.py",
     moduleSource: "assets/magic_mirror.py",
+    photosDir: "/home/pyodide/photos",
+    photos: [
+      "face-portrait-william-stitt.jpg",
+      "face-portrait-eddie-kopp.jpg",
+      "human-skin-closeup.jpg",
+    ],
   },
-  mediapipe: { base: "https://cdn.jsdelivr.net/npm/@mediapipe/hands/", script: "hands.js" },
-  capture: { w: 240, h: 180 },
+  mediapipe: {
+    hands: { base: "https://cdn.jsdelivr.net/npm/@mediapipe/hands/", script: "hands.js" },
+    face: { base: "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/", script: "face_mesh.js" },
+  },
+  capture: { w: 480, h: 360 },
   quality: [
-    { label: "Nhanh (60×45)", w: 60, h: 45 },
-    { label: "Vừa (80×60)", w: 80, h: 60 },
-    { label: "Nét (120×90)", w: 120, h: 90 },
+    { label: "Tiết kiệm (160×120)", w: 160, h: 120 },
+    { label: "Cân bằng (240×180)", w: 240, h: 180 },
+    { label: "Nét (320×240)", w: 320, h: 240 },
   ],
   defaultQuality: 1,
   fingerMax: 5,
@@ -29,7 +38,7 @@ const CFG = {
   thumbOutRatio: 1.25,
   fpsWindow: 12,
   storagePrefix: "magic-mirror-nb:",
-  storageSchema: 2,
+  storageSchema: 3,
   saveDelayMs: 350,
   skipTag: "skip-browser",
   tab: "    ",
@@ -187,7 +196,7 @@ const Kernel = {
 
     Kernel.setState("loading", "Đang tải Python…");
     Kernel.py = await loadPyodide({ indexURL });
-    Kernel.setState("loading", "Đang tải numpy + pillow…");
+    Kernel.setState("loading", "Đang tải NumPy + SciPy + Pillow…");
     await Kernel.py.loadPackage(CFG.pyodide.packages);
     // `batched` gọi mỗi dòng một lần và bỏ ký tự xuống dòng — trả lại cho đúng.
     Kernel.py.setStdout({ batched: (s) => Kernel.sink && Kernel.sink("out", s + "\n") });
@@ -201,6 +210,15 @@ const Kernel = {
     const res = await fetch(CFG.pyodide.moduleSource, { cache: "no-store" });
     if (!res.ok) throw new Error(CFG.pyodide.moduleSource + ": " + res.status);
     Kernel.py.FS.writeFile(CFG.pyodide.modulePath, new TextEncoder().encode(await res.text()));
+    if (SKIN) {
+      Kernel.py.FS.mkdirTree(CFG.pyodide.photosDir);
+      for (const file of CFG.pyodide.photos) {
+        const photoUrl = `assets/photos/${file}`;
+        const photo = await fetch(photoUrl, { cache: "no-store" });
+        if (!photo.ok) throw new Error(photoUrl + ": " + photo.status);
+        Kernel.py.FS.writeFile(`${CFG.pyodide.photosDir}/${file}`, new Uint8Array(await photo.arrayBuffer()));
+      }
+    }
     const dir = JSON.stringify(CFG.pyodide.moduleDir);
     await Kernel.py.runPythonAsync(
       `import sys\nif ${dir} not in sys.path:\n    sys.path.insert(0, ${dir})\n` +
@@ -270,7 +288,8 @@ const Cam = {
   host: null, stream: null, video: null, capture: null, display: null,
   fingers: CFG.fingerMax, seen: -1, seenCount: 0, auto: true,
   handAngle: 0, rawHandAngle: 0,
-  hands: null, frame: 0, running: false, quality: SKIN ? 0 : CFG.defaultQuality,
+  hands: null, faceMesh: null, faceLandmarks: [], frame: 0, running: false, quality: CFG.defaultQuality,
+  showFaceMesh: true,
   times: [], msgEl: null, badgeEl: null, fpsEl: null, buttons: {},
   // chỉ dùng ở bản đơn giản
   fx: null, gaugeEl: null, sparks: [], sparkColor: CFG.defaultSparkColor,
@@ -338,22 +357,23 @@ const Cam = {
     stop.onclick = () => Cam.stop();
     bar.appendChild(stop);
 
-    const auto = document.createElement("label");
-    const box = document.createElement("input");
-    box.type = "checkbox"; box.checked = true;
-    box.onchange = () => { Cam.auto = box.checked; Cam.refreshButtons(); };
-    auto.append(box, "Tự đếm ngón tay");
-    bar.appendChild(auto);
-
     Cam.buttons = {};
-    for (let n = 0; n <= CFG.fingerMax; n++) {
-      const b = document.createElement("button");
-      b.className = "gest"; b.textContent = T.fingerBtn(n);
-      b.onclick = () => Cam.setFingers(n);
-      Cam.buttons[n] = b;
-      bar.appendChild(b);
+    if (!SKIN) {
+      const auto = document.createElement("label");
+      const box = document.createElement("input");
+      box.type = "checkbox"; box.checked = true;
+      box.onchange = () => { Cam.auto = box.checked; Cam.refreshButtons(); };
+      auto.append(box, "Tự đếm ngón tay");
+      bar.appendChild(auto);
+      for (let n = 0; n <= CFG.fingerMax; n++) {
+        const b = document.createElement("button");
+        b.className = "gest"; b.textContent = T.fingerBtn(n);
+        b.onclick = () => Cam.setFingers(n);
+        Cam.buttons[n] = b;
+        bar.appendChild(b);
+      }
+      bar.appendChild(Object.assign(document.createElement("span"), { className: "sep" }));
     }
-    bar.appendChild(Object.assign(document.createElement("span"), { className: "sep" }));
 
     const q = document.createElement("select");
     q.className = "btn";
@@ -361,19 +381,29 @@ const Cam = {
     q.value = String(Cam.quality);
     q.onchange = () => { Cam.quality = Number(q.value); };
     bar.append(Object.assign(document.createElement("label"), { textContent: "Độ nét:" }), q);
-    for (const [label, spell] of [["ϟ Thiên Lôi", "lightning"], ["⚔ Vạn Kiếm", "swords"], ["✺ Hỏa Liên · Hoa Vũ", "lotus"]]) {
-      const weatherButton = document.createElement("button");
-      weatherButton.className = "btn";
-      weatherButton.textContent = label;
-      weatherButton.onclick = () => Cam.castWeather(spell);
-      bar.appendChild(weatherButton);
+    if (SKIN) {
+      const landmarks = document.createElement("label");
+      const landmarkBox = document.createElement("input");
+      landmarkBox.type = "checkbox"; landmarkBox.checked = Cam.showFaceMesh;
+      landmarkBox.onchange = () => { Cam.showFaceMesh = landmarkBox.checked; };
+      landmarks.append(landmarkBox, "Hiện đường viền Face Mesh");
+      bar.appendChild(landmarks);
+    }
+    if (!SKIN) {
+      for (const [label, spell] of [["ϟ Thiên Lôi", "lightning"], ["⚔ Vạn Kiếm", "swords"], ["✺ Hỏa Liên · Hoa Vũ", "lotus"]]) {
+        const weatherButton = document.createElement("button");
+        weatherButton.className = "btn";
+        weatherButton.textContent = label;
+        weatherButton.onclick = () => Cam.castWeather(spell);
+        bar.appendChild(weatherButton);
+      }
     }
     const stageButton = document.createElement("button");
-    stageButton.className = "btn"; stageButton.textContent = "⛶ Trình diễn";
+    stageButton.className = "btn"; stageButton.textContent = SKIN ? "⛶ Toàn màn hình" : "⛶ Trình diễn";
     stageButton.onclick = () => bar.closest(".cam").requestFullscreen?.();
     bar.appendChild(stageButton);
     const recordButton = document.createElement("button");
-    recordButton.className = "btn record-vfx"; recordButton.textContent = "● Quay màn phép";
+    recordButton.className = "btn record-vfx"; recordButton.textContent = SKIN ? "● Quay kết quả" : "● Quay màn phép";
     recordButton.onclick = () => Cam.toggleRecording(recordButton);
     bar.appendChild(recordButton);
     Cam.refreshButtons();
@@ -402,7 +432,9 @@ const Cam = {
   async openCamera() {
     try {
       Cam.stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: CFG.capture.w, height: CFG.capture.h, facingMode: "user" },
+        video: {
+          width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user",
+        },
       });
     } catch (err) {
       Cam.msgEl.textContent = T.camDenied + err.message;
@@ -417,9 +449,11 @@ const Cam = {
 
   /** MediaPipe là tùy chọn: không có nó thì dùng các nút số ngón bằng chuột. */
   async loadHands() {
+    if (SKIN) return Cam.loadFaceMesh();
     try {
-      await Kernel.loadScript(CFG.mediapipe.base + CFG.mediapipe.script);
-      Cam.hands = new Hands({ locateFile: (f) => CFG.mediapipe.base + f });
+      const config = CFG.mediapipe.hands;
+      await Kernel.loadScript(config.base + config.script);
+      Cam.hands = new Hands({ locateFile: (f) => config.base + f });
       Cam.hands.setOptions({
         maxNumHands: 2, modelComplexity: 0,
         minDetectionConfidence: 0.6, minTrackingConfidence: 0.6,
@@ -453,6 +487,28 @@ const Cam = {
     }
   },
 
+  async loadFaceMesh() {
+    try {
+      const config = CFG.mediapipe.face;
+      await Kernel.loadScript(config.base + config.script);
+      Cam.faceMesh = new FaceMesh({ locateFile: (file) => config.base + file });
+      Cam.faceMesh.setOptions({
+        maxNumFaces: 1,
+        refineLandmarks: true,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.6,
+      });
+      Cam.faceMesh.onResults((result) => {
+        Cam.faceLandmarks = result.multiFaceLandmarks?.[0] || [];
+      });
+      Cam.msgEl.textContent = "MediaPipe Face Mesh đang tìm đường viền khuôn mặt…";
+    } catch (error) {
+      Cam.faceMesh = null;
+      Cam.faceLandmarks = [];
+      Cam.msgEl.textContent = "Không tải được MediaPipe Face Mesh; camera vẫn chạy nhưng face mask đang tắt.";
+    }
+  },
+
   /** Đọc bàn tay: ngón nào đang duỗi, và hai đầu ngón cái / ngón út ở đâu.
    *  Bốn ngón dựa vào toạ độ y; ngón cái dựa vào khoảng cách tới gốc ngón út, nên
    *  không phụ thuộc tay trái/phải hay ảnh có bị lật hay không. */
@@ -479,6 +535,57 @@ const Cam = {
       center: { x: 1 - centerRaw.x, y: centerRaw.y },
       aim: onScreen(lm[8]),
     };
+  },
+
+  faceOval() {
+    const order = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,
+      152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+    return order.map((index) => Cam.faceLandmarks[index]).filter(Boolean);
+  },
+
+  faceMaskBytes(width, height) {
+    const canvas = Cam.maskCanvas || (Cam.maskCanvas = document.createElement("canvas"));
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const oval = Cam.faceOval();
+    if (oval.length) {
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      oval.forEach((landmark, index) => {
+        const x = (1 - landmark.x) * width;
+        const y = landmark.y * height;
+        if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.closePath(); ctx.fill();
+    }
+    const rgba = ctx.getImageData(0, 0, width, height).data;
+    const mask = new Uint8Array(width * height);
+    for (let index = 0; index < mask.length; index++) mask[index] = rgba[index * 4 + 3];
+    return mask;
+  },
+
+  drawFaceMesh() {
+    if (!SKIN || !Cam.fx) return;
+    const ctx = Cam.fx.getContext("2d");
+    ctx.clearRect(0, 0, Cam.fx.width, Cam.fx.height);
+    if (!Cam.showFaceMesh || !Cam.faceLandmarks.length) return;
+    const point = (landmark) => ({
+      x: (1 - landmark.x) * Cam.fx.width,
+      y: landmark.y * Cam.fx.height,
+    });
+    const oval = Cam.faceOval().map(point);
+    ctx.fillStyle = "rgba(255, 209, 102, .14)";
+    ctx.strokeStyle = "rgba(255, 209, 102, .95)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    oval.forEach((p, index) => index ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "rgba(95, 238, 220, .82)";
+    Cam.faceLandmarks.forEach((landmark, index) => {
+      if (index % 6 !== 0) return;
+      const p = point(landmark);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2); ctx.fill();
+    });
   },
 
   observeSeals(hands) {
@@ -692,11 +799,13 @@ const Cam = {
     ctx.drawImage(Cam.video, -CFG.capture.w, 0, CFG.capture.w, CFG.capture.h);
     ctx.restore();
 
-    if (Cam.hands && Cam.auto && Cam.frame % CFG.detectEveryNFrames === 0) {
-      try { await Cam.hands.send({ image: Cam.video }); } catch (e) { /* vẫn chạy tiếp */ }
+    const tracker = SKIN ? Cam.faceMesh : Cam.hands;
+    if (tracker && (SKIN || Cam.auto) && Cam.frame % CFG.detectEveryNFrames === 0) {
+      try { await tracker.send({ image: Cam.video }); } catch (e) { /* vẫn chạy tiếp */ }
     }
     Cam.frame++;
     if (Cam.running) Cam.renderFrame(ctx);
+    if (SKIN && Cam.running) Cam.drawFaceMesh();
     const elapsed = performance.now() - startedAt;
     if (SIMPLE && Cam.running) {
       Cam.updateHold();
@@ -714,7 +823,8 @@ const Cam = {
     try {
       bytes = Kernel.callBridge("_frame",
         [new Uint8Array(src.buffer.slice(0)), CFG.capture.w, CFG.capture.h,
-          Cam.fingers, level.w, level.h, Cam.handAngle]);
+          Cam.fingers, level.w, level.h, Cam.handAngle,
+          SKIN ? Cam.faceMaskBytes(level.w, level.h) : null]);
       Cam.msgEl.textContent = Kernel.callBridge("_status", []);
     } catch (err) {
       Cam.msgEl.textContent = String((err && err.message) || err).split("\n").pop();
@@ -739,12 +849,12 @@ const Cam = {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `magic-mirror-vfx-${new Date().toISOString().replace(/[:.]/g, "-")}.webm`;
+        link.download = `${SKIN ? "skin-lab-camera" : "magic-mirror-vfx"}-${new Date().toISOString().replace(/[:.]/g, "-")}.webm`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(url), 2000);
         button.disabled = false;
         button.classList.remove("recording");
-        button.textContent = "● Quay màn phép";
+        button.textContent = SKIN ? "● Quay kết quả" : "● Quay màn phép";
         Cam.msgEl.textContent = "Video WebM đã được tải xuống.";
       };
       Cam.recorder.stop();
@@ -766,7 +876,8 @@ const Cam = {
     Cam.recorder.start(250);
     button.classList.add("recording");
     button.textContent = "■ Dừng và tải video";
-    Cam.msgEl.textContent = "ĐANG QUAY · Hãy giơ tổ hợp ngón và biểu diễn.";
+    Cam.msgEl.textContent = SKIN ? "ĐANG QUAY · Khung hình chỉ được ghi khi em bấm quay." :
+      "ĐANG QUAY · Hãy giơ tổ hợp ngón và biểu diễn.";
     const compose = () => {
       if (Cam.recorder?.state !== "recording") return;
       const ctx = Cam.recordCanvas.getContext("2d");
@@ -783,6 +894,7 @@ const Cam = {
     Cam.running = false;
     if (Cam.stream) Cam.stream.getTracks().forEach((t) => t.stop());
     Cam.stream = null;
+    Cam.faceLandmarks = [];
     Cam.times = [];
   },
 };

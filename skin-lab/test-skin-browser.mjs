@@ -110,11 +110,11 @@ async function notebookState(cdp) {
   return result.result.value;
 }
 
-async function waitForNotebook(cdp, mode, label, expectedCells = 43) {
+async function waitForNotebook(cdp, mode, label, expectedCells = 55) {
   const state = await poll(
     () => notebookState(cdp),
     (value) => value?.page === mode && (value.state === "ready" || value.state === "error"),
-    90_000,
+    180_000,
     label,
   );
   if (state.state !== "ready") throw new Error(`${label} kernel failed: ${state.text}`);
@@ -163,7 +163,7 @@ try {
   }
 
   await cdp.evaluate("location.reload()");
-  await waitForNotebook(cdp, "skin", "resumed practice route", 44);
+  await waitForNotebook(cdp, "skin", "resumed practice route", 56);
   const resumed = await poll(async () => {
     const result = await cdp.evaluate(`({
       source: Nb.cells.find((item) => item.id === "task-convolve-layer")?.source,
@@ -174,15 +174,18 @@ try {
     return result.result.value;
   }, (value) => value?.source?.includes("autosave-browser-check")
     && value?.userSource === "observation = 89.28" && value?.resume, 10_000, "resume banner");
-  if (!resumed.key.includes(":skin:v2")) throw new Error(`Unexpected practice storage key: ${resumed.key}`);
+  if (!resumed.key.includes(":skin:v3")) throw new Error(`Unexpected practice storage key: ${resumed.key}`);
 
   await cdp.evaluate(`location.href = ${JSON.stringify(ANSWER_URL)}`);
   await waitForNotebook(cdp, "skin-answers", "answer route");
   const run = await cdp.evaluate(`(async () => {
     const ids = [
-      "skin-setup", "skin-overview", "skin-convolution-math", "skin-vote-math",
-      "skin-red-gap-math", "skin-soften-math", "skin-check", "skin-demo",
-      "numpy-filter-gallery", "numpy-kernel-gallery",
+      "skin-setup", "skin-overview", "skin-pixel-channels", "numpy-channels",
+      "skin-convolution-math", "skin-preview-convolution", "skin-preview-evidence",
+      "skin-vote-math", "skin-preview-mask", "skin-red-gap-math",
+      "skin-preview-pimples", "skin-soften-math", "skin-preview-cleanup",
+      "skin-check", "skin-demo", "numpy-filter-gallery", "numpy-kernel-gallery",
+      "skin-public-gallery", "skin-public-test", "skin-face-mesh-map", "skin-face-mask-pipeline",
     ];
     for (const id of ids) {
       const index = Nb.cells.findIndex((item) => item.id === id);
@@ -190,21 +193,35 @@ try {
       await Nb.runCell(index);
     }
     const output = (id) => Nb.cells.find((item) => item.id === id).outEl;
+    const controlHost = document.createElement("div");
+    document.body.appendChild(controlHost);
+    Cam.host = controlHost;
+    Cam.build();
+    const controls = controlHost.innerText;
+    controlHost.remove();
     return {
       grader: output("skin-check").innerText,
       images: ids.filter((id) => output(id).querySelector("img")).length,
       errors: ids.flatMap((id) => [...output(id).querySelectorAll(".err")].map((item) => item.innerText)),
       answerKey: Nb.storageKey(),
-      practiceSaveStillPresent: Boolean(localStorage.getItem("magic-dust-kit:skin-lab:skin:v2")),
+      controls,
+      practiceSaveStillPresent: Boolean(localStorage.getItem("magic-dust-kit:skin-lab:skin:v3")),
     };
   })()`);
+  if (run.exceptionDetails) throw new Error(`Answer evaluation exception: ${JSON.stringify(run.exceptionDetails)}`);
+  if (!run.result?.value) throw new Error(`Answer evaluation failed: ${JSON.stringify(run)}`);
   const evidence = run.result.value;
+  if (!Array.isArray(evidence.errors)) throw new Error(`Unexpected answer evidence: ${JSON.stringify(evidence)}`);
   if (evidence.errors.length) throw new Error(`Notebook errors: ${evidence.errors.join(" | ")}`);
   if (!evidence.grader.includes("Kết quả: 5/5")) {
     throw new Error(`The browser grader did not reach 5/5: ${evidence.grader}`);
   }
-  if (evidence.images < 8) throw new Error(`Expected at least 8 rendered illustrations, got ${evidence.images}`);
-  if (!evidence.answerKey.includes(":skin-answers:v2") || !evidence.practiceSaveStillPresent) {
+  if (evidence.images < 19) throw new Error(`Expected at least 19 rendered illustrations, got ${evidence.images}`);
+  if (!evidence.controls.includes("Face Mesh") || evidence.controls.includes("Thiên Lôi") ||
+      evidence.controls.includes("Vạn Kiếm") || evidence.controls.includes("Hỏa Liên")) {
+    throw new Error(`Skin camera controls are wrong: ${evidence.controls}`);
+  }
+  if (!evidence.answerKey.includes(":skin-answers:v3") || !evidence.practiceSaveStillPresent) {
     throw new Error("Practice and answer routes do not use separate localStorage records.");
   }
 

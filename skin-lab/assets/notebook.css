@@ -155,7 +155,7 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
 .cam-stage{position:relative;background:var(--ink);display:grid;place-items:center;padding:12px}
 .cam-screen{position:relative;width:100%;max-width:480px;aspect-ratio:4/3}
 .cam-screen canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:var(--r-nho);display:block}
-.cam-out{image-rendering:pixelated;transition:filter .55s,opacity .5s}
+.cam-out{image-rendering:auto;transition:filter .55s,opacity .5s}
 .cam-fx,.spell-fx{pointer-events:none}             /* các lớp VFX nằm trên ảnh camera */
 .spell-fx{z-index:1}
 .cam-screen::after{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:var(--r-nho);

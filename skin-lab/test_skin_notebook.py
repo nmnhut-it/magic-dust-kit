@@ -69,11 +69,27 @@ class TestSkinNotebook(unittest.TestCase):
         ):
             self.assertIn(phrase, lesson)
 
-    def test_lesson_has_a_small_optional_numpy_extension(self):
+    def test_numpy_scipy_and_pillow_are_the_main_implementation_path(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
-        for phrase in ("np.asarray", ".shape", "np.where", "np.clip", "boolean mask"):
+        for phrase in (
+            "np.asarray", ".shape", "np.where", "np.clip", "Image.fromarray",
+            "ndimage.convolve", "ndimage.uniform_filter", "ndimage.maximum_filter",
+            "không viết vòng lặp Python cho từng pixel",
+        ):
             self.assertIn(phrase, lesson)
-        self.assertIn("không thuộc 5 phần bắt buộc", lesson)
+        self.assertNotIn("không thuộc 5 phần bắt buộc", lesson)
+
+    def test_every_stage_has_numbers_images_and_explanatory_preview(self):
+        ids = {cell["id"] for cell in self.practice["cells"]}
+        for cell_id in (
+            "skin-pixel-channels", "numpy-channels", "skin-convolution-math",
+            "skin-preview-convolution", "skin-preview-evidence", "skin-preview-mask",
+            "skin-preview-pimples", "skin-preview-cleanup", "skin-demo",
+        ):
+            self.assertIn(cell_id, ids)
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        self.assertIn("con số cụ thể", lesson)
+        self.assertIn("Overlay giữ màu gốc", lesson)
 
     def test_tasks_name_given_input_process_and_output(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
@@ -108,7 +124,7 @@ class TestSkinNotebook(unittest.TestCase):
         answer_ids = [cell["id"] for cell in self.answers["cells"]]
         self.assertEqual(practice_ids, answer_ids)
         self.assertEqual(len(practice_ids), len(set(practice_ids)))
-        self.assertEqual(len(practice_ids), 43)
+        self.assertEqual(len(practice_ids), 55)
         for notebook in (self.practice, self.answers):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)
@@ -130,10 +146,32 @@ class TestSkinNotebook(unittest.TestCase):
         self.assertIn('tags.includes("autoload")', runtime)
         self.assertIn("Tiếp tục từ chỗ đang học", runtime)
         self.assertIn("window.confirm", runtime)
+        self.assertIn("storageSchema: 3", runtime)
         persistence = re.search(r"persist\(\) \{(.+?)\n  \},", runtime, re.DOTALL)
         self.assertIsNotNone(persistence)
         for forbidden in ("Cam.stream", "toDataURL", "canvas", "imageData"):
             self.assertNotIn(forbidden, persistence.group(1))
+
+    def test_public_photos_are_local_cc0_assets(self):
+        sources = (ROOT / "assets" / "photos" / "SOURCES.md").read_text(encoding="utf-8")
+        files = sorted((ROOT / "assets" / "photos").glob("*.jpg"))
+        self.assertEqual(len(files), 3)
+        self.assertGreaterEqual(sources.count("CC0 1.0"), 3)
+        for photo in files:
+            self.assertLess(photo.stat().st_size, 130_000)
+            self.assertIn(photo.name, sources)
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        self.assertIn("assets/photos/${file}", runtime)
+        self.assertIn("FS.writeFile(`${CFG.pyodide.photosDir}/${file}`", runtime)
+
+    def test_face_mesh_is_the_camera_capstone_and_spells_are_not_skin_controls(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "478 landmark"):
+            self.assertIn(phrase, lesson)
+        self.assertIn("@mediapipe/face_mesh", runtime)
+        self.assertIn("if (!SKIN)", runtime)
+        self.assertIn('"Hiện đường viền Face Mesh"', runtime)
 
 
 if __name__ == "__main__":

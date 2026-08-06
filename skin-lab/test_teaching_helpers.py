@@ -71,18 +71,29 @@ class TestTeachingHelpers(unittest.TestCase):
                 board = magic_mirror.skin_demo()
                 live = magic_mirror.process_skin(
                     magic_mirror.skin_sample_image(), magic_mirror.DEMO_SIZE)
+                previews = (
+                    magic_mirror.preview_library_convolution(),
+                    magic_mirror.preview_skin_evidence(),
+                    magic_mirror.preview_skin_mask(),
+                    magic_mirror.preview_pimple_mask(),
+                    magic_mirror.preview_cleanup(),
+                )
 
-        self.assertEqual(board.size, (488, 368))
+        self.assertEqual(board.size, (496, 292))
         self.assertEqual(live.size, magic_mirror.OUTPUT_SIZE)
+        self.assertTrue(all(isinstance(preview, Image.Image) for preview in previews))
 
     def test_skin_explanation_helpers_return_visible_illustrations(self):
         helpers = (
             magic_mirror.show_skin_pipeline_overview,
+            magic_mirror.show_skin_pixel_channels,
+            magic_mirror.show_numpy_channels,
             magic_mirror.show_convolution_math,
             magic_mirror.show_skin_evidence_math,
             magic_mirror.show_skin_vote_math,
             magic_mirror.show_red_gap_math,
             magic_mirror.show_soften_math,
+            magic_mirror.show_face_mesh_map,
         )
         for helper in helpers:
             with self.subTest(helper=helper.__name__), redirect_stdout(io.StringIO()):
@@ -128,6 +139,41 @@ class TestTeachingHelpers(unittest.TestCase):
 
         with self.assertRaises(magic_mirror.MagicMirrorError):
             magic_mirror.preview_numpy_filter(mutate_input)
+
+    def test_face_mask_keeps_every_pixel_outside_the_face_unchanged(self):
+        names = (
+            "convolve_layer", "skin_evidence", "detect_skin",
+            "detect_pimples", "remove_pimples",
+        )
+        with ExitStack() as stack:
+            main_module = sys.modules["__main__"]
+            for name in names:
+                stack.enter_context(patch.object(
+                    main_module, name, getattr(skin_filters_solution, name), create=True))
+            original = magic_mirror.skin_sample_image(magic_mirror.OUTPUT_SIZE)
+            disabled = [[0] * original.width for _ in range(original.height)]
+            result = magic_mirror.process_skin(original, magic_mirror.OUTPUT_SIZE, disabled)
+            with redirect_stdout(io.StringIO()):
+                pipeline = magic_mirror.show_face_mask_pipeline()
+
+        self.assertEqual(result.tobytes(), original.tobytes())
+        self.assertIsInstance(pipeline, Image.Image)
+        self.assertEqual(pipeline.size, (488, 412))
+
+    def test_public_cc0_gallery_loads_bundled_colour_images(self):
+        with redirect_stdout(io.StringIO()):
+            gallery = magic_mirror.show_public_photo_gallery()
+        self.assertEqual(gallery.size, (616, 172))
+        self.assertGreater(len(gallery.getcolors(maxcolors=gallery.width * gallery.height) or []), 100)
+
+    def test_solution_uses_vectorized_image_libraries(self):
+        source = (Path(__file__).parent / "skin_filters_solution.py").read_text(encoding="utf-8")
+        for call in (
+            "ndimage.convolve", "ndimage.uniform_filter", "ndimage.maximum_filter",
+            "np.where", "np.asarray",
+        ):
+            self.assertIn(call, source)
+        self.assertNotRegex(source, r"for\s+(row|column|x|y)\s+in")
 
 
 if __name__ == "__main__":
