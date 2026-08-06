@@ -281,6 +281,21 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
   border-radius:5px;background:var(--paper-raised);font:800 11px/1 var(--mono)}
 .mech-five-grid .middle{border:3px solid var(--honey-line)}
 .mech-five-grid .selected{background:var(--success-soft);color:var(--success-ink)}
+.mech-number-grid{display:grid;gap:3px;width:min(100%,270px);margin:8px auto}
+.mech-number-grid span,.mech-number-grid button{min-width:0;aspect-ratio:1;display:grid;place-items:center;
+  padding:0;border:1px solid var(--mint-line);border-radius:4px;background:var(--paper-raised);
+  color:var(--ink);font:800 11px/1 var(--mono)}
+.mech-number-grid.three{width:min(100%,180px)}
+.mech-number-grid.seven{width:min(100%,280px)}
+.mech-number-grid.products span{background:var(--mint-soft)}
+.mech-number-grid.scan-input button.on{background:var(--mint-soft);color:var(--mint-ink)}
+.mech-number-grid.scan-input button.window{background:var(--honey-soft);border-color:var(--honey-line)}
+.mech-number-grid.scan-input button.centre,.mech-number-grid.output-map span.centre{
+  outline:3px solid var(--honey-line);outline-offset:1px}
+.mech-number-grid.output-map span:not(:empty){font-size:10px}
+.mech-number-grid.output-map span.detected{background:var(--success-soft);border-color:var(--success-ink);
+  color:var(--success-ink)}
+.mech-grid-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:start}
 .mech-toggle-row{align-items:center;margin:8px 0}.mech-toggle-row strong{min-width:86px;font-family:var(--mono)}
 .mech-truth-table{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
 .mech-truth-table span{padding:7px;border:1px solid var(--mint-line);border-radius:6px;background:var(--paper-raised);
@@ -312,6 +327,7 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
   .brand small{display:none}
   .snapshot-results{grid-template-columns:1fr;padding:10px}
   .mech-body{grid-template-columns:1fr;padding:10px}.mech-check{margin:0 10px 10px}
+  .mech-number-grid.seven{width:min(100%,245px)}
   .mech-swatches{grid-template-columns:1fr 1fr}.mechanism-card{border-radius:var(--r-vua)}
 }
 @media(prefers-reduced-motion:reduce){

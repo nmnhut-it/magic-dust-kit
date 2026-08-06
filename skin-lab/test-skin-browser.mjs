@@ -113,7 +113,7 @@ async function notebookState(cdp) {
   return result.result.value;
 }
 
-async function waitForNotebook(cdp, mode, label, expectedCells = 61) {
+async function waitForNotebook(cdp, mode, label, expectedCells = 69) {
   const state = await poll(
     () => notebookState(cdp),
     (value) => value?.page === mode && (value.state === "ready" || value.state === "error"),
@@ -148,6 +148,8 @@ try {
       ["skin-mechanism-rgb", "(120, 0, 0)"],
       ["skin-mechanism-rule", "0 — do not select"],
       ["skin-mechanism-neighbours", "255 — keep this region"],
+      ["skin-mechanism-kernel-filter", "14.44"],
+      ["skin-mechanism-convolution-scan", "0 — no vertical edge"],
       ["skin-mechanism-red-spot", "Yes, because"],
       ["skin-mechanism-soften", "(170, 110, 95)"],
       ["skin-mechanism-face", "Keep the original colour"],
@@ -164,11 +166,34 @@ try {
         throw new Error("Equivalent code stayed locked for " + id);
       }
     }
+    const scanIndex = Nb.cells.findIndex((item) => item.id === "skin-mechanism-convolution-scan");
+    const scanHost = Nb.cells[scanIndex].outEl;
+    const clickText = (text) => {
+      const target = [...scanHost.querySelectorAll("button")].find((button) => button.textContent.trim() === text);
+      if (!target) throw new Error("Missing convolution scanner button " + text);
+      target.click();
+    };
+    clickText("Next →"); clickText("Next →"); clickText("Next →");
+    const edgeMap = scanHost.querySelector(".output-map")?.innerText;
+    const edgeExplanation = scanHost.innerText.includes("Bright columns appear where values change from 0 to 1");
+    clickText("Find a large patch");
+    clickText("Next →"); clickText("Next →"); clickText("Next →");
+    const patchMapValues = [...scanHost.querySelectorAll(".output-map span")].map((item) => item.textContent);
+    const isolated = [...scanHost.querySelectorAll(".scan-input button")]
+      .find((button) => button.title === "row 1, column 1");
+    if (!isolated) throw new Error("Missing isolated-dot position in convolution scanner");
+    isolated.click();
+    const isolatedExplanation = [...scanHost.querySelectorAll(".mech-result")]
+      .some((item) => item.textContent.includes("reject this small mark"));
     Nb.persist();
     return {
       concepts: Nb.saved.concepts,
       widgetIds: Object.keys(Nb.saved.widgets),
       doneCells: document.querySelectorAll(".cell.done").length,
+      edgeMap,
+      edgeExplanation,
+      patchHasKeptCells: patchMapValues.includes("255"),
+      isolatedExplanation,
     };
   })()`);
   if (mechanisms.exceptionDetails) {
@@ -176,11 +201,15 @@ try {
   }
   if (!mechanisms.result?.value) throw new Error(`Mechanism evaluation failed: ${JSON.stringify(mechanisms)}`);
   const mechanismEvidence = mechanisms.result.value;
-  if (mechanismEvidence.concepts.length !== 6 || mechanismEvidence.widgetIds.length !== 6 ||
-      mechanismEvidence.doneCells < 6) {
+  if (mechanismEvidence.concepts.length !== 8 || mechanismEvidence.widgetIds.length !== 8 ||
+      mechanismEvidence.doneCells < 8) {
     throw new Error(`Mechanism progress was not saved: ${JSON.stringify(mechanismEvidence)}`);
   }
-  console.log("Browser check: six mechanism answers and widget states persisted.");
+  if (!mechanismEvidence.edgeMap || !mechanismEvidence.edgeExplanation ||
+      !mechanismEvidence.patchHasKeptCells || !mechanismEvidence.isolatedExplanation) {
+    throw new Error(`Convolution scanner did not reveal both output maps: ${JSON.stringify(mechanismEvidence)}`);
+  }
+  console.log("Browser check: eight mechanism answers and widget states persisted.");
 
   const saved = await cdp.evaluate(`(() => {
     const cell = Nb.cells.find((item) => item.id === "task-convolve-layer");
@@ -201,15 +230,15 @@ try {
   if (!savedJson.cells["user-browser-check"].user) {
     throw new Error("Autosave did not mark the student-created cell for restoration.");
   }
-  if (savedJson.concepts.length !== 6 || Object.keys(savedJson.widgets).length !== 6) {
-    throw new Error("Autosave did not keep all six mechanism states.");
+  if (savedJson.concepts.length !== 8 || Object.keys(savedJson.widgets).length !== 8) {
+    throw new Error("Autosave did not keep all eight mechanism states.");
   }
   if (savedText.includes("data:image") || savedText.includes("base64,")) {
     throw new Error("Autosave unexpectedly contains image or camera frame data.");
   }
 
   await cdp.evaluate("location.reload()");
-  await waitForNotebook(cdp, "skin", "resumed practice route", 62);
+  await waitForNotebook(cdp, "skin", "resumed practice route", 70);
   const resumed = await poll(async () => {
     const result = await cdp.evaluate(`({
       source: Nb.cells.find((item) => item.id === "task-convolve-layer")?.source,
@@ -228,9 +257,12 @@ try {
   console.log("Browser check: answer notebook and Pyodide are ready.");
   const run = await cdp.evaluate(`(async () => {
     const ids = [
-      "skin-setup", "skin-overview", "skin-pixel-channels", "numpy-channels",
+      "skin-setup", "skin-overview", "skin-pixel-channels", "numpy-array", "numpy-channels",
+      "numpy-change-one-number",
       "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
-      "skin-convolution-math", "skin-preview-convolution", "skin-preview-evidence",
+      "skin-convolution-math", "skin-mechanism-kernel-filter", "skin-rgb-convolution",
+      "skin-mechanism-convolution-scan", "skin-convolution-transfer",
+      "skin-preview-convolution", "skin-preview-evidence",
       "skin-preview-mask", "skin-mechanism-red-spot", "skin-preview-pimples",
       "skin-mechanism-soften", "skin-preview-cleanup", "skin-mechanism-face",
       "skin-check", "skin-demo", "numpy-filter-gallery", "numpy-kernel-gallery",
@@ -292,8 +324,8 @@ try {
   if (!evidence.grader.includes("Result: 5/5")) {
     throw new Error(`The browser grader did not reach 5/5: ${evidence.grader}`);
   }
-  if (evidence.images < 17 || evidence.mechanisms !== 6) {
-    throw new Error(`Expected at least 17 images and six mechanisms, got ${evidence.images} and ${evidence.mechanisms}.`);
+  if (evidence.images < 20 || evidence.mechanisms !== 8) {
+    throw new Error(`Expected at least 20 images and eight mechanisms, got ${evidence.images} and ${evidence.mechanisms}.`);
   }
   if (!evidence.fitsMobile) throw new Error("Skin Lab overflows the 390 px mobile viewport.");
   if (!evidence.controls.includes("Capture one photo") || !evidence.controls.includes("Choose an image file") ||
@@ -326,7 +358,7 @@ try {
 
   console.log(
     `Browser OK (${REMOTE_BASE ? "live" : "local"}): autosave resumed by stable ID; ` +
-    `six mechanisms persisted; one photo captured and camera stopped; answer grader 5/5; ` +
+    `eight mechanisms persisted; one photo captured and camera stopped; answer grader 5/5; ` +
     `${evidence.images} illustrations; mobile fits; ` +
     `main route ${original.cells} cells.`,
   );

@@ -9,6 +9,32 @@
   const RED_SPOT = [225, 62, 66];
   const BLUE = [35, 80, 185];
   const WEIGHTS = [[1, 2, 1], [2, 4, 2], [1, 2, 1]];
+  const FILTERS = {
+    identity: {
+      label: "Identity",
+      kernel: [[0, 0, 0], [0, 1, 0], [0, 0, 0]],
+      divisor: 1,
+      conclusion: "The output equals the original centre. This filter changes nothing.",
+    },
+    blur: {
+      label: "Blur",
+      kernel: [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
+      divisor: 9,
+      conclusion: "The bright centre moves toward its neighbours, so the jump becomes softer.",
+    },
+    sharpen: {
+      label: "Sharpen",
+      kernel: [[0, -1, 0], [-1, 5, -1], [0, -1, 0]],
+      divisor: 1,
+      conclusion: "The centre is pushed farther from its side neighbours, making the contrast stronger.",
+    },
+    edge: {
+      label: "Edge",
+      kernel: [[-1, -1, -1], [-1, 8, -1], [-1, -1, -1]],
+      divisor: 1,
+      conclusion: "A flat area gives 0. A large result marks a place that differs from its neighbours.",
+    },
+  };
 
   const copy = (value) => JSON.parse(JSON.stringify(value));
   const sum = (values) => values.reduce((total, value) => total + value, 0);
@@ -72,12 +98,69 @@
     return { allowed, output: allowed ? "Use the smoothed colour" : "Keep the original colour" };
   }
 
+  function calculateKernelFilter(state) {
+    const input = [[10, 10, 10], [10, 90, 10], [10, 10, 10]];
+    const filter = FILTERS[state.filter] || FILTERS.blur;
+    const products = input.map((row, r) => row.map((value, c) => value * filter.kernel[r][c]));
+    const total = sum(products.flat());
+    const raw = total / filter.divisor;
+    const clipped = Math.max(0, Math.min(255, raw));
+    return { input, filter, products, total, raw, clipped };
+  }
+
+  function scanInput(mode) {
+    if (mode === "patch") {
+      return Array.from({ length: 7 }, (_, row) => Array.from({ length: 7 }, (_, column) =>
+        (row === 1 && column === 1) || (row >= 3 && row <= 5 && column >= 3 && column <= 5) ? 1 : 0));
+    }
+    return Array.from({ length: 7 }, () => Array.from({ length: 7 }, (_, column) => column >= 3 ? 1 : 0));
+  }
+
+  function clamp(value, minimum, maximum) {
+    return Math.max(minimum, Math.min(maximum, value));
+  }
+
+  function scanConvolve(input, kernel) {
+    return input.map((row, r) => row.map((_, c) => {
+      let total = 0;
+      for (let kr = 0; kr < 3; kr += 1) {
+        for (let kc = 0; kc < 3; kc += 1) {
+          const rr = clamp(r + kr - 1, 0, input.length - 1);
+          const cc = clamp(c + kc - 1, 0, row.length - 1);
+          total += input[rr][cc] * kernel[kr][kc];
+        }
+      }
+      return total;
+    }));
+  }
+
+  function calculateConvolutionScan(state) {
+    const mode = state.mode === "patch" ? "patch" : "edge";
+    const input = scanInput(mode);
+    const kernel = mode === "edge"
+      ? [[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]]
+      : [[1, 1, 1], [1, 1, 1], [1, 1, 1]];
+    const row = clamp(Number(state.row), 1, 5);
+    const column = clamp(Number(state.column), 1, 5);
+    const window = Array.from({ length: 3 }, (_, r) =>
+      Array.from({ length: 3 }, (_, c) => input[row + r - 1][column + c - 1]));
+    const products = window.map((values, r) => values.map((value, c) => value * kernel[r][c]));
+    const sumValue = sum(products.flat());
+    const rawMap = scanConvolve(input, kernel);
+    const output = mode === "edge"
+      ? rawMap.map((values) => values.map((value) => Math.abs(value)))
+      : rawMap.map((values) => values.map((value) => value >= 5 ? 255 : 0));
+    return { mode, input, kernel, row, column, window, products, sum: sumValue, rawMap, output };
+  }
+
   const DEFAULTS = {
     rgb_pixel: { row: 3, column: 3, red: 225, green: 62, blue: 66, answer: "", passed: false },
     rgb_rule: { preset: "skin", red: 183, green: 127, blue: 103, answer: "", passed: false },
     neighbours: { cells: [1, 1, 1, 1, 0, 1, 1, 1, 1], threshold: 5, answer: "", passed: false },
     red_spot: { view: "mean", answer: "", passed: false },
     soften: { mask: 255, answer: "", passed: false },
+    kernel_filter: { filter: "blur", answer: "", passed: false },
+    convolution_scan: { mode: "edge", row: 3, column: 3, reveal: 0, answer: "", passed: false },
     face_gate: { face: 1, skin: 1, answer: "", passed: false },
   };
 
@@ -121,6 +204,22 @@
       answers: [["(170, 110, 95)", "170,110,95"], ["(180, 100, 90)", "180,100,90"], ["(160, 120, 100)", "160,120,100"]],
       correct: "170,110,95",
       code: "softened = ndimage.convolve(pixels, weights, mode=\"nearest\") / weights.sum()\noutput = np.where(pimple_mask[:, :, None] == 255, softened, pixels)",
+    },
+    kernel_filter: {
+      title: "Filter lab — one neighbourhood, four kernels",
+      instruction: "Keep the nine input values fixed. Change only the kernel and follow every product to the output.",
+      question: "A blur sees centre 50 and eight neighbours of 10. What is (50 + 8 × 10) / 9?",
+      answers: [["14.44", "14.44"], ["50", "50"], ["130", "130"]],
+      correct: "14.44",
+      code: "filtered = ndimage.convolve(layer, kernel, mode=\"nearest\") / divisor\noutput = np.clip(filtered, 0, 255)",
+    },
+    convolution_scan: {
+      title: "Convolution scanner — reveal an edge or a large patch",
+      instruction: "Move the yellow 3 × 3 window across a 7 × 7 input, then reveal the calculation one step at a time.",
+      question: "A flat 3 × 3 area contains only 1s. The vertical-edge kernel has columns −1, 0, +1. What sum does it produce?",
+      answers: [["0 — no vertical edge", "0"], ["3 — strong edge", "3"], ["9 — large patch", "9"]],
+      correct: "0",
+      code: "edge_response = ndimage.convolve(binary, edge_kernel, mode=\"nearest\")\nedges = np.abs(edge_response)\ncounts = ndimage.convolve(binary, np.ones((3, 3)), mode=\"nearest\")\nlarge_patch = np.where(counts >= 5, 255, 0)",
     },
     face_gate: {
       title: "Mechanism 6 — Both masks must allow the change",
@@ -327,6 +426,122 @@
     body.append(left, right);
   }
 
+  function numberGrid(values, extraClass = "", cellClass = () => "") {
+    const grid = el("div", `mech-number-grid ${extraClass}`.trim());
+    grid.style.gridTemplateColumns = `repeat(${values[0].length}, minmax(0, 1fr))`;
+    values.forEach((row, r) => row.forEach((value, c) => {
+      grid.appendChild(el("span", cellClass(r, c), String(value)));
+    }));
+    return grid;
+  }
+
+  function renderKernelFilter(body, state, rerender, save) {
+    const result = calculateKernelFilter(state);
+    const left = panel("1. Keep the input fixed");
+    left.appendChild(numberGrid(result.input, "three"));
+    left.appendChild(el("p", "mech-conclusion", "Eight neighbours are 10. The centre is 90."));
+    const choices = el("div", "mech-choices");
+    Object.entries(FILTERS).forEach(([name, filter]) => {
+      choices.appendChild(button(filter.label,
+        `mech-choice${state.filter === name ? " selected" : ""}`, () => {
+          state.filter = name; save(); rerender();
+        }));
+    });
+    left.append(el("h4", "", "2. Change only the kernel"), choices,
+      numberGrid(result.filter.kernel, "three"));
+
+    const right = panel("3. Multiply matching positions");
+    right.append(
+      numberGrid(result.products, "three products"),
+      el("p", "mech-equation", `Add all products: total = ${result.total}`),
+      el("p", "mech-equation", `Divide: ${result.total} / ${result.filter.divisor} = ${result.raw.toFixed(2)}`),
+      el("p", "mech-equation", `Keep 0..255: output = ${Number(result.clipped.toFixed(2))}`),
+      el("p", "mech-conclusion", result.filter.conclusion),
+    );
+    body.append(left, right);
+  }
+
+  function selectableScanGrid(result, state, rerender, save) {
+    const grid = el("div", "mech-number-grid seven scan-input");
+    grid.style.gridTemplateColumns = "repeat(7, minmax(0, 1fr))";
+    result.input.forEach((values, row) => values.forEach((value, column) => {
+      const inWindow = Math.abs(row - result.row) <= 1 && Math.abs(column - result.column) <= 1;
+      const isCentre = row === result.row && column === result.column;
+      const cell = button(String(value), `${value ? "on " : ""}${inWindow ? "window " : ""}${isCentre ? "centre" : ""}`, () => {
+        if (row < 1 || row > 5 || column < 1 || column > 5) return;
+        state.row = row; state.column = column; save(); rerender();
+      });
+      cell.title = `row ${row}, column ${column}`;
+      grid.appendChild(cell);
+    }));
+    return grid;
+  }
+
+  function renderConvolutionScan(body, state, rerender, save) {
+    const result = calculateConvolutionScan(state);
+    const left = panel("1. Choose a pattern and window position");
+    const choices = el("div", "mech-choices");
+    [["Find a vertical edge", "edge"], ["Find a large patch", "patch"]].forEach(([label, mode]) => {
+      choices.appendChild(button(label, `mech-choice${result.mode === mode ? " selected" : ""}`, () => {
+        state.mode = mode;
+        state.row = mode === "edge" ? 3 : 4;
+        state.column = mode === "edge" ? 3 : 4;
+        state.reveal = 0; save(); rerender();
+      }));
+    });
+    left.append(choices, selectableScanGrid(result, state, rerender, save));
+    left.appendChild(el("p", "mech-readout",
+      `Yellow window centred at row ${result.row}, column ${result.column}`));
+
+    const right = panel(`2. Reveal step ${Number(state.reveal) + 1} of 4`);
+    const nav = el("div", "mech-choices");
+    const previous = button("← Previous", "mech-choice", () => {
+      state.reveal = Math.max(0, Number(state.reveal) - 1); save(); rerender();
+    });
+    const next = button("Next →", "mech-choice", () => {
+      state.reveal = Math.min(3, Number(state.reveal) + 1); save(); rerender();
+    });
+    previous.disabled = Number(state.reveal) === 0;
+    next.disabled = Number(state.reveal) === 3;
+    nav.append(previous, next); right.appendChild(nav);
+
+    if (Number(state.reveal) === 0) {
+      right.appendChild(el("p", "mech-conclusion",
+        "The yellow box is the only 3 × 3 data used for this output position. Predict the result before continuing."));
+    }
+    if (Number(state.reveal) >= 1) {
+      const pair = el("div", "mech-grid-pair");
+      const windowBox = el("div");
+      windowBox.append(el("h4", "", "3 × 3 image window"), numberGrid(result.window, "three"));
+      const kernelBox = el("div");
+      kernelBox.append(el("h4", "", "3 × 3 kernel"), numberGrid(result.kernel, "three"));
+      pair.append(windowBox, kernelBox); right.appendChild(pair);
+    }
+    if (Number(state.reveal) >= 2) {
+      right.append(el("h4", "", "Multiply matching cells"), numberGrid(result.products, "three products"),
+        el("p", "mech-equation", `Add all nine products: ${result.products.flat().join(" + ")} = ${result.sum}`));
+      if (result.mode === "patch") {
+        right.appendChild(el("p", `mech-result ${result.sum >= 5 ? "yes" : "no"}`,
+          `${result.sum} >= 5 → ${result.sum >= 5 ? "keep this large patch" : "reject this small mark"}`));
+      } else {
+        right.appendChild(el("p", `mech-result ${Math.abs(result.sum) ? "yes" : "no"}`,
+          `Ignore the minus sign: edge strength = |${result.sum}| = ${Math.abs(result.sum)}`));
+      }
+    }
+    if (Number(state.reveal) >= 3) {
+      right.append(el("h4", "", "Move the window everywhere → output map"),
+        numberGrid(result.output, "seven output-map",
+          (row, column) => [
+            result.output[row][column] > 0 ? "detected" : "",
+            row === result.row && column === result.column ? "centre" : "",
+          ].filter(Boolean).join(" ")),
+        el("p", "mech-conclusion", result.mode === "edge"
+          ? "Flat areas produce 0. Bright columns appear where values change from 0 to 1: those are vertical edges."
+          : "An isolated 1 never reaches five votes. The 3 × 3 block produces counts of 5 or more, so the large patch remains."));
+    }
+    body.append(left, right);
+  }
+
   function renderFace(body, state, rerender, save) {
     const left = panel("1. Switch the two masks");
     [["face_mask", "face"], ["skin_mask", "skin"]].forEach(([label, key]) => {
@@ -359,6 +574,8 @@
     neighbours: renderNeighbours,
     red_spot: renderRedSpot,
     soften: renderSoften,
+    kernel_filter: renderKernelFilter,
+    convolution_scan: renderConvolutionScan,
     face_gate: renderFace,
   };
 
@@ -428,6 +645,8 @@
     calculateNeighbours,
     calculateRedSpot,
     calculateSoften,
+    calculateKernelFilter,
+    calculateConvolutionScan,
     calculateFace,
     defaults: () => copy(DEFAULTS),
   };

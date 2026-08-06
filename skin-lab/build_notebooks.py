@@ -13,7 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HERE = pathlib.Path(__file__).resolve().parent
-COURSE_VERSION = "2026.08.06.7"
+COURSE_VERSION = "2026.08.06.8"
 PRACTICE_FILE = "Skin_Lab.ipynb"
 SOLUTION_FILE = "Skin_Lab_Answers.ipynb"
 TASK_ORDER = (
@@ -533,6 +533,16 @@ By the end of the lab, you will be able to:
 Every observation cell gives you **numbers, an image or overlay, and a short explanation**. The numbers show the calculation.
 The image shows which pixels were selected. The explanation connects those two pieces of evidence.
 
+### Five checkpoints — stop after any one of them
+
+1. **RGB:** I can point to one matrix position and read its R, G, and B values.
+2. **Masks:** I can explain why a rule writes `0` or `255` at that position.
+3. **Convolution:** I can trace a 3 × 3 window through multiply → add → divide → one output value.
+4. **Selective change:** I can explain why a mask changes some pixels and keeps others.
+5. **Portrait pipeline:** I can use a difference panel and pixel count to defend one setting.
+
+The page saves after every edit. You are not expected to finish all five checkpoints in one sitting.
+
 This is a lesson about image-processing algorithms. It is **not a diagnostic tool and it does not rate anyone's skin**.
 Lighting, cameras, backgrounds, and different skin tones can all make a hand-written colour rule fail.
 
@@ -565,7 +575,8 @@ Run the next cell before writing code. It shows one input image and three output
 3. final image: only selected pixels receive a calculated replacement colour.
 
 A mask is a location map, not a colour photograph. The numbers `0` and `255` do not describe a person's skin and are not
-a score. Before you continue, predict this: **why should the program show both the mask and the final image?**
+a score. The function name `detect_pimples` is already part of the project; in this lesson, read it as “find locally red
+pixels,” not as a medical judgement. Before you continue, predict this: **why show both the mask and the final image?**
 """
 
 RGB_PIXEL = """## Mechanism 1 — one pixel contains three RGB numbers
@@ -585,23 +596,43 @@ the matching Python code is revealed.
 
 NUMPY_INTRO = """## From one pixel to a whole image with NumPy
 
-Before using a photograph, build a **3 × 3 colour matrix**. Each position stores an RGB triplet. The code cell below gives
-you nine colours, including pure red, green, blue, and the three colours used later in the drawn face.
+Before using a photograph, build a **5 × 5 colour matrix**. Each position stores an RGB triplet. This tiny image has a
+blue border, a 3 × 3 skin-coloured region, and one red centre pixel. The simple pattern makes every number traceable.
 
-The panel selected a pixel by row and column. NumPy uses the same address system:
+The panel selected a pixel by row and column. NumPy starts counting both at **0**, so a 5 × 5 matrix has row numbers
+`0, 1, 2, 3, 4` and column numbers `0, 1, 2, 3, 4`:
 
-- `pixels[3, 3]` reads all three RGB values at row 3, column 3;
+- `pixels[2, 2]` reads the red centre pixel;
 - `pixels[:, :, 0]` reads the red value at every row and column;
 - `pixels[:, :, 1]` reads every green value;
 - `pixels[:, :, 2]` reads every blue value.
 
-For the 3 × 3 example, `pixels.shape` is `(3, 3, 3)`: 3 rows, 3 columns, and 3 channels. Separating the channels produces
-three ordinary number matrices. At row 2, column 0, they contain `R = 183`, `G = 127`, and `B = 103`; putting those three
-values back in the same order rebuilds the colour `(183, 127, 103)`.
+For this example, `pixels.shape` is `(5, 5, 3)`: 5 rows, 5 columns, and 3 channels. The last `3` does **not** mean another
+row. It means every position stores three channel values. Separating the channels produces three ordinary 5 × 5 number
+matrices. At row 2, column 2, they contain `R = 225`, `G = 62`, and `B = 66`; putting those values back in that order
+rebuilds the red centre colour `(225, 62, 66)`.
 
 Run the next two cells. First read the complete matrix and select one position. Then inspect six panels: the RGB matrix,
 the R/G/B number matrices shown as coloured intensities, the rebuilt RGB matrix, and the difference matrix. A maximum
-difference of `0` proves that all nine colours were rebuilt without losing a channel value.
+difference of `0` proves that all 25 colours were rebuilt without losing a channel value.
+"""
+
+MATRIX_CHANGE = """### Worked example — change one number, then trace the colour
+
+Use a copy so the original matrix stays unchanged. The example edits `pixels[2, 2, 2]`:
+
+```text
+first 2  = row 2
+second 2 = column 2
+last 2   = B channel
+B changes from 66 to 220
+(225, 62, 66) → (225, 62, 220)
+```
+
+Before running the cell, predict three things: **which square changes, which channel changes, and what RGB triplet appears?**
+The output then shows BEFORE, AFTER, and ABSOLUTE DIFFERENCE. Exactly `1/25` pixels and `1/75` channel values should change.
+
+After the worked run, change `channel` to `0` or `1`, or choose another row and column. Make a prediction before each run.
 """
 
 LIBRARIES = """## The library operations used in this project
@@ -686,6 +717,51 @@ because it was blended with eight values of `10`.
 
 `ndimage.convolve` performs this calculation at every pixel. `mode="nearest"` handles an edge by reusing the value of the
 nearest border pixel when part of the 3 × 3 area would fall outside the image.
+"""
+
+FILTER_LAB = """### Worked filter lab — why one convolution becomes different filters
+
+A **kernel is a small matrix of instructions**. Keep the same image values and change only the kernel:
+
+```text
+kernel      = the small instruction matrix
+convolution = move it, multiply matching cells, add, and write one output
+filter      = the visible effect produced by those repeated outputs
+```
+
+| Kernel | Centre calculation for eight `10`s around centre `90` | What the output means |
+|---|---|---|
+| Identity | `1 × 90 = 90` | keep the centre |
+| Blur | `(8 × 10 + 90) / 9 = 18.89` | move the centre toward its neighbours |
+| Sharpen | `5 × 90 - 4 × 10 = 410 → clip to 255` | increase the difference from side neighbours |
+| Edge | `8 × 90 - 8 × 10 = 640 → clip to 255` | report a strong local change |
+
+For a flat area of nine `10`s, the edge calculation is `8 × 10 - 8 × 10 = 0`. This is the key idea: an edge filter gives
+small output on flat areas and large output where nearby values differ.
+
+Open the first panel and select all four kernels. It reveals the input, kernel, nine products, sum, divisor, and clipped
+output. Then run the RGB example: the same blur is calculated separately for R, G, and B and rebuilt as `(188, 120, 99)`.
+
+Finally, open the 7 × 7 scanner:
+
+1. **Find a vertical edge:** a `−1, 0, +1` kernel returns `0` on flat columns and a large value where `0` changes to `1`.
+2. **Find a large patch:** a kernel of nine `1`s counts nearby selected cells. An isolated `1` scores only `1`, while the
+   centre of a 3 × 3 patch scores `9`. The threshold `count >= 5` rejects the dot and keeps the patch.
+
+Use **Next** to reveal the window, kernel, products, and full output map in order. Move the yellow window and predict the
+new output before revealing it.
+"""
+
+CONVOLUTION_TRANSFER = """### Checkpoint — can you transfer the convolution idea?
+
+Do not copy a number from the table. Use the mechanism to predict four new outputs:
+
+1. A flat 3 × 3 area of `1`s uses the edge kernel with eight `−1`s and centre `8`.
+2. A patch counter sees one isolated selected pixel.
+3. The same counter sits at the centre of a filled 3 × 3 patch.
+4. The RGB blur uses the three channel calculations shown above.
+
+Fill the four blanks, then run the cell. A complete explanation must connect each number to what appears in the output map.
 """
 
 TASK_CONVOLVE = """### Coding task 2 — complete `convolve_layer`
@@ -883,15 +959,16 @@ boundary. It does not diagnose skin and it does not find red spots by itself.
 
 PRO_PIPELINE = """## Capstone — build a visible, adjustable portrait pipeline
 
-Your five functions are the foundation. A real photograph needs three additional controls so the result is visible without
-smearing strong facial details:
+Your five functions are the foundation. The final program repeats ideas you already used:
 
-1. Face Mesh creates `face_mask`. Your RGB mask is combined with Y/Cb/Cr colour evidence. `Y` tracks lightness while `Cb`
-   and `Cr` track blue and red colour differences, so the decision is not tied to one exact RGB triplet.
-2. `scipy.ndimage.sobel` measures rapid changes in lightness. Strong edges often belong to eyes, lips, hair, or the face
-   outline, so the pipeline protects those locations from general smoothing.
-3. Your chosen 3 × 3 kernel smooths the remaining region. Red areas receive a stronger blend. A small brightness value is
-   added only inside the allowed mask.
+1. Face Mesh draws a face boundary. Pixels outside it are kept.
+2. Colour rules make a skin-region mask. They use RGB plus a second way of separating lightness from colour.
+3. An edge filter finds strong changes around eyes, lips, hair, and the face outline. Those details are protected.
+4. Your 3 × 3 kernel smooths the remaining selected region. Locally red areas use a stronger blend.
+5. A small brightness value is added only where both the face and skin masks allow it.
+
+Under the hood, the second colour system is called Y/Cb/Cr, and the SciPy edge operation is called `sobel`. You do not need
+to memorise those names. You do need to trace the same pattern: **numbers → mask or filtered values → selected output**.
 
 For one channel, suppose the original value is `200`, the kernel result is `188`, and `skin_smooth_strength = 0.55`:
 
@@ -989,18 +1066,56 @@ PREDICT_A = PREDICT_Q.replace("___", "170 / 9")
 
 NUMPY_ARRAY_CODE = """import numpy as np
 
+background = [35, 80, 185]
+skin = [183, 127, 103]
+red_spot = [225, 62, 66]
+
 pixels = np.array([
-    [[255, 0, 0], [0, 255, 0], [0, 0, 255]],
-    [[255, 255, 0], [0, 255, 255], [255, 0, 255]],
-    [[183, 127, 103], [225, 62, 66], [35, 80, 185]],
+    [background, background, background, background, background],
+    [background, skin,       skin,       skin,       background],
+    [background, skin,       red_spot,   skin,       background],
+    [background, skin,       skin,       skin,       background],
+    [background, background, background, background, background],
 ], dtype=np.int16)
 
 print("pixels shape:", pixels.shape, "= rows, columns, RGB channels")
-print("pixel at row 2, column 0:", pixels[2, 0])
+print("pixel at row 2, column 2:", pixels[2, 2])
 print("R matrix:\\n", pixels[:, :, 0])
 print("G matrix:\\n", pixels[:, :, 1])
 print("B matrix:\\n", pixels[:, :, 2])
 """
+
+MATRIX_CHANGE_CODE = """row = 2
+column = 2
+channel = 2      # 0 is R, 1 is G, 2 is B
+new_value = 220
+
+experiment = pixels.copy()
+experiment[row, column, channel] = new_value
+magic_mirror.show_rgb_matrix_change(pixels, experiment, row, column)
+"""
+
+CONVOLUTION_TRANSFER_Q = """flat_edge_sum = ___
+isolated_patch_count = ___
+large_patch_count = ___
+blurred_rgb = (___, ___, ___)
+
+magic_mirror.check_convolution_intuition(
+    flat_edge_sum,
+    isolated_patch_count,
+    large_patch_count,
+    blurred_rgb,
+)
+"""
+CONVOLUTION_TRANSFER_A = CONVOLUTION_TRANSFER_Q.replace(
+    "flat_edge_sum = ___", "flat_edge_sum = 0"
+).replace(
+    "isolated_patch_count = ___", "isolated_patch_count = 1"
+).replace(
+    "large_patch_count = ___", "large_patch_count = 9"
+).replace(
+    "blurred_rgb = (___, ___, ___)", "blurred_rgb = (188, 120, 99)"
+)
 
 NUMPY_MASK_CODE = """red = pixels[:, :, 0]
 green = pixels[:, :, 1]
@@ -1044,6 +1159,8 @@ def build_skin_cells(solution):
         markdown_cell("numpy-intro", NUMPY_INTRO),
         code_cell("numpy-array", NUMPY_ARRAY_CODE),
         code_cell("numpy-channels", "magic_mirror.show_numpy_channels()"),
+        markdown_cell("numpy-change-one-number-note", MATRIX_CHANGE),
+        code_cell("numpy-change-one-number", MATRIX_CHANGE_CODE),
         markdown_cell("skin-library-map", LIBRARIES),
         markdown_cell("skin-evidence", EVIDENCE),
         code_cell("skin-mechanism-rule", 'magic_mirror.show_mechanism("rgb_rule")',
@@ -1057,6 +1174,15 @@ def build_skin_cells(solution):
                   ("concept:neighbours",)),
         markdown_cell("skin-convolution", CONVOLUTION),
         code_cell("skin-convolution-math", "magic_mirror.show_convolution_math()"),
+        markdown_cell("skin-kernel-filter-note", FILTER_LAB),
+        code_cell("skin-mechanism-kernel-filter", 'magic_mirror.show_mechanism("kernel_filter")',
+                  ("concept:kernel_filter",)),
+        code_cell("skin-rgb-convolution", "magic_mirror.show_rgb_convolution_math()"),
+        code_cell("skin-mechanism-convolution-scan", 'magic_mirror.show_mechanism("convolution_scan")',
+                  ("concept:convolution_scan",)),
+        markdown_cell("skin-convolution-transfer-note", CONVOLUTION_TRANSFER),
+        code_cell("skin-convolution-transfer",
+                  CONVOLUTION_TRANSFER_A if solution else CONVOLUTION_TRANSFER_Q),
         markdown_cell("skin-task-convolve-note", TASK_CONVOLVE),
         code_cell("task-convolve-layer", blocks["convolve_layer"],
                   ("autoload", "task:convolve_layer")),

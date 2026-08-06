@@ -29,12 +29,12 @@ class TestSkinNotebook(unittest.TestCase):
         practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
         answer_page = (ROOT / "dap-an.html").read_text(encoding="utf-8")
         self.assertIn('notebook: "Skin_Lab.ipynb"', practice_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.7", practice_page)
-        self.assertIn("assets/skin-mechanisms.js?v=2026.08.06.7", practice_page)
+        self.assertIn("assets/notebook.js?v=2026.08.06.8", practice_page)
+        self.assertIn("assets/skin-mechanisms.js?v=2026.08.06.8", practice_page)
         self.assertIn('href="dap-an.html"', practice_page)
         self.assertIn('href="../index.html"', practice_page)
         self.assertIn('notebook: "Skin_Lab_Answers.ipynb"', answer_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.7", answer_page)
+        self.assertIn("assets/notebook.js?v=2026.08.06.8", answer_page)
         self.assertIn('href="./"', answer_page)
         self.assertIn('href="../index.html"', answer_page)
 
@@ -86,16 +86,22 @@ class TestSkinNotebook(unittest.TestCase):
         matrix_cell = next(cell for cell in self.practice["cells"] if cell["id"] == "numpy-array")
         matrix_source = source(matrix_cell)
         self.assertIn("np.array([", matrix_source)
-        self.assertIn("[[255, 0, 0], [0, 255, 0], [0, 0, 255]]", matrix_source)
+        self.assertIn("[background, skin,       red_spot,   skin,       background]", matrix_source)
         self.assertIn('print("R matrix:', matrix_source)
         self.assertIn('print("G matrix:', matrix_source)
         self.assertIn('print("B matrix:', matrix_source)
-        self.assertLess(lesson.index("3 × 3 colour matrix"), lesson.index("turn RGB evidence into 0 or 255"))
+        self.assertIn("NumPy starts counting both at **0**", lesson)
+        self.assertIn("`pixels[2, 2]`", lesson)
+        self.assertNotIn("`pixels[3, 3]`", lesson)
+        self.assertLess(lesson.index("5 × 5 colour matrix"), lesson.index("turn RGB evidence into 0 or 255"))
 
     def test_every_stage_has_numbers_images_and_explanatory_preview(self):
         ids = {cell["id"] for cell in self.practice["cells"]}
         for cell_id in (
             "skin-pixel-channels", "numpy-channels", "skin-convolution-math",
+            "numpy-change-one-number", "skin-mechanism-kernel-filter",
+            "skin-rgb-convolution", "skin-mechanism-convolution-scan",
+            "skin-convolution-transfer",
             "skin-preview-convolution", "skin-preview-evidence", "skin-preview-mask",
             "skin-preview-pimples", "skin-preview-cleanup", "skin-demo",
             "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
@@ -114,7 +120,8 @@ class TestSkinNotebook(unittest.TestCase):
             if tag.startswith("concept:")
         }
         self.assertEqual(set(concepts), {
-            "rgb_pixel", "rgb_rule", "neighbours", "red_spot", "soften", "face_gate",
+            "rgb_pixel", "rgb_rule", "neighbours", "kernel_filter", "convolution_scan",
+            "red_spot", "soften", "face_gate",
         })
         for concept, cell in concepts.items():
             self.assertIn(f'show_mechanism("{concept}")', source(cell))
@@ -180,7 +187,7 @@ class TestSkinNotebook(unittest.TestCase):
         answer_ids = [cell["id"] for cell in self.answers["cells"]]
         self.assertEqual(practice_ids, answer_ids)
         self.assertEqual(len(practice_ids), len(set(practice_ids)))
-        self.assertEqual(len(practice_ids), 61)
+        self.assertEqual(len(practice_ids), 69)
         for notebook in (self.practice, self.answers):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)
@@ -256,6 +263,17 @@ class TestSkinNotebook(unittest.TestCase):
             "skin region", "red region", "difference panel",
         ):
             self.assertIn(phrase, lesson)
+
+    def test_convolution_transfer_check_is_unsolved_only_in_practice(self):
+        practice = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-convolution-transfer")
+        answers = next(cell for cell in self.answers["cells"] if cell["id"] == "skin-convolution-transfer")
+        self.assertIn("flat_edge_sum = ___", source(practice))
+        self.assertIn("large_patch_count = ___", source(practice))
+        self.assertIn("blurred_rgb = (___, ___, ___)", source(practice))
+        self.assertIn("flat_edge_sum = 0", source(answers))
+        self.assertIn("isolated_patch_count = 1", source(answers))
+        self.assertIn("large_patch_count = 9", source(answers))
+        self.assertIn("blurred_rgb = (188, 120, 99)", source(answers))
 
     def test_one_photo_uses_high_quality_smooth_display(self):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")

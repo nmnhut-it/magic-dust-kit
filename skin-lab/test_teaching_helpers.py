@@ -126,6 +126,7 @@ class TestTeachingHelpers(unittest.TestCase):
             magic_mirror.show_skin_pixel_channels,
             magic_mirror.show_numpy_channels,
             magic_mirror.show_convolution_math,
+            magic_mirror.show_rgb_convolution_math,
             magic_mirror.show_skin_evidence_math,
             magic_mirror.show_skin_vote_math,
             magic_mirror.show_red_gap_math,
@@ -144,14 +145,50 @@ class TestTeachingHelpers(unittest.TestCase):
         with redirect_stdout(output):
             picture = magic_mirror.show_numpy_channels()
         report = output.getvalue()
-        self.assertIn("pixels has shape (3, 3, 3)", report)
-        self.assertIn("R matrix = [[255, 0, 0]", report)
-        self.assertIn("G matrix = [[0, 255, 0]", report)
-        self.assertIn("B matrix = [[0, 0, 255]", report)
-        self.assertIn("R=183, G=127, B=103 -> RGB (183, 127, 103)", report)
+        self.assertIn("pixels has shape (5, 5, 3)", report)
+        self.assertIn("R matrix = [[35, 35, 35, 35, 35]", report)
+        self.assertIn("G matrix = [[80, 80, 80, 80, 80]", report)
+        self.assertIn("B matrix = [[185, 185, 185, 185, 185]", report)
+        self.assertIn("R=225, G=62, B=66 -> RGB (225, 62, 66)", report)
         self.assertIn("maximum difference = 0", report)
         self.assertIsInstance(picture, Image.Image)
         self.assertGreaterEqual(picture.width, 400)
+
+    def test_change_one_channel_example_reports_exact_scope(self):
+        before = magic_mirror._rgb_example_pixels().astype(np.int16)
+        after = before.copy()
+        after[2, 2, 2] = 220
+        output = io.StringIO()
+        with redirect_stdout(output):
+            picture = magic_mirror.show_rgb_matrix_change(before, after, 2, 2)
+        report = output.getvalue()
+        self.assertIn("Pixel before: (225, 62, 66) | pixel after: (225, 62, 220)", report)
+        self.assertIn("row 2, column 2, B: 66 -> 220", report)
+        self.assertIn("Changed pixels: 1/25 | changed channel values: 1/75", report)
+        self.assertIsInstance(picture, Image.Image)
+
+    def test_rgb_convolution_rebuilds_three_calculated_channels(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            picture = magic_mirror.show_rgb_convolution_math()
+        report = output.getvalue()
+        self.assertIn("R output = (225 + 8 × 183) / 9 = 1689 / 9 = 187.67 -> 188", report)
+        self.assertIn("G output = (62 + 8 × 127) / 9 = 1078 / 9 = 119.78 -> 120", report)
+        self.assertIn("B output = (66 + 8 × 103) / 9 = 890 / 9 = 98.89 -> 99", report)
+        self.assertIn("rebuild centre RGB (188, 120, 99)", report)
+        self.assertIsInstance(picture, Image.Image)
+
+    def test_convolution_transfer_check_explains_all_four_outputs(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            picture = magic_mirror.check_convolution_intuition(0, 1, 9, (188, 120, 99))
+        report = output.getvalue()
+        self.assertIn("flat edge: 0 | expected 0 | correct", report)
+        self.assertIn("isolated dot: 1 | expected 1 | correct", report)
+        self.assertIn("large patch: 9 | expected 9 | correct", report)
+        self.assertIn("RGB blur: (188, 120, 99) | expected (188, 120, 99) | correct", report)
+        self.assertIn("Intuition check: 4/4 correct", report)
+        self.assertIsInstance(picture, Image.Image)
 
     def test_number_substitutions_match_the_lesson(self):
         blurred = (8 * 10 + 90) / 9

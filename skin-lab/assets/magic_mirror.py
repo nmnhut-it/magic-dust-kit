@@ -930,11 +930,20 @@ def show_skin_pixel_channels():
 
 
 def _rgb_matrix_picture(pixels, channel=None):
-    """Draw a 3x3 colour matrix and write the channel value inside every cell."""
+    """Draw a colour matrix with zero-based row/column labels and channel values."""
     values = np.asarray(pixels, dtype=np.uint8)
-    cell = 72
-    picture = Image.new("RGB", (values.shape[1] * cell, values.shape[0] * cell), PAPER_WARM)
+    cell = 54 if max(values.shape[:2]) >= 5 else 72
+    margin = 28
+    width = max(298, margin + values.shape[1] * cell)
+    height = max(298, margin + values.shape[0] * cell)
+    picture = Image.new(
+        "RGB", (width, height), PAPER_WARM,
+    )
     draw = ImageDraw.Draw(picture)
+    for column in range(values.shape[1]):
+        _text(picture, (margin + column * cell + 8, 8), "col %d" % column, INK_MUTED)
+    for row in range(values.shape[0]):
+        _text(picture, (3, margin + row * cell + 8), "r%d" % row, INK_MUTED)
     for row in range(values.shape[0]):
         for column in range(values.shape[1]):
             red, green, blue = (int(value) for value in values[row, column])
@@ -945,7 +954,7 @@ def _rgb_matrix_picture(pixels, channel=None):
                 level = (red, green, blue)[channel]
                 fill = tuple(level if index == channel else 0 for index in range(3))
                 lines = (str(level),)
-            x, y = column * cell, row * cell
+            x, y = margin + column * cell, margin + row * cell
             draw.rectangle((x, y, x + cell - 1, y + cell - 1), fill=fill, outline=PAPER_RAISED, width=2)
             label_height = 14 * len(lines) + 4
             draw.rectangle((x + 4, y + 4, x + cell - 4, y + 4 + label_height), fill=PAPER_RAISED)
@@ -954,13 +963,39 @@ def _rgb_matrix_picture(pixels, channel=None):
     return picture
 
 
-def show_numpy_channels():
-    """Show a literal 3x3 RGB matrix, its number channels, and an exact rebuild."""
-    pixels = np.array([
-        [[255, 0, 0], [0, 255, 0], [0, 0, 255]],
-        [[255, 255, 0], [0, 255, 255], [255, 0, 255]],
-        [[183, 127, 103], [225, 62, 66], [35, 80, 185]],
+def _rgb_output_pixel_picture(color):
+    """Draw one convolution output without stretching it into a full matrix."""
+    red, green, blue = (int(value) for value in color)
+    picture = Image.new("RGB", (298, 298), PAPER_WARM)
+    draw = ImageDraw.Draw(picture)
+    _text(picture, (82, 42), "one output position", INK_MUTED)
+    draw.rectangle((82, 82, 216, 216), fill=(red, green, blue),
+                   outline=PAPER_RAISED, width=3)
+    draw.rectangle((94, 94, 204, 151), fill=PAPER_RAISED)
+    _text(picture, (108, 101), "R = %d" % red, INK)
+    _text(picture, (108, 119), "G = %d" % green, INK)
+    _text(picture, (108, 137), "B = %d" % blue, INK)
+    _text(picture, (95, 236), "RGB (%d, %d, %d)" % (red, green, blue), INK)
+    return picture
+
+
+def _rgb_example_pixels():
+    """Return a 5x5 tiny image: blue border, 3x3 skin region, red centre."""
+    background = [35, 80, 185]
+    skin = [183, 127, 103]
+    red_spot = [225, 62, 66]
+    return np.array([
+        [background, background, background, background, background],
+        [background, skin, skin, skin, background],
+        [background, skin, red_spot, skin, background],
+        [background, skin, skin, skin, background],
+        [background, background, background, background, background],
     ], dtype=np.uint8)
+
+
+def show_numpy_channels():
+    """Show a literal 5x5 RGB matrix, its number channels, and an exact rebuild."""
+    pixels = _rgb_example_pixels()
     original = Image.fromarray(pixels, "RGB")
     red_only = np.zeros_like(pixels)
     green_only = np.zeros_like(pixels)
@@ -977,7 +1012,7 @@ def show_numpy_channels():
     print("R matrix =", pixels[:, :, 0].tolist())
     print("G matrix =", pixels[:, :, 1].tolist())
     print("B matrix =", pixels[:, :, 2].tolist())
-    print("At row 2, column 0: R=183, G=127, B=103 -> RGB (183, 127, 103).")
+    print("At row 2, column 2: R=225, G=62, B=66 -> RGB (225, 62, 66).")
     print("np.stack((red, green, blue), axis=2) rebuilds the image; maximum difference = %d." %
           int(difference.max()))
     return _image_grid(
@@ -986,7 +1021,42 @@ def show_numpy_channels():
          _rgb_matrix_picture(rebuilt), _rgb_matrix_picture(difference)),
         ("RGB MATRIX", "R NUMBER MATRIX", "G NUMBER MATRIX",
          "B NUMBER MATRIX", "REBUILT RGB", "DIFFERENCE = 0"),
-        columns=2, tile_size=(216, 216),
+        columns=2, tile_size=(298, 298),
+    )
+
+
+def show_rgb_matrix_change(before, after, row=2, column=2):
+    """Show exactly which matrix position and RGB channel a learner changed."""
+    original = np.asarray(before)
+    changed = np.asarray(after)
+    if original.shape != (5, 5, 3) or changed.shape != (5, 5, 3):
+        raise MagicMirrorError("Both matrices must have shape (5, 5, 3).")
+    row, column = int(row), int(column)
+    if not 0 <= row < 5 or not 0 <= column < 5:
+        raise MagicMirrorError("row and column must be 0, 1, 2, 3, or 4.")
+    original = np.clip(original, 0, 255).astype(np.uint8)
+    changed = np.clip(changed, 0, 255).astype(np.uint8)
+    channel_changes = np.argwhere(original != changed)
+    pixel_changes = np.any(original != changed, axis=2)
+    old_pixel = tuple(int(value) for value in original[row, column])
+    new_pixel = tuple(int(value) for value in changed[row, column])
+    names = ("R", "G", "B")
+    descriptions = [
+        "row %d, column %d, %s: %d -> %d"
+        % (r, c, names[channel], int(original[r, c, channel]), int(changed[r, c, channel]))
+        for r, c, channel in channel_changes
+    ]
+    difference = np.abs(changed.astype(np.int16) - original.astype(np.int16)).astype(np.uint8)
+    print("Selected position: row %d, column %d." % (row, column))
+    print("Pixel before: %s | pixel after: %s." % (old_pixel, new_pixel))
+    print("Changed channel values: %s." % (", ".join(descriptions) if descriptions else "none"))
+    print("Changed pixels: %d/25 | changed channel values: %d/75." %
+          (int(pixel_changes.sum()), len(channel_changes)))
+    return _image_grid(
+        (_rgb_matrix_picture(original), _rgb_matrix_picture(changed),
+         _rgb_matrix_picture(difference)),
+        ("BEFORE", "AFTER", "ABSOLUTE DIFFERENCE"),
+        columns=3, tile_size=(298, 298),
     )
 
 
@@ -1114,6 +1184,52 @@ def show_convolution_math():
     print("The eight outer pixels contribute 8 × 10 = 80.")
     print("Add the centre: 80 + 90 = 170. Divide by 9: 170 / 9 = 18.89.")
     return _zoom(image)
+
+
+def show_rgb_convolution_math():
+    """Apply one 3x3 blur to the R, G, and B windows of the 5x5 tiny image."""
+    source = _rgb_example_pixels()
+    window = source[1:4, 1:4]
+    red = (225 + 8 * 183) / 9
+    green = (62 + 8 * 127) / 9
+    blue = (66 + 8 * 103) / 9
+    output = (round(red), round(green), round(blue))
+    print("The 3 × 3 window is rows 1..3 and columns 1..3 of the 5 × 5 image.")
+    print("R output = (225 + 8 × 183) / 9 = 1689 / 9 = 187.67 -> 188.")
+    print("G output = (62 + 8 × 127) / 9 = 1078 / 9 = 119.78 -> 120.")
+    print("B output = (66 + 8 × 103) / 9 = 890 / 9 = 98.89 -> 99.")
+    print("The three channel results rebuild centre RGB (188, 120, 99).")
+    return _image_grid(
+        (_rgb_matrix_picture(source), _rgb_matrix_picture(window, 0),
+         _rgb_matrix_picture(window, 1), _rgb_matrix_picture(window, 2),
+         _rgb_output_pixel_picture(output)),
+        ("5 BY 5 RGB INPUT", "3 BY 3 R WINDOW", "3 BY 3 G WINDOW", "3 BY 3 B WINDOW",
+         "REBUILT CENTRE (188,120,99)"),
+        columns=2, tile_size=(298, 298),
+    )
+
+
+def check_convolution_intuition(flat_edge_sum, isolated_patch_count,
+                                large_patch_count, blurred_rgb):
+    """Check four transfer predictions and show the mechanism behind every answer."""
+    given = (
+        int(flat_edge_sum), int(isolated_patch_count), int(large_patch_count),
+        tuple(int(value) for value in blurred_rgb),
+    )
+    expected = (0, 1, 9, (188, 120, 99))
+    labels = ("flat edge", "isolated dot", "large patch", "RGB blur")
+    passed = sum(actual == target for actual, target in zip(given, expected))
+    for label, actual, target in zip(labels, given, expected):
+        print("%s: %s | expected %s | %s" %
+              (label, actual, target, "correct" if actual == target else "check again"))
+    print("Intuition check: %d/4 correct." % passed)
+    return _math_card("WHY THESE FOUR OUTPUTS?", (
+        "flat: 8 x 1 - 8 x 1 = 0 -> no edge",
+        "one selected cell: count 1 < 5 -> reject",
+        "filled 3x3 patch: count 9 >= 5 -> keep",
+        "R, G, B blur -> (188, 120, 99)",
+        "one kernel run on 3 channels rebuilds one RGB pixel",
+    ), width=330)
 
 
 def show_skin_evidence_math():
