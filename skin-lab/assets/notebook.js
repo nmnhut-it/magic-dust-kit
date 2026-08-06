@@ -16,6 +16,7 @@ const CFG = {
     moduleSource: "assets/magic_mirror.py",
     photosDir: "/home/pyodide/photos",
     photos: [
+      "face-acne-cheek.jpg",
       "face-portrait-william-stitt.jpg",
       "face-portrait-eddie-kopp.jpg",
       "human-skin-closeup.jpg",
@@ -980,6 +981,35 @@ const Snapshot = {
     message.className = "snapshot-message";
     message.textContent = "Requesting camera access…";
 
+    // Nút đổi kernel dưới tấm ảnh đã chụp: chạy lại pipeline trên ĐÚNG ảnh đó,
+    // không mở lại camera — để học sinh tự tay so 3×3 với 5×5.
+    const kernels = document.createElement("div");
+    kernels.className = "snapshot-bar snapshot-kernels hidden";
+    kernels.appendChild(Object.assign(document.createElement("span"),
+      { textContent: "Try another kernel on the same photo:" }));
+    [["gentle", "gentle 3×3"], ["balanced", "balanced 3×3"],
+      ["strong", "strong 3×3"], ["wide", "wide 5×5"]].forEach(([name, label]) => {
+      const pick = document.createElement("button");
+      pick.type = "button"; pick.className = "btn";
+      pick.dataset.kernel = name; pick.textContent = label;
+      pick.onclick = async () => {
+        if (Snapshot.busy || !Snapshot.lastCanvas) return;
+        Snapshot.busy = true; pick.disabled = true;
+        try {
+          Kernel.callBridge("_set_snapshot_kernel", [name]);
+          [...kernels.querySelectorAll("button")].forEach((other) =>
+            other.classList.toggle("primary", other === pick));
+          await Snapshot.renderPipeline();
+        } catch (error) {
+          Snapshot.message.textContent = "The kernel could not be changed: "
+            + String(error?.message || error).split("\n").pop();
+        } finally {
+          Snapshot.busy = false; pick.disabled = false;
+        }
+      };
+      kernels.appendChild(pick);
+    });
+
     const results = document.createElement("div");
     results.className = "snapshot-results hidden";
     const makeResult = (label) => {
@@ -996,11 +1026,12 @@ const Snapshot = {
     const differenceCanvas = makeResult("4 · Changed colours, magnified ×6");
     const outputCanvas = makeResult("5 · OUTPUT: red correction, smoothing, and brightness");
 
-    wrap.append(intro, live, bar, message, results);
+    wrap.append(intro, live, bar, message, kernels, results);
     host.appendChild(wrap);
     Object.assign(Snapshot, {
-      wrap, video, captureButton: capture, message, results,
+      wrap, video, captureButton: capture, message, results, kernelBar: kernels,
       inputCanvas, skinCanvas, spotCanvas, differenceCanvas, outputCanvas,
+      lastCanvas: null, lastLandmarks: [], busy: false,
     });
     return wrap;
   },
@@ -1145,11 +1176,22 @@ const Snapshot = {
     Snapshot.message.textContent = "Face Mesh is finding the face outline…";
     const landmarks = await Snapshot.detectFace(canvas);
     Snapshot.drawFaceOutline(Snapshot.inputCanvas, landmarks);
+    Snapshot.lastCanvas = canvas;
+    Snapshot.lastLandmarks = landmarks;
+    await Snapshot.renderPipeline();
+  },
 
+  /** Chạy pipeline trên tấm ảnh đã giữ lại. Nút đổi kernel gọi lại hàm này,
+   *  nên học sinh so được các kernel trên cùng một tấm ảnh. */
+  async renderPipeline() {
+    const canvas = Snapshot.lastCanvas;
+    if (!canvas || !Kernel.py || Kernel.state !== "ready") return;
+    const landmarks = Snapshot.lastLandmarks || [];
     const level = CFG.quality[2];
     const source = canvas.getContext("2d", { willReadFrequently: true })
       .getImageData(0, 0, CFG.capture.w, CFG.capture.h).data;
     const faceMask = landmarks.length ? Snapshot.faceMaskBytes(landmarks, level.w, level.h) : null;
+    Snapshot.message.textContent = "NumPy and SciPy are processing the photo…";
     try {
       const packed = new Uint8Array(Kernel.callBridge("_skin_snapshot", [
         new Uint8Array(source.buffer.slice(0)), CFG.capture.w, CFG.capture.h,
@@ -1166,6 +1208,7 @@ const Snapshot = {
         target.getContext("2d").putImageData(
           new ImageData(new Uint8ClampedArray(frame), CFG.capture.w, CFG.capture.h), 0, 0);
       });
+      Snapshot.kernelBar?.classList.remove("hidden");
       const report = Kernel.callBridge("_skin_snapshot_report", []);
       Snapshot.message.textContent = (landmarks.length
         ? "Face Mesh limited changes to the face region. "
@@ -1264,9 +1307,12 @@ const Nb = {
       });
     }
     Nb.cells.forEach((cell) => {
-      // Chỉ ô code mới giữ bản đã lưu: code là bài làm của học sinh, còn chữ giảng
-      // (markdown) phải nhận bản cập nhật mỗi lần bài học được sửa trên máy chủ.
-      if (cell.type !== "code") return;
+      // Chỉ ô chứa BÀI LÀM của học sinh mới giữ bản đã lưu: năm ô task, các ô gắn
+      // thẻ student-work và ô các em tự thêm. Ô quan sát + chữ giảng luôn nạp bản
+      // mới — bản lưu từ phiên bản cũ từng đè lên ô quan sát mới và làm vỡ bài
+      // (numpy-array đời .6/.7 tạo ma trận khác hẳn ô đổi-một-số đời .9 cần).
+      const holdsStudentWork = cell.tags.some((tag) => tag.startsWith("task:") || tag === "student-work");
+      if (cell.type !== "code" || !holdsStudentWork) return;
       if (Object.prototype.hasOwnProperty.call(Nb.saved.cells, cell.id)) {
         cell.source = typeof Nb.saved.cells[cell.id] === "string"
           ? Nb.saved.cells[cell.id]

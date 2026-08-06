@@ -243,6 +243,9 @@ try {
   const saved = await cdp.evaluate(`(() => {
     const cell = Nb.cells.find((item) => item.id === "task-convolve-layer");
     cell.source += "\\n# autosave-browser-check";
+    // Giả lập bản lưu đời cũ: ô quan sát numpy-array từng chứa code khác hẳn.
+    const observation = Nb.cells.find((item) => item.id === "numpy-array");
+    observation.source = "# legacy-observation-cell\\npixels = 'stale'";
     Nb.cells.push({
       id: "user-browser-check", type: "code", source: "observation = 89.28",
       tags: [], editing: false, count: null,
@@ -255,6 +258,9 @@ try {
   const savedJson = JSON.parse(savedText);
   if (!savedJson.cells["task-convolve-layer"].source.includes("autosave-browser-check")) {
     throw new Error("Stable-ID autosave did not store the edited task cell.");
+  }
+  if (!savedJson.cells["numpy-array"].source.includes("legacy-observation-cell")) {
+    throw new Error("The stale-observation seed was not written to the save.");
   }
   if (!savedJson.cells["user-browser-check"].user) {
     throw new Error("Autosave did not mark the student-created cell for restoration.");
@@ -271,6 +277,7 @@ try {
   const resumed = await poll(async () => {
     const result = await cdp.evaluate(`({
       source: Nb.cells.find((item) => item.id === "task-convolve-layer")?.source,
+      observationSource: Nb.cells.find((item) => item.id === "numpy-array")?.source,
       userSource: Nb.cells.find((item) => item.id === "user-browser-check")?.source,
       resume: document.getElementById("resumeBtn")?.textContent,
       key: Nb.storageKey(),
@@ -279,7 +286,11 @@ try {
   }, (value) => value?.source?.includes("autosave-browser-check")
     && value?.userSource === "observation = 89.28" && value?.resume, 10_000, "resume banner");
   if (!resumed.key.includes(":skin:v3")) throw new Error(`Unexpected practice storage key: ${resumed.key}`);
-  console.log("Browser check: edited code, user cell, and progress survived reload.");
+  if (resumed.observationSource.includes("legacy-observation-cell")
+      || !resumed.observationSource.includes("red_spot,   skin")) {
+    throw new Error("A stale saved observation cell overrode the fresh notebook code after reload.");
+  }
+  console.log("Browser check: edited code and user cell survived; stale observation cell was refreshed.");
 
   await cdp.evaluate(`location.href = ${JSON.stringify(ANSWER_URL)}`);
   await waitForNotebook(cdp, "skin-answers", "answer route");
@@ -326,6 +337,17 @@ try {
       resultCanvases: Snapshot.results.querySelectorAll("canvas").length,
       outputWidth: Snapshot.outputCanvas.width,
     };
+    const kernelButton = [...document.querySelectorAll(".snapshot-kernels button")]
+      .find((button) => button.dataset.kernel === "gentle");
+    if (!kernelButton) throw new Error("Missing kernel buttons under the captured photo");
+    kernelButton.click();
+    await waitFor(() => Snapshot.message?.textContent.includes("Kernel gentle"),
+      40_000, "same-photo kernel switch");
+    const kernelEvidence = {
+      message: Snapshot.message.textContent,
+      streamStillStopped: Snapshot.stream === null,
+      barVisible: !document.querySelector(".snapshot-kernels").classList.contains("hidden"),
+    };
     const output = (id) => Nb.cells.find((item) => item.id === id).outEl;
     const controlHost = document.createElement("div");
     document.body.appendChild(controlHost);
@@ -340,6 +362,7 @@ try {
       answerKey: Nb.storageKey(),
       controls,
       photoEvidence,
+      kernelEvidence,
       mechanisms: ids.filter((id) => output(id).querySelector(".mechanism-card")).length,
       fitsMobile: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       practiceSaveStillPresent: Boolean(localStorage.getItem("magic-dust-kit:skin-lab:skin:v3")),
@@ -365,6 +388,10 @@ try {
       evidence.photoEvidence.outputWidth !== 480 ||
       !evidence.photoEvidence.message.includes("OUTPUT changed")) {
     throw new Error(`One-photo processing did not finish correctly: ${JSON.stringify(evidence.photoEvidence)}`);
+  }
+  if (!evidence.kernelEvidence.message.includes("Kernel gentle ran") ||
+      !evidence.kernelEvidence.streamStillStopped || !evidence.kernelEvidence.barVisible) {
+    throw new Error(`Same-photo kernel switching failed: ${JSON.stringify(evidence.kernelEvidence)}`);
   }
   if (!evidence.answerKey.includes(":skin-answers:v3") || !evidence.practiceSaveStillPresent) {
     throw new Error("Practice and answer routes do not use separate localStorage records.");

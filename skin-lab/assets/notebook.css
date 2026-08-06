@@ -224,6 +224,9 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
 .snapshot-live video{display:block;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
 .snapshot-bar{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:12px 14px}
 .snapshot-bar label.btn{display:inline-flex;align-items:center;cursor:pointer}
+.snapshot-kernels{border-top:2px solid var(--mint-line);background:var(--paper-warm)}
+.snapshot-kernels.hidden{display:none}
+.snapshot-kernels span{align-self:center;font-size:12px;font-weight:700;color:var(--ink)}
 .snapshot-message{margin:0;padding:11px 15px;border-top:2px solid var(--mint-line);
   background:var(--paper-warm);color:var(--ink);font-size:12.5px;font-weight:700;line-height:1.55}
 .snapshot-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px;

@@ -58,8 +58,9 @@ OUTPUT_SIZE = (480, 360)
 DEMO_SIZE = (80, 60)
 PUBLIC_PHOTO_DIR = Path(__file__).resolve().parent / "photos"
 PUBLIC_PHOTOS = (
-    ("face-portrait-william-stitt.jpg", "PORTRAIT 1 · WILLIAM STITT"),
-    ("face-portrait-eddie-kopp.jpg", "PORTRAIT 2 · EDDIE KOPP"),
+    ("face-acne-cheek.jpg", "ACNE CHEEK · DR. G. R. RAO"),
+    ("face-portrait-william-stitt.jpg", "PORTRAIT · WILLIAM STITT"),
+    ("face-portrait-eddie-kopp.jpg", "PORTRAIT · EDDIE KOPP"),
     ("human-skin-closeup.jpg", "SKIN CLOSE-UP · M. HOWARD"),
 )
 
@@ -1029,11 +1030,22 @@ def show_rgb_matrix_change(before, after, row=2, column=2):
     """Show exactly which matrix position and RGB channel a learner changed."""
     original = np.asarray(before)
     changed = np.asarray(after)
-    if original.shape != (5, 5, 3) or changed.shape != (5, 5, 3):
-        raise MagicMirrorError("Both matrices must have shape (5, 5, 3).")
+    small = (
+        original.ndim == 3 and original.shape[2] == 3
+        and max(original.shape[:2]) <= 12
+    )
+    if not small or original.shape != changed.shape:
+        raise MagicMirrorError(
+            "This demo reads the small colour matrix built by the pixels = np.array([...]) "
+            "cell above. Run that cell first, then run this cell again. "
+            "(Received shapes %s and %s; expected matching (rows, columns, 3) up to 12 x 12.)"
+            % (original.shape, changed.shape))
+    rows, columns = original.shape[:2]
     row, column = int(row), int(column)
-    if not 0 <= row < 5 or not 0 <= column < 5:
-        raise MagicMirrorError("row and column must be 0, 1, 2, 3, or 4.")
+    if not 0 <= row < rows or not 0 <= column < columns:
+        raise MagicMirrorError(
+            "For this matrix, row must be 0..%d and column must be 0..%d."
+            % (rows - 1, columns - 1))
     original = np.clip(original, 0, 255).astype(np.uint8)
     changed = np.clip(changed, 0, 255).astype(np.uint8)
     channel_changes = np.argwhere(original != changed)
@@ -1050,8 +1062,9 @@ def show_rgb_matrix_change(before, after, row=2, column=2):
     print("Selected position: row %d, column %d." % (row, column))
     print("Pixel before: %s | pixel after: %s." % (old_pixel, new_pixel))
     print("Changed channel values: %s." % (", ".join(descriptions) if descriptions else "none"))
-    print("Changed pixels: %d/25 | changed channel values: %d/75." %
-          (int(pixel_changes.sum()), len(channel_changes)))
+    print("Changed pixels: %d/%d | changed channel values: %d/%d." %
+          (int(pixel_changes.sum()), rows * columns,
+           len(channel_changes), rows * columns * 3))
     return _image_grid(
         (_rgb_matrix_picture(original), _rgb_matrix_picture(changed),
          _rgb_matrix_picture(difference)),
@@ -1071,10 +1084,11 @@ def _public_photo(file_name, size=None):
 
 
 def show_public_photo_gallery():
-    """Show locally bundled CC0 inputs with different tones, lighting, and texture."""
+    """Show locally bundled public-licence inputs with different tones, lighting, and texture."""
     pictures = [_public_photo(file_name, (200, 150)) for file_name, _ in PUBLIC_PHOTOS]
     labels = [label for _, label in PUBLIC_PHOTOS]
-    print("Three CC0 images are bundled with the lesson; the page does not hotlink them from another site.")
+    print("Four public images are bundled with the lesson; the page does not hotlink them from another site.")
+    print("Image 0 shows real acne, so the pipeline has visible work to do; the clear-skin images test the opposite case.")
     print("Different tones and lighting help you test where the hand-written RGB rule succeeds or fails.")
     return _image_grid(pictures, labels, columns=3, tile_size=(200, 150),
                        resample=Image.Resampling.LANCZOS)
@@ -1083,7 +1097,7 @@ def show_public_photo_gallery():
 def try_public_photo(index=0):
     """Run the student's complete pipeline on one public photo and expose every decision."""
     if not 0 <= int(index) < len(PUBLIC_PHOTOS):
-        raise MagicMirrorError("index must be 0, 1, or 2.")
+        raise MagicMirrorError("index must be 0..%d." % (len(PUBLIC_PHOTOS) - 1))
     file_name, label = PUBLIC_PHOTOS[int(index)]
     original = _public_photo(file_name, (200, 150))
     skin_mask = np.asarray(_student_function("detect_skin")(original))
@@ -1413,6 +1427,39 @@ def _mask_overlay(image, mask, color, alpha=0.55):
 
 _snapshot_status = ""
 
+SNAPSHOT_KERNELS = {
+    "gentle": ((1, 2, 1), (2, 4, 2), (1, 2, 1)),
+    "balanced": ((1, 1, 1), (1, 1, 1), (1, 1, 1)),
+    "strong": ((1, 1, 1), (1, 0, 1), (1, 1, 1)),
+    "wide": (
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+    ),
+}
+
+
+def _set_snapshot_kernel(name):
+    """The kernel buttons under the captured photo call this before re-running.
+
+    A student's own kernel_options entry (typed in the settings cell) wins over
+    the canonical grid, so hands-on edits stay visible in the camera result.
+    """
+    if name not in SNAPSHOT_KERNELS:
+        raise MagicMirrorError(
+            "Unknown kernel '%s'. Choose gentle, balanced, strong, or wide." % name)
+    kernel = SNAPSHOT_KERNELS[name]
+    custom = getattr(__main__, "kernel_options", None)
+    if isinstance(custom, dict) and name in custom:
+        candidate = np.asarray(custom[name], dtype=np.float32)
+        if candidate.shape in ((3, 3), (5, 5)):
+            kernel = custom[name]
+    __main__.kernel_choice = name
+    __main__.SOFTEN_KERNEL = kernel
+    return name
+
 
 def _pipeline_number(name, default, minimum, maximum):
     """Read one learner setting from the notebook and keep it in a safe range."""
@@ -1429,16 +1476,16 @@ def _pipeline_number(name, default, minimum, maximum):
 def _pipeline_settings():
     """Validate the kernel and strengths that learners may edit in the capstone cell."""
     kernel = np.asarray(getattr(__main__, "SOFTEN_KERNEL", SKIN_SOFTEN_KERNEL), dtype=np.float32)
-    if kernel.shape != (3, 3):
-        raise MagicMirrorError("SOFTEN_KERNEL must have exactly 3 rows and 3 columns.")
+    if kernel.shape not in ((3, 3), (5, 5)):
+        raise MagicMirrorError("SOFTEN_KERNEL must be a 3 x 3 or 5 x 5 grid of weights.")
     if not np.isfinite(kernel).all() or (kernel < 0).any() or float(kernel.sum()) <= 0:
-        raise MagicMirrorError("The nine SOFTEN_KERNEL weights must be non-negative and their total must exceed 0.")
+        raise MagicMirrorError("The SOFTEN_KERNEL weights must be non-negative and their total must exceed 0.")
     return {
         "kernel": kernel,
         "kernel_choice": str(getattr(__main__, "kernel_choice", "balanced")),
         "skin_strength": _pipeline_number("skin_smooth_strength", 0.55, 0, 1),
         "spot_strength": _pipeline_number("spot_smooth_strength", 0.90, 0, 1),
-        "brightness": _pipeline_number("skin_brightness", 10, -25, 25),
+        "brightness": _pipeline_number("skin_brightness", 5, -25, 25),
         "passes": int(_pipeline_number("skin_kernel_passes", 2, 1, 4)),
         "redness_sensitivity": _pipeline_number("redness_sensitivity", 1.6, 0.5, 4),
     }
@@ -1478,18 +1525,22 @@ def _adaptive_skin_pipeline(image, face_mask=None):
     skin = ndimage.uniform_filter(skin.astype(np.float32), size=5, mode="nearest") >= 0.45
     skin &= face
 
+    redness = red - (green + blue) / 2
+    local_redness = ndimage.gaussian_filter(redness, sigma=3, mode="nearest")
+    red_residual = redness - local_redness
+
     edge_x = ndimage.sobel(luminance, axis=1, mode="nearest")
     edge_y = ndimage.sobel(luminance, axis=0, mode="nearest")
     edge_strength = np.hypot(edge_x, edge_y)
     skin_edges = edge_strength[skin]
-    edge_limit = max(18.0, float(np.percentile(skin_edges, 82))) if skin_edges.size else 18.0
-    protected = ndimage.binary_dilation(edge_strength >= edge_limit, iterations=1) & face
+    edge_limit = max(24.0, float(np.percentile(skin_edges, 88))) if skin_edges.size else 24.0
+    # Mụn đỏ chính là "cạnh" mạnh nhất trên má nhiều mụn — nếu không loại vùng đỏ
+    # ra khỏi lớp bảo vệ chi tiết thì pipeline bảo vệ đúng thứ nó phải làm mềm.
+    reddish = ndimage.gaussian_filter((red_residual >= 2.0).astype(np.float32), sigma=1) > 0.2
+    protected = ndimage.binary_dilation(edge_strength >= edge_limit, iterations=1) & face & ~(reddish & skin)
     allowed = skin & ~protected
 
     student_spots = np.asarray(_student_function("detect_pimples")(source, basic_skin.astype(np.uint8) * 255)) > 0
-    redness = red - (green + blue) / 2
-    local_redness = ndimage.gaussian_filter(redness, sigma=3, mode="nearest")
-    red_residual = redness - local_redness
     samples = red_residual[allowed]
     if samples.size:
         median = float(np.median(samples))
@@ -1498,7 +1549,7 @@ def _adaptive_skin_pipeline(image, face_mask=None):
     else:
         red_limit = 4.0
     adaptive_spots = red_residual >= red_limit
-    spots = ndimage.binary_dilation(student_spots | adaptive_spots, iterations=1) & allowed
+    spots = ndimage.binary_dilation(student_spots | adaptive_spots, iterations=1) & skin & face
 
     student_cleaned = np.asarray(
         _require_image(_student_function("remove_pimples")(source), "remove_pimples"),
@@ -1515,13 +1566,17 @@ def _adaptive_skin_pipeline(image, face_mask=None):
         * settings["skin_strength"] * detail_keep * face,
         0, 1,
     )
+    # Vùng đỏ được kéo về MÀU DA quanh nó (gaussian theo kênh), không chỉ blur:
+    # kernel nhỏ chỉ làm mềm kết cấu, còn một mảng đỏ rộng phải đổi màu mới thấy.
+    # detail_keep không nhân vào đây — mụn thường nằm ngay trên "cạnh" của chính nó.
     spot_alpha = np.clip(
         ndimage.gaussian_filter(spots.astype(np.float32), sigma=0.9)
-        * settings["spot_strength"] * detail_keep * face,
+        * settings["spot_strength"] * face,
         0, 1,
     )
     result = pixels * (1 - skin_alpha[:, :, None]) + softened * skin_alpha[:, :, None]
-    spot_target = (student_cleaned + softened) / 2
+    background = ndimage.gaussian_filter(softened, sigma=(3, 3, 0), mode="nearest")
+    spot_target = (background * 2 + student_cleaned) / 3
     result = result * (1 - spot_alpha[:, :, None]) + spot_target * spot_alpha[:, :, None]
     brightness_alpha = np.clip(
         ndimage.gaussian_filter(allowed.astype(np.float32), sigma=1.5) * detail_keep * face,
@@ -1588,15 +1643,15 @@ def describe_skin_pipeline_settings():
 
 
 def preview_pro_skin_pipeline():
-    """Run the capstone pipeline on a bundled portrait before a personal photo is used."""
+    """Run the capstone pipeline on the bundled acne photo before a personal photo is used."""
     original = _public_photo(PUBLIC_PHOTOS[0][0], (320, 240))
     height, width = original.height, original.width
     y, x = np.ogrid[:height, :width]
     face = (((x - width * 0.50) / (width * 0.34)) ** 2
             + ((y - height * 0.48) / (height * 0.50)) ** 2 <= 1)
     data = _adaptive_skin_pipeline(original, face)
-    settings = data["settings"]
-    center_weight = float(settings["kernel"][1, 1] / settings["kernel"].sum())
+    kernel = data["settings"]["kernel"]
+    center_weight = float(kernel[kernel.shape[0] // 2, kernel.shape[1] // 2] / kernel.sum())
     print(_pipeline_report(data))
     print("Normalised centre-pixel weight = %.3f." % center_weight)
     print("DIFFERENCE ×6 brightens changed colours; dark areas were kept close to the input.")

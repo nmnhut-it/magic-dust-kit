@@ -2,6 +2,7 @@
 
 Các ảnh dưới đây được tải về project và thu nhỏ để dùng ngoại tuyến trong bài học. Không hotlink ảnh từ Wikimedia Commons.
 
+- `face-acne-cheek.jpg`: Dr. Gandikota Raghurama Rao, *0601 Acne Vulgaris*, CC BY 4.0 (bắt buộc ghi công — đã ghi ở đây và trong bài). Bản trong project được cắt bỏ khung sách rồi thu về 640 px. Nguồn: https://commons.wikimedia.org/wiki/File:0601_Acne_Vulgaris.jpg
 - `face-portrait-william-stitt.jpg`: William Stitt, *Face portrait (Unsplash)*, CC0 1.0. Nguồn: https://commons.wikimedia.org/wiki/File:Face_portrait_(Unsplash).jpg
 - `face-portrait-eddie-kopp.jpg`: Eddie Kopp, *Young woman's face (Unsplash)*, CC0 1.0. Nguồn: https://commons.wikimedia.org/wiki/File:Young_woman%27s_face_(Unsplash).jpg
 - `human-skin-closeup.jpg`: Montavius Howard (TongCreator), *Human skin close-up*, CC0 1.0. Nguồn: https://commons.wikimedia.org/wiki/File:Human_skin_close-up.jpg

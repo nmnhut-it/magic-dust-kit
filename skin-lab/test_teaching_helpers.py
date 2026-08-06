@@ -247,11 +247,44 @@ class TestTeachingHelpers(unittest.TestCase):
         self.assertIsInstance(pipeline, Image.Image)
         self.assertEqual(pipeline.size, (488, 412))
 
-    def test_public_cc0_gallery_loads_bundled_colour_images(self):
+    def test_public_gallery_loads_bundled_colour_images(self):
         with redirect_stdout(io.StringIO()):
             gallery = magic_mirror.show_public_photo_gallery()
-        self.assertEqual(gallery.size, (616, 172))
+        self.assertEqual(gallery.size, (616, 352))
         self.assertGreater(len(gallery.getcolors(maxcolors=gallery.width * gallery.height) or []), 100)
+
+    def test_matrix_change_demo_explains_a_stale_or_oversized_matrix(self):
+        stale = np.zeros((60, 80, 3), dtype=np.uint8)
+        with self.assertRaises(magic_mirror.MagicMirrorError) as caught:
+            magic_mirror.show_rgb_matrix_change(stale, stale.copy(), 2, 2)
+        self.assertIn("Run that cell first", str(caught.exception))
+
+    def test_matrix_change_demo_accepts_other_small_matrices(self):
+        before = np.full((4, 6, 3), 120, dtype=np.uint8)
+        after = before.copy()
+        after[1, 2, 0] = 200
+        output = io.StringIO()
+        with redirect_stdout(output):
+            picture = magic_mirror.show_rgb_matrix_change(before, after, 1, 2)
+        self.assertIn("Changed pixels: 1/24 | changed channel values: 1/72.", output.getvalue())
+        self.assertIsInstance(picture, Image.Image)
+
+    def test_snapshot_kernel_buttons_switch_the_capstone_kernel(self):
+        main_module = sys.modules["__main__"]
+        custom_gentle = ((0, 1, 0), (1, 4, 1), (0, 1, 0))
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(
+                main_module, "kernel_options", {"gentle": custom_gentle}, create=True))
+            stack.enter_context(patch.object(main_module, "kernel_choice", "wide", create=True))
+            stack.enter_context(patch.object(
+                main_module, "SOFTEN_KERNEL", magic_mirror.SNAPSHOT_KERNELS["wide"], create=True))
+            magic_mirror._set_snapshot_kernel("gentle")
+            self.assertEqual(main_module.kernel_choice, "gentle")
+            self.assertEqual(main_module.SOFTEN_KERNEL, custom_gentle)
+            magic_mirror._set_snapshot_kernel("wide")
+            self.assertEqual(np.asarray(main_module.SOFTEN_KERNEL).shape, (5, 5))
+        with self.assertRaises(magic_mirror.MagicMirrorError):
+            magic_mirror._set_snapshot_kernel("mystery")
 
     def test_grader_translates_unfilled_blanks_into_plain_instructions(self):
         def unfilled():

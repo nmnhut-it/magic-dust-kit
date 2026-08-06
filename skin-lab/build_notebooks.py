@@ -13,7 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HERE = pathlib.Path(__file__).resolve().parent
-COURSE_VERSION = "2026.08.06.9"
+COURSE_VERSION = "2026.08.06.10"
 PRACTICE_FILE = "Skin_Lab.ipynb"
 SOLUTION_FILE = "Skin_Lab_Answers.ipynb"
 TASK_ORDER = (
@@ -539,21 +539,30 @@ The starter function adds `40` to the blue channel and uses `np.clip` to keep ev
 Run it once. Then change the channel index or the added amount and state which visible change your new numbers caused.
 """
 
-PUBLIC_IMAGES = """## Test the simple rule on public photographs
+PUBLIC_IMAGES = """## Test your five functions on real photographs
 
-Three CC0 images are bundled with the lesson, so the page does not hotlink personal data: portraits by
-[William Stitt](https://commons.wikimedia.org/wiki/File:Face_portrait_(Unsplash).jpg) and
-[Eddie Kopp](https://commons.wikimedia.org/wiki/File:Young_woman%27s_face_(Unsplash).jpg), plus a skin close-up by
-[Montavius Howard](https://commons.wikimedia.org/wiki/File:Human_skin_close-up.jpg).
+Four public images are bundled with the lesson, so the page does not hotlink personal data: a cheek with real acne from a
+dermatology teaching collection by [Dr. Gandikota Raghurama Rao](https://commons.wikimedia.org/wiki/File:0601_Acne_Vulgaris.jpg)
+(CC BY 4.0), portraits by [William Stitt](https://commons.wikimedia.org/wiki/File:Face_portrait_(Unsplash).jpg) and
+[Eddie Kopp](https://commons.wikimedia.org/wiki/File:Young_woman%27s_face_(Unsplash).jpg), and a skin close-up by
+[Montavius Howard](https://commons.wikimedia.org/wiki/File:Human_skin_close-up.jpg) (those three CC0).
 
-Run `try_public_photo(0)`, then change the index to `1` and `2`. Each run shows the input, the skin overlay, the red-area
-overlay, and the output. Use the printed pixel counts and the overlays as evidence:
+Run `try_public_photo(0)` — the acne cheek, where the pipeline has real work to do — then change the index to `1`, `2`,
+or `3`. Each run shows the input, the skin overlay, the red-area overlay, and the output. Use the printed pixel counts
+and the overlays as evidence:
 
 - Where did the colour rule miss part of the intended region?
 - Where did it select a background or feature by mistake?
 - Which change could be caused by lighting rather than the subject?
 
-The goal is to test the limits of your code, not to make a claim about any person in the photographs.
+**Expect a surprise in the red region:** your `detect_pimples` may select nothing — even on the acne cheek. A real
+blotch is many pixels wide, so the 5 × 5 window sits *inside* the blotch: the local mean is almost as red as the centre,
+and the gap never reaches `24`. The drawn face worked because its spots were single bright pixels. That is not a bug in
+your code; it is the honest limit of a small window. The capstone below fixes it with a wider comparison and an adaptive
+threshold — watch its red-region count on the same photograph.
+
+The goal is to test the limits of your code, not to make a claim about any person in the photographs. The acne photo is
+a teaching image shared by its author; treat it the way a doctor would — skin to understand, not to judge.
 """
 
 FACE_GATE = """## Mechanism 6 — require both masks before changing a pixel
@@ -592,8 +601,11 @@ Your five functions are the foundation. The final program repeats ideas you alre
 
 1. Face Mesh draws a face boundary. Pixels outside it are kept.
 2. Colour rules make a skin-region mask. They use RGB plus a second way of separating lightness from colour.
-3. An edge filter finds strong changes around eyes, lips, hair, and the face outline. Those details are protected.
-4. Your 3 × 3 kernel smooths the remaining selected region. Locally red areas use a stronger blend.
+3. An edge filter finds strong changes around eyes, lips, hair, and the face outline. Those details are protected —
+   but locally red skin does not count as protected detail, otherwise the pipeline would protect the very blotches
+   it should soften.
+4. The kernel you choose smooths the selected region. Locally red areas are additionally pulled toward the
+   surrounding skin colour with a stronger blend.
 5. A small brightness value is added only where both the face and skin masks allow it.
 
 Under the hood, the second colour system is called Y/Cb/Cr, and the SciPy edge operation is called `sobel`. You do not need
@@ -605,6 +617,15 @@ Follow two pixels through those five steps:
   result and gains a little brightness.
 - A pixel on the **edge of the lips**: inside the face, but the edge filter marks it as protected detail — it keeps its
   original colour, which is why the mouth stays sharp.
+
+### How far does a kernel reach?
+
+One pass of a 3 × 3 kernel mixes each pixel only with neighbours **one step away**. Run it `n` times and information
+travels about `n` steps. A red blotch on a real photograph can be ten steps wide, so:
+
+- more `skin_kernel_passes`, or the **wide 5 × 5 kernel**, increase how far the smoothing reaches;
+- reach alone still cannot fix colour — averaging inside a red blotch only produces more red. That is why the red
+  region is also pulled toward the surrounding skin colour, not merely blurred.
 
 For one channel, suppose the original value is `200`, the kernel result is `188`, and `skin_smooth_strength = 0.55`:
 
@@ -620,8 +641,9 @@ The kernel decides the candidate smooth colour. `skin_smooth_strength` decides h
 
 ### Capstone task — choose and defend your settings
 
-- **Given:** three 3 × 3 kernels and safe ranges for all settings.
-- **INPUT:** the next cell uses a public portrait; the final cell accepts one captured or uploaded photograph.
+- **Given:** four kernels — `gentle`, `balanced`, `strong` (3 × 3) and `wide` (5 × 5) — and safe ranges for all settings.
+- **INPUT:** the next cell uses the bundled acne photograph, where the effect is easy to see; the final cell accepts one
+  captured or uploaded photograph.
 - **PROCESS:** change `kernel_choice`, then test one or more strengths, brightness, pass count, or the nine kernel weights.
 - **OUTPUT:** the report must name the kernel, weight total, strengths, and changed-pixel count. The five-panel figure must
   show input, skin region, red region, magnified difference, and final output.
@@ -630,10 +652,11 @@ Change one setting at a time. Use the difference panel and changed-pixel count�
 effect of your change.
 """
 
-PIPELINE_SETTINGS_CODE = """# Choose "gentle", "balanced", or "strong".
-kernel_choice = "balanced"
+PIPELINE_SETTINGS_CODE = """# Choose "gentle", "balanced", "strong", or "wide".
+# "wide" reaches two steps per pass, so its smoothing is clearly visible.
+kernel_choice = "wide"
 
-# You may also edit any of the nine weights.
+# You may also edit the weights of any kernel.
 kernel_options = {
     "gentle": (
         (1, 2, 1),
@@ -650,12 +673,19 @@ kernel_options = {
         (1, 0, 1),
         (1, 1, 1),
     ),
+    "wide": (
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+        (1, 1, 1, 1, 1),
+    ),
 }
 
 SOFTEN_KERNEL = kernel_options[kernel_choice]
 skin_smooth_strength = 0.55   # 0.00 keeps the input; 1.00 uses the full smooth colour
 spot_smooth_strength = 0.90   # red areas receive a stronger blend
-skin_brightness = 10          # add -25 to 25 inside the selected skin region
+skin_brightness = 5           # add -25 to 25 inside the selected skin region
 skin_kernel_passes = 2        # run the kernel 1 to 4 times
 redness_sensitivity = 1.6     # lower selects more red areas; higher selects fewer
 
@@ -670,6 +700,9 @@ PHOTO = """## Run the pipeline once on a photograph
   once; NumPy and SciPy then run the pipeline once on that still image.
 - **OUTPUT:** five panels show the input, allowed skin region, stronger red region, magnified colour difference, and final
   result. The report states how many pixels were selected, protected, and changed, plus your kernel and settings.
+- **Hands-on comparison:** after the result appears, press the kernel buttons under it — `gentle 3×3`, `balanced 3×3`,
+  `strong 3×3`, `wide 5×5`. Each press re-runs the whole pipeline on the **same** photograph, so the only thing that
+  changed is the kernel. Compare the reports and the difference panels: how much farther does a 5 × 5 kernel reach?
 
 The image stays only in this cell's visible output. It is not written to `localStorage`, and it disappears after a reload.
 Your code and progress remain. Processing uses 320 × 240 pixels and displays at 480 × 360 for a clear still-image result.
@@ -792,7 +825,8 @@ def build_skin_cells(solution):
                   ("concept:convolution_scan",)),
         markdown_cell("skin-convolution-transfer-note", CONVOLUTION_TRANSFER),
         code_cell("skin-convolution-transfer",
-                  CONVOLUTION_TRANSFER_A if solution else CONVOLUTION_TRANSFER_Q),
+                  CONVOLUTION_TRANSFER_A if solution else CONVOLUTION_TRANSFER_Q,
+                  ("student-work",)),
         markdown_cell("skin-task-convolve-note", TASK_CONVOLVE),
         code_cell("task-convolve-layer", blocks["convolve_layer"],
                   ("autoload", "task:convolve_layer")),
@@ -834,7 +868,7 @@ def build_skin_cells(solution):
         code_cell("skin-face-mesh-map", "magic_mirror.show_face_mesh_map()"),
         code_cell("skin-face-mask-pipeline", "magic_mirror.show_face_mask_pipeline()"),
         markdown_cell("skin-pro-pipeline-note", PRO_PIPELINE),
-        code_cell("skin-pipeline-settings", PIPELINE_SETTINGS_CODE, ("autoload",)),
+        code_cell("skin-pipeline-settings", PIPELINE_SETTINGS_CODE, ("autoload", "student-work")),
         code_cell("skin-pro-pipeline-preview", "magic_mirror.preview_pro_skin_pipeline()"),
         markdown_cell("skin-photo-note", PHOTO),
         code_cell("skin-photo", "magic_mirror.capture_skin_photo()"),

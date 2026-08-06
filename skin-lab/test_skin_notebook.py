@@ -29,12 +29,12 @@ class TestSkinNotebook(unittest.TestCase):
         practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
         answer_page = (ROOT / "dap-an.html").read_text(encoding="utf-8")
         self.assertIn('notebook: "Skin_Lab.ipynb"', practice_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.9", practice_page)
-        self.assertIn("assets/skin-mechanisms.js?v=2026.08.06.9", practice_page)
+        self.assertIn("assets/notebook.js?v=2026.08.06.10", practice_page)
+        self.assertIn("assets/skin-mechanisms.js?v=2026.08.06.10", practice_page)
         self.assertIn('href="dap-an.html"', practice_page)
         self.assertIn('href="../index.html"', practice_page)
         self.assertIn('notebook: "Skin_Lab_Answers.ipynb"', answer_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.9", answer_page)
+        self.assertIn("assets/notebook.js?v=2026.08.06.10", answer_page)
         self.assertIn('href="./"', answer_page)
         self.assertIn('href="../index.html"', answer_page)
 
@@ -224,9 +224,18 @@ class TestSkinNotebook(unittest.TestCase):
     def test_runtime_translates_blanks_and_refreshes_teaching_text(self):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         self.assertIn("Replace every ___ with your answer", runtime)
-        self.assertIn('if (cell.type !== "code") return;', runtime)
+        self.assertIn('tag.startsWith("task:") || tag === "student-work"', runtime)
+        self.assertIn('if (cell.type !== "code" || !holdsStudentWork) return;', runtime)
         helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
         self.assertIn("still contains ___ blanks", helpers)
+
+    def test_student_work_cells_are_the_only_restored_code_cells(self):
+        tagged = {
+            cell["id"]
+            for cell in self.practice["cells"]
+            if "student-work" in cell.get("metadata", {}).get("tags", [])
+        }
+        self.assertEqual(tagged, {"skin-convolution-transfer", "skin-pipeline-settings"})
 
     def test_route_has_no_training_dependency_or_diagnostic_claim(self):
         code = (ROOT / "skin_filters_solution.py").read_text(encoding="utf-8").lower()
@@ -276,15 +285,21 @@ class TestSkinNotebook(unittest.TestCase):
         for forbidden in ("Cam.stream", "toDataURL", "canvas", "imageData"):
             self.assertNotIn(forbidden, persistence.group(1))
 
-    def test_public_photos_are_local_cc0_assets(self):
+    def test_public_photos_are_local_free_licence_assets(self):
         sources = (ROOT / "assets" / "photos" / "SOURCES.md").read_text(encoding="utf-8")
         files = sorted((ROOT / "assets" / "photos").glob("*.jpg"))
-        self.assertEqual(len(files), 3)
+        self.assertEqual(len(files), 4)
         self.assertGreaterEqual(sources.count("CC0 1.0"), 3)
+        self.assertIn("CC BY 4.0", sources)
+        self.assertIn("Gandikota Raghurama Rao", sources)
         for photo in files:
             self.assertLess(photo.stat().st_size, 130_000)
             self.assertIn(photo.name, sources)
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        self.assertIn("Dr. Gandikota Raghurama Rao", lesson)
+        self.assertIn("your `detect_pimples` may select nothing", lesson)
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        self.assertIn('"face-acne-cheek.jpg"', runtime)
         self.assertIn("assets/photos/${file}", runtime)
         self.assertIn("FS.writeFile(`${CFG.pyodide.photosDir}/${file}`", runtime)
 
@@ -295,8 +310,12 @@ class TestSkinNotebook(unittest.TestCase):
             self.assertIn(phrase, lesson)
         self.assertIn("@mediapipe/face_mesh", runtime)
         self.assertIn("Capture one photo", lesson)
+        self.assertIn("press the kernel buttons under it", lesson)
         self.assertIn("Capture one photo", runtime)
         self.assertIn("Choose an image file", runtime)
+        self.assertIn("Try another kernel on the same photo:", runtime)
+        self.assertIn('Kernel.callBridge("_set_snapshot_kernel", [name])', runtime)
+        self.assertIn("Snapshot.renderPipeline()", runtime)
         self.assertIn("Snapshot.stopStream();", runtime)
         self.assertIn("faceMaskBytes(landmarks", runtime)
         self.assertIn('Kernel.callBridge("_skin_snapshot"', runtime)
@@ -310,11 +329,12 @@ class TestSkinNotebook(unittest.TestCase):
         settings = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-pipeline-settings")
         self.assertIn("autoload", settings["metadata"]["tags"])
         for phrase in (
-            'kernel_choice = "balanced"', "SOFTEN_KERNEL = kernel_options[kernel_choice]",
+            'kernel_choice = "wide"', "SOFTEN_KERNEL = kernel_options[kernel_choice]",
             "skin_smooth_strength = 0.55", "spot_smooth_strength = 0.90",
-            "skin_brightness = 10", "skin_kernel_passes = 2",
+            "skin_brightness = 5", "skin_kernel_passes = 2",
             "mixed = 200 × (1 - 0.55) + 188 × 0.55",
             "skin region", "red region", "difference panel",
+            "How far does a kernel reach?",
         ):
             self.assertIn(phrase, lesson)
 

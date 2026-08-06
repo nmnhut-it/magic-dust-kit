@@ -16,6 +16,18 @@ Lesson structure (one continuous trail for young learners):
   same number, and every note lists its `___` blanks one by one.
 - A survival kit up front: cell-type legend, error first-aid table, and a
   glossary cell (`skin-glossary`).
+- Four bundled photos (`assets/photos/`): the default index `0` is a real acne
+  cheek (CC BY 4.0, credited) so the pipeline visibly has work to do; the lesson
+  explains why the student's 5 × 5 rule may find nothing on real photographs,
+  and the capstone answers it (adaptive threshold, `wide` 5 × 5 kernel default,
+  red areas pulled toward the surrounding skin colour, red skin excluded from
+  edge protection).
+- After the one-photo capture, kernel buttons under the result re-run the
+  pipeline on the same captured image (`Snapshot.renderPipeline` +
+  `magic_mirror._set_snapshot_kernel`), so students compare `gentle/balanced/
+  strong 3×3` against `wide 5×5` hands-on without reopening the camera; a
+  custom `kernel_options` entry typed in the settings cell wins over the
+  canonical weights.
 
 Source files:
 
@@ -37,10 +49,14 @@ node test-skin-browser.mjs
 ```
 
 Autosave stores code, progress, mechanism state, and the current cell in this
-browser. Only **code** cells restore from the save; markdown always loads fresh
-from the deployed notebook, so teaching-text fixes reach returning students.
-A captured or uploaded image is not written to `localStorage`. Students can
-download the notebook to move their code to another device.
+browser. Only cells holding student work restore from the save — the five
+`task:*` cells, the two `student-work` cells (transfer answers and capstone
+settings), and student-added `user-*` cells. Markdown and observation code
+always load fresh from the deployed notebook: a save written by an older
+release once restored a different `numpy-array` cell under the same id and
+crashed the newer change-one-number demo. A captured or uploaded image is not
+written to `localStorage`. Students can download the notebook to move their
+code to another device.
 
 Unfilled `___` blanks are translated for learners in both error paths: a cell
 run appends "Replace every ___ with your answer …" (`notebook.js
