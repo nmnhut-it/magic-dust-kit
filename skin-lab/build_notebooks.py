@@ -13,7 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HERE = pathlib.Path(__file__).resolve().parent
-COURSE_VERSION = "2026.08.06.4"
+COURSE_VERSION = "2026.08.06.5"
 PRACTICE_FILE = "Skin_Lab.ipynb"
 SOLUTION_FILE = "Skin_Lab_Answers.ipynb"
 TASK_ORDER = (
@@ -76,16 +76,18 @@ Sau khi hiểu sáu bước trên ảnh nhỏ, em sẽ dùng **NumPy** và **Sci
 Cuối bài, **MediaPipe Face Mesh** giới hạn vùng được phép xử lý vào bên trong khuôn mặt.
 
 Đây là bài học về thuật toán xử lý ảnh, **không phải công cụ chẩn đoán hay đánh giá làn da**. Luật màu trong bài
-có thể nhận sai khi ánh sáng, camera, màu da hoặc màu nền thay đổi.
+có thể nhận sai khi ánh sáng, thiết bị chụp, màu da hoặc màu nền thay đổi.
 
 Trang tự lưu code, lựa chọn trong các bảng và chặng em đã hoàn thành trên máy này. Em có thể đóng trang rồi quay lại.
-Ảnh camera không được lưu. Muốn chuyển bài sang máy khác, em bấm **Tải notebook**.
+Ảnh em chụp chỉ được dùng để tạo OUTPUT trên trang, không được đưa vào phần tự lưu. Muốn chuyển bài sang máy khác,
+em bấm **Tải notebook**.
 """
 
 SETUP = """## Trước khi bắt đầu
 
-Chạy hai ô dưới. Ô đầu mở hình minh họa và camera. Ô thứ hai chuẩn bị NumPy, SciPy, Pillow cùng các con số dùng
-trong bài. Em chưa cần sửa hai ô này.
+Chạy hai ô dưới. Ô đầu mở các hình minh họa. Ô thứ hai chuẩn bị NumPy, SciPy, Pillow cùng các con số dùng trong bài.
+Em chưa cần sửa hai ô này. Đến cuối bài, em mới mở camera để chụp một tấm ảnh.
+Ảnh 7×7 và ảnh tổng hợp có khuôn mặt đã cho sẵn, nên em vẫn làm được các bước chính mà không cần ảnh cá nhân.
 
 Mỗi nhiệm vụ sau đó đều ghi rõ: dữ liệu nào đã cho sẵn, INPUT nào đến từ bên ngoài, em cần viết gì và OUTPUT nào
 chứng minh hàm đã đúng. Sau khi sửa một hàm, chạy ô xem kết quả ngay dưới hàm đó.
@@ -190,7 +192,7 @@ Với nền xanh `(35, 80, 185)`, `warmth = 35 - 185 = -150`. Điều kiện c�
 TASK_EVIDENCE = """### Nhiệm vụ 2 — Hoàn thành `skin_evidence`
 
 - **Dữ liệu đã cho sẵn:** `red`, `green`, `blue` là ba số, hoặc ba bảng số có cùng kích thước.
-- **INPUT thật:** chưa có ở đây. Sau này `detect_skin` sẽ đưa màu của ảnh hoặc camera vào hàm.
+- **INPUT thật:** chưa có ở đây. Sau này `detect_skin` sẽ đưa màu của một ảnh vào hàm.
 - **Em cần viết:** tính `warmth = red - blue`, `red_green_gap = red - green`, rồi đưa `looks_like_skin` vào `np.where`.
 - **OUTPUT để kiểm tra:** `(183, 127, 103)` trả `255`; `(35, 80, 185)` trả `0`. Nếu INPUT là ba bảng, OUTPUT là
   một bảng `uint8` có cùng số hàng và cột.
@@ -213,7 +215,7 @@ Ta đếm `0/1` vì kết quả dễ đọc hơn việc tính trung bình của 
 TASK_SKIN = """### Nhiệm vụ 3 — Hoàn thành `detect_skin`
 
 - **Dữ liệu đã cho sẵn:** ảnh PIL `img`, bảng 3×3 toàn số `1` và mức tối thiểu `5`.
-- **INPUT thật:** một ảnh; ở cuối bài, mỗi khung hình camera là một INPUT mới.
+- **INPUT thật:** một ảnh; ở cuối bài, đó là tấm ảnh em vừa chụp hoặc chọn từ máy.
 - **Em cần viết:** đổi `raw_mask` từ `0/255` thành `binary` chỉ có `0/1`; dùng `convolve_layer` để đếm; so
   `neighbour_count` với `SKIN_NEIGHBOURS_NEEDED`.
 - **OUTPUT để kiểm tra:** một bảng `uint8` chỉ có `0/255`. Pixel đỏ giữa vùng da phải là `255`; pixel giữa ảnh nền
@@ -286,7 +288,7 @@ Vì vậy chương trình có thể tính màu mềm cho cả ảnh, nhưng ch�
 TASK_REMOVE = """### Nhiệm vụ 5 — Hoàn thành `remove_pimples`
 
 - **Dữ liệu đã cho sẵn:** ảnh `img`, bảng trọng số và bốn hàm em vừa hoàn thành.
-- **INPUT thật:** một ảnh PIL; cuối bài, đây là khung hình camera vừa nhận được.
+- **INPUT thật:** một ảnh PIL; cuối bài, đây là tấm ảnh em vừa chụp hoặc chọn từ máy.
 - **Em cần viết:** đưa `pixels` vào `ndimage.convolve`; đưa `pimple_mask` vào điều kiện của `np.where`.
   `pimple_mask[:, :, None]` dùng cùng một lựa chọn cho cả ba số R, G, B của mỗi pixel.
 - **OUTPUT để kiểm tra:** một ảnh PIL cùng kích thước. Pixel đỏ giữa ảnh bớt nổi bật, pixel ở góc giữ nguyên và ảnh INPUT
@@ -371,20 +373,22 @@ output    = np.where(allowed[..., None], cleaned, original)
 nó không chẩn đoán da và không tự tìm vùng đỏ.
 """
 
-CAMERA = """## Chạy với INPUT thật từ camera
+PHOTO = """## Chụp một tấm ảnh rồi chạy chương trình
 
-Mỗi khung hình camera đi qua đúng các bước em vừa học. Trên màn hình, bật **Hiện đường viền Face Mesh** để thấy vùng
-MediaPipe tìm được. Chọn **Nét (320×240)** nếu hình còn rỗ và máy chạy ổn; chọn **Cân bằng (240×180)** hoặc
-**Tiết kiệm (160×120)** nếu máy xử lý chậm. Trình duyệt phóng kết quả lên 480×360 và làm mượt khi hiển thị, nên độ nét
-phụ thuộc cả kích thước xử lý lẫn camera thật.
+- **Dữ liệu đã cho sẵn:** năm hàm xử lý ảnh em đã viết và các điểm viền mặt của MediaPipe Face Mesh.
+- **INPUT thật:** đúng một tấm ảnh em vừa chụp. Nếu không mở được camera, em bấm **Chọn ảnh từ máy**.
+- **Em cần làm:** chạy ô dưới, căn khuôn mặt vào khung rồi bấm **Chụp một tấm**. Camera dừng ngay sau khi chụp.
+  Face Mesh tìm đường bao khuôn mặt một lần; NumPy và SciPy cũng chỉ chạy một lần trên tấm ảnh đó.
+- **OUTPUT để kiểm tra:** hình bên trái là ảnh INPUT có đường bao Face Mesh. Hình bên phải là ảnh sau khi chạy năm hàm.
+  Dòng chữ dưới các nút cho biết chương trình đã tìm thấy khuôn mặt hay đã phải xử lý toàn bộ ảnh.
 
-Ảnh được xử lý ngay trong trình duyệt và không được đưa vào localStorage. Nếu camera bị chặn, em vẫn có thể hoàn thành
-toàn bộ bài bằng ảnh 7×7, ảnh tổng hợp và ba ảnh công khai ở trên.
+Ảnh được giữ trong OUTPUT của ô này để em quan sát, nhưng không được đưa vào `localStorage`. Khi em tải lại trang,
+ảnh sẽ biến mất; code và tiến độ vẫn còn. Bài dùng kích thước xử lý 320×240 và hiển thị ở 480×360 để hình đủ rõ.
 """
 
 REFLECT = """## Ghi lại điều em quan sát được
 
-Sau khi thử ảnh mẫu hoặc camera, hãy thêm một ô code hoặc ô chữ và ghi ba ý:
+Sau khi thử ảnh mẫu hoặc ảnh em vừa chụp, hãy thêm một ô code hoặc ô chữ và ghi ba ý:
 
 1. Một trường hợp luật nhận đúng vùng cần xử lý.
 2. Một vật hoặc ánh sáng làm luật nhận nhầm.
@@ -509,8 +513,8 @@ def build_skin_cells(solution):
         markdown_cell("skin-face-mesh-note", FACE_MESH),
         code_cell("skin-face-mesh-map", "magic_mirror.show_face_mesh_map()"),
         code_cell("skin-face-mask-pipeline", "magic_mirror.show_face_mask_pipeline()"),
-        markdown_cell("skin-camera-note", CAMERA),
-        code_cell("skin-camera", "magic_mirror.run()"),
+        markdown_cell("skin-photo-note", PHOTO),
+        code_cell("skin-photo", "magic_mirror.capture_skin_photo()"),
         markdown_cell("skin-reflect", REFLECT),
     ]
 

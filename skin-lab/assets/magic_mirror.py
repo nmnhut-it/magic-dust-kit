@@ -28,10 +28,11 @@ and the student writes a grid flip plus an if/else:
 
 Skin Lab only (/skin-lab/), where the student writes one reusable convolution
 layer and a no-training skin / red-spot pipeline:
-    skin_intro()               explain the static and live workflow
+    skin_intro()               explain the still-photo workflow
     show_skin_sample()         synthetic portrait; works without camera
     skin_demo()                original, skin mask, spot mask, cleaned result
     check_skin_code()          grade the five Skin Lab functions
+    capture_skin_photo()       capture one photo, stop camera, process once
 
 The filter functions are looked up in the notebook on EVERY frame, so re-running
 the filter cell changes the live picture immediately - no camera restart needed.
@@ -584,6 +585,14 @@ def stop():
     js.MagicMirrorUI.stop()
 
 
+def capture_skin_photo():
+    """Open the one-photo input used by the Skin Lab capstone."""
+    ui = getattr(js, "MagicMirrorUI", None)
+    if ui is None or not hasattr(ui, "snapshot"):
+        raise MagicMirrorError("Không mở được công cụ chụp ảnh. Hãy tải lại trang bằng Ctrl+F5.")
+    ui.snapshot()
+
+
 def show(value):
     """Render a cell result: a PIL image becomes a picture, anything else becomes text."""
     if value is None:
@@ -719,7 +728,8 @@ def skin_intro():
     print("Em sẽ theo dõi một pixel: lấy ba số RGB, kiểm tra điều kiện, nhìn các pixel xung quanh rồi chọn màu đầu ra.")
     print("Sau mỗi ví dụ số đều có hình cho biết pixel nào đang được nói đến.")
     print("Face Mesh có sẵn sẽ tìm đường bao khuôn mặt; em không phải huấn luyện một mô hình mới.")
-    print("Trang tự lưu code và tiến độ, nhưng không lưu ảnh camera. Bài này không dùng để chẩn đoán da.")
+    print("Trang tự lưu code và tiến độ. Tấm ảnh em chụp không được đưa vào phần tự lưu.")
+    print("Bài này không dùng để chẩn đoán da.")
 
 
 def set_spark(color=None, count=None):
@@ -1024,7 +1034,7 @@ def show_face_mask_pipeline():
         (original, _mask_picture(face_mask, (95, 238, 220)),
          _mask_picture(skin_mask, (245, 204, 166)),
          _mask_overlay(original, allowed, (255, 210, 80), 0.65)),
-        ("ẢNH CAMERA", "VÙNG KHUÔN MẶT", "VÙNG DA RGB", "VÙNG ĐƯỢC PHÉP ĐỔI"),
+        ("ẢNH INPUT", "VÙNG KHUÔN MẶT", "VÙNG DA RGB", "VÙNG ĐƯỢC PHÉP ĐỔI"),
         columns=2, tile_size=(240, 180),
     )
 
@@ -1230,7 +1240,7 @@ def skin_sample_image(size=DEMO_SIZE):
 def show_skin_sample():
     """Show the fixed Skin Lab input before students write any detector."""
     print("Ảnh mẫu có nền xanh, khuôn mặt và ba vùng đỏ được đặt trên má.")
-    print("Em có thể dùng ảnh này khi camera bị chặn; bài không cần ảnh cá nhân.")
+    print("Đây là ảnh cho sẵn để em học cơ chế trước khi tự chụp một tấm ở cuối bài.")
     return skin_sample_image().resize(OUTPUT_SIZE, Image.Resampling.NEAREST)
 
 
@@ -1562,4 +1572,4 @@ def check_skin_code():
     print("-" * 54)
     print("Kết quả: %d/%d phần đã đúng." % (passed, len(SKIN_TESTS)))
     if passed == len(SKIN_TESTS):
-        print("Tốt! Chạy magic_mirror.skin_demo(), rồi mới thử camera bằng run().")
+        print("Tốt! Chạy magic_mirror.skin_demo(), rồi chụp một tấm bằng capture_skin_photo().")

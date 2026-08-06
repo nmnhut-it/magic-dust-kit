@@ -139,7 +139,7 @@ class TestSkinNotebook(unittest.TestCase):
             self.assertIn("INPUT", task_text)
             self.assertIn("Em cần viết", task_text)
             self.assertIn("OUTPUT", task_text)
-        self.assertIn("Ảnh camera không được lưu", lesson)
+        self.assertIn("Ảnh em chụp chỉ được dùng để tạo OUTPUT", lesson)
 
     def test_route_has_no_training_dependency_or_diagnostic_claim(self):
         code = (ROOT / "skin_filters_solution.py").read_text(encoding="utf-8").lower()
@@ -166,7 +166,7 @@ class TestSkinNotebook(unittest.TestCase):
                     self.assertEqual(cell["outputs"], [])
                     self.assertIsNone(cell["execution_count"])
 
-    def test_runtime_saves_by_stable_id_and_never_persists_camera_images(self):
+    def test_runtime_saves_by_stable_id_and_never_persists_captured_images(self):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         self.assertIn("magic-dust-kit:skin-lab:", runtime)
         self.assertIn("cells: {}, passed: [], widgets: {}, concepts: []", runtime)
@@ -199,22 +199,28 @@ class TestSkinNotebook(unittest.TestCase):
         self.assertIn("assets/photos/${file}", runtime)
         self.assertIn("FS.writeFile(`${CFG.pyodide.photosDir}/${file}`", runtime)
 
-    def test_face_mesh_is_the_camera_capstone_and_spells_are_not_skin_controls(self):
+    def test_face_mesh_is_the_one_photo_capstone(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "tối đa 478 điểm"):
             self.assertIn(phrase, lesson)
         self.assertIn("@mediapipe/face_mesh", runtime)
-        self.assertIn("if (!SKIN)", runtime)
-        self.assertIn('"Hiện đường viền Face Mesh"', runtime)
+        self.assertIn("Chụp một tấm", lesson)
+        self.assertIn("Chụp một tấm", runtime)
+        self.assertIn("Chọn ảnh từ máy", runtime)
+        self.assertIn("Snapshot.stopStream();", runtime)
+        self.assertIn("faceMaskBytes(landmarks", runtime)
+        photo_cell = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-photo")
+        self.assertEqual(source(photo_cell), "magic_mirror.capture_skin_photo()")
+        self.assertNotIn("magic_mirror.run()", lesson)
 
-    def test_camera_has_smooth_display_and_three_quality_levels(self):
+    def test_one_photo_uses_high_quality_smooth_display(self):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         styles = (ROOT / "assets" / "notebook.css").read_text(encoding="utf-8")
-        for label in ("Tiết kiệm (160×120)", "Cân bằng (240×180)", "Nét (320×240)"):
-            self.assertIn(label, runtime)
-        self.assertIn(".cam-out{image-rendering:auto", styles)
-        self.assertIn("Trình duyệt phóng kết quả lên 480×360 và làm mượt", "\n".join(
+        self.assertIn("const level = CFG.quality[2]", runtime)
+        self.assertIn(".snapshot-results canvas", styles)
+        self.assertIn("image-rendering:auto", styles)
+        self.assertIn("kích thước xử lý 320×240 và hiển thị ở 480×360", "\n".join(
             source(cell) for cell in self.practice["cells"]
         ))
 

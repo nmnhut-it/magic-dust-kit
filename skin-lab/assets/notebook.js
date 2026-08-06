@@ -229,6 +229,7 @@ const Kernel = {
 
   async restart() {
     Cam.stop();
+    Snapshot.stop();
     Kernel.setState("loading", "Đang khởi động lại…");
     Kernel.py = null;
     await Kernel.boot();
@@ -899,11 +900,259 @@ const Cam = {
   },
 };
 
+/* ------------------------ chụp một ảnh cho Skin Lab ------------------------ */
+const Snapshot = {
+  host: null, wrap: null, stream: null, video: null, sourceCanvas: null,
+  inputCanvas: null, outputCanvas: null, message: null, captureButton: null,
+  results: null, faceMesh: null,
+
+  start() {
+    Snapshot.stop();
+    Snapshot.host = Nb.currentOutput;
+    if (!Snapshot.host) return;
+    Snapshot.build(Snapshot.host);
+    Snapshot.openCamera();
+  },
+
+  build(host) {
+    host.textContent = "";
+    const wrap = document.createElement("section");
+    wrap.className = "snapshot-lab";
+
+    const intro = document.createElement("div");
+    intro.className = "snapshot-intro";
+    intro.innerHTML = "<strong>INPUT là một tấm ảnh.</strong> Căn khuôn mặt vào khung rồi bấm Chụp một tấm. " +
+      "Camera sẽ dừng ngay; NumPy, SciPy và Face Mesh chỉ chạy một lần trên ảnh vừa chụp.";
+
+    const live = document.createElement("div");
+    live.className = "snapshot-live";
+    const video = document.createElement("video");
+    video.autoplay = true; video.playsInline = true; video.muted = true;
+    live.appendChild(video);
+
+    const bar = document.createElement("div");
+    bar.className = "snapshot-bar";
+    const capture = document.createElement("button");
+    capture.type = "button"; capture.className = "btn primary";
+    capture.textContent = "Chụp một tấm"; capture.disabled = true;
+    capture.onclick = () => Snapshot.capturePhoto();
+    const retry = document.createElement("button");
+    retry.type = "button"; retry.className = "btn"; retry.textContent = "Mở lại camera";
+    retry.onclick = () => Snapshot.openCamera();
+    const choose = document.createElement("label");
+    choose.className = "btn"; choose.textContent = "Chọn ảnh từ máy";
+    const picker = document.createElement("input");
+    picker.type = "file"; picker.accept = "image/*"; picker.hidden = true;
+    picker.onchange = () => Snapshot.useFile(picker.files?.[0]);
+    choose.appendChild(picker);
+    bar.append(capture, retry, choose);
+
+    const message = document.createElement("p");
+    message.className = "snapshot-message";
+    message.textContent = "Đang xin quyền mở camera…";
+
+    const results = document.createElement("div");
+    results.className = "snapshot-results hidden";
+    const makeResult = (label) => {
+      const figure = document.createElement("figure");
+      const canvas = document.createElement("canvas");
+      canvas.width = CFG.capture.w; canvas.height = CFG.capture.h;
+      figure.append(canvas, Object.assign(document.createElement("figcaption"), { textContent: label }));
+      results.appendChild(figure);
+      return canvas;
+    };
+    const inputCanvas = makeResult("Ảnh vừa chụp và đường bao Face Mesh");
+    const outputCanvas = makeResult("OUTPUT sau khi chạy NumPy và SciPy");
+
+    wrap.append(intro, live, bar, message, results);
+    host.appendChild(wrap);
+    Object.assign(Snapshot, {
+      wrap, video, captureButton: capture, message, results, inputCanvas, outputCanvas,
+    });
+    return wrap;
+  },
+
+  async openCamera() {
+    Snapshot.stopStream();
+    if (!Snapshot.video || !Snapshot.message) return;
+    Snapshot.captureButton.disabled = true;
+    Snapshot.message.textContent = "Đang xin quyền mở camera…";
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("camera unavailable");
+      Snapshot.stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+      });
+      Snapshot.video.srcObject = Snapshot.stream;
+      await Snapshot.video.play();
+      Snapshot.captureButton.disabled = false;
+      Snapshot.message.textContent = "Camera đã sẵn sàng. Bấm Chụp một tấm; camera sẽ dừng ngay sau đó.";
+    } catch (error) {
+      Snapshot.stopStream();
+      Snapshot.message.textContent = "Không mở được camera. Camera có thể đang được Zoom, Meet hoặc ứng dụng khác sử dụng. " +
+        "Hãy đóng ứng dụng đó và bấm Mở lại camera, hoặc bấm Chọn ảnh từ máy.";
+    }
+  },
+
+  drawCover(ctx, source, sourceWidth, sourceHeight) {
+    const targetWidth = CFG.capture.w, targetHeight = CFG.capture.h;
+    const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
+    const cropWidth = targetWidth / scale, cropHeight = targetHeight / scale;
+    const sourceX = (sourceWidth - cropWidth) / 2;
+    const sourceY = (sourceHeight - cropHeight) / 2;
+    ctx.drawImage(source, sourceX, sourceY, cropWidth, cropHeight, 0, 0, targetWidth, targetHeight);
+  },
+
+  capturePhoto() {
+    if (!Snapshot.video?.videoWidth) {
+      Snapshot.message.textContent = "Camera chưa có hình. Chờ một chút rồi bấm Chụp một tấm lần nữa.";
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = CFG.capture.w; canvas.height = CFG.capture.h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.save();
+    ctx.translate(CFG.capture.w, 0); ctx.scale(-1, 1);
+    Snapshot.drawCover(ctx, Snapshot.video, Snapshot.video.videoWidth, Snapshot.video.videoHeight);
+    ctx.restore();
+    Snapshot.stopStream();
+    Snapshot.processCanvas(canvas);
+  },
+
+  async useFile(file) {
+    if (!file) return;
+    Snapshot.stopStream();
+    try {
+      const bitmap = await createImageBitmap(file);
+      const canvas = document.createElement("canvas");
+      canvas.width = CFG.capture.w; canvas.height = CFG.capture.h;
+      Snapshot.drawCover(canvas.getContext("2d", { willReadFrequently: true }), bitmap, bitmap.width, bitmap.height);
+      bitmap.close?.();
+      await Snapshot.processCanvas(canvas);
+    } catch (error) {
+      Snapshot.message.textContent = "Không đọc được tệp ảnh này. Hãy chọn ảnh JPG, PNG hoặc WebP khác.";
+    }
+  },
+
+  async detectFace(canvas) {
+    try {
+      if (!window.FaceMesh) {
+        const config = CFG.mediapipe.face;
+        await Kernel.loadScript(config.base + config.script);
+      }
+      const config = CFG.mediapipe.face;
+      const mesh = new FaceMesh({ locateFile: (file) => config.base + file });
+      Snapshot.faceMesh = mesh;
+      mesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.6 });
+      const landmarks = await new Promise((resolve) => {
+        let finished = false;
+        const finish = (value) => {
+          if (finished) return;
+          finished = true; resolve(value);
+        };
+        mesh.onResults((result) => finish(result.multiFaceLandmarks?.[0] || []));
+        Promise.resolve(mesh.send({ image: canvas })).catch(() => finish([]));
+        setTimeout(() => finish([]), 12_000);
+      });
+      mesh.close?.();
+      Snapshot.faceMesh = null;
+      return landmarks;
+    } catch (error) {
+      Snapshot.faceMesh = null;
+      return [];
+    }
+  },
+
+  faceOval(landmarks) {
+    const order = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,
+      152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
+    return order.map((index) => landmarks[index]).filter(Boolean);
+  },
+
+  faceMaskBytes(landmarks, width, height) {
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const oval = Snapshot.faceOval(landmarks);
+    if (oval.length) {
+      ctx.fillStyle = "#fff"; ctx.beginPath();
+      oval.forEach((point, index) => {
+        const x = point.x * width, y = point.y * height;
+        if (index) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      });
+      ctx.closePath(); ctx.fill();
+    }
+    const rgba = ctx.getImageData(0, 0, width, height).data;
+    const mask = new Uint8Array(width * height);
+    for (let index = 0; index < mask.length; index++) mask[index] = rgba[index * 4 + 3];
+    return mask;
+  },
+
+  drawFaceOutline(canvas, landmarks) {
+    const ctx = canvas.getContext("2d");
+    const oval = Snapshot.faceOval(landmarks);
+    if (!oval.length) return;
+    ctx.strokeStyle = CFG.sparkColors.honey; ctx.lineWidth = 4; ctx.beginPath();
+    oval.forEach((point, index) => {
+      const x = point.x * canvas.width, y = point.y * canvas.height;
+      if (index) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    });
+    ctx.closePath(); ctx.stroke();
+  },
+
+  async processCanvas(canvas) {
+    if (!Kernel.py || Kernel.state !== "ready") {
+      Snapshot.message.textContent = "Python chưa sẵn sàng. Chờ góc trên bên phải hiện Kernel sẵn sàng rồi thử lại.";
+      return;
+    }
+    Snapshot.results.classList.remove("hidden");
+    const inputContext = Snapshot.inputCanvas.getContext("2d");
+    inputContext.clearRect(0, 0, CFG.capture.w, CFG.capture.h);
+    inputContext.drawImage(canvas, 0, 0);
+    Snapshot.message.textContent = "Đang dùng Face Mesh để tìm đường bao khuôn mặt…";
+    const landmarks = await Snapshot.detectFace(canvas);
+    Snapshot.drawFaceOutline(Snapshot.inputCanvas, landmarks);
+
+    const level = CFG.quality[2];
+    const source = canvas.getContext("2d", { willReadFrequently: true })
+      .getImageData(0, 0, CFG.capture.w, CFG.capture.h).data;
+    const faceMask = landmarks.length ? Snapshot.faceMaskBytes(landmarks, level.w, level.h) : null;
+    try {
+      const bytes = Kernel.callBridge("_frame", [
+        new Uint8Array(source.buffer.slice(0)), CFG.capture.w, CFG.capture.h,
+        CFG.fingerMax, level.w, level.h, 0, faceMask,
+      ]);
+      Snapshot.outputCanvas.getContext("2d").putImageData(
+        new ImageData(new Uint8ClampedArray(bytes), CFG.capture.w, CFG.capture.h), 0, 0);
+      Snapshot.message.textContent = landmarks.length
+        ? "Đã tìm thấy khuôn mặt. OUTPUT chỉ đổi pixel nằm trong face_mask và vùng mà thuật toán đã chọn."
+        : "Face Mesh chưa tìm thấy khuôn mặt. NumPy và SciPy vẫn chạy một lần trên toàn bộ ảnh để em xem kết quả.";
+    } catch (error) {
+      Snapshot.outputCanvas.getContext("2d").drawImage(canvas, 0, 0);
+      Snapshot.message.textContent = "Chưa chạy được ảnh: " + String(error?.message || error).split("\n").pop();
+    }
+  },
+
+  stopStream() {
+    if (Snapshot.stream) Snapshot.stream.getTracks().forEach((track) => track.stop());
+    Snapshot.stream = null;
+    if (Snapshot.video) Snapshot.video.srcObject = null;
+    if (Snapshot.captureButton) Snapshot.captureButton.disabled = true;
+  },
+
+  stop() {
+    Snapshot.stopStream();
+    Snapshot.faceMesh?.close?.();
+    Snapshot.faceMesh = null;
+  },
+};
+
 /** Cầu nối mà phía Python gọi sang. */
 window.MagicMirrorUI = {
   start: () => Cam.start(),
   stop: () => Cam.stop(),
   emit: (kind, data) => Nb.emit(kind, data),
+  snapshot: () => { Snapshot.start(); },
   mechanism: (id, kind) => Nb.showMechanism(id, kind),
   progress: (taskId, passed) => Nb.recordTask(taskId, Boolean(passed)),
   /** magic_mirror.set_spark() gọi vào đây để đổi màu / số lượng bụi phép. */
@@ -1230,6 +1479,7 @@ const Nb = {
   async runCell(idx) {
     const cell = Nb.cells[idx];
     if (!cell) return;
+    if (Snapshot.stream && Snapshot.host !== cell.outEl) Snapshot.stopStream();
     Nb.focusCell(idx, false);
     if (cell.type === "markdown") { cell.editing = false; Nb.render(); return; }
     if (Kernel.state === "loading") return;
@@ -1263,6 +1513,7 @@ const Nb = {
   },
 
   clearOutputs() {
+    Snapshot.stop();
     Nb.counter = 0;
     Nb.cells.forEach((c) => {
       c.count = null;
@@ -1325,6 +1576,7 @@ const App = {
       if (!window.confirm("Xóa toàn bộ code và tiến độ Skin Lab đã tự lưu trên máy này?")) return;
       localStorage.removeItem(Nb.storageKey());
       Cam.stop();
+      Snapshot.stop();
       App.openNotebook();
     };
     document.getElementById("saveBtn").onclick = App.download;

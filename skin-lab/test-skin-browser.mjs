@@ -34,6 +34,8 @@ const browser = spawn(browserPath, [
   "--disable-gpu",
   "--disable-extensions",
   "--no-first-run",
+  "--use-fake-device-for-media-stream",
+  "--use-fake-ui-for-media-stream",
   "--window-size=390,844",
   `--user-data-dir=${profile}`,
   `--remote-debugging-port=${DEBUG_PORT}`,
@@ -239,12 +241,35 @@ try {
       if (index < 0) throw new Error("Missing cell " + id);
       await Nb.runCell(index);
     }
+    const photoIndex = Nb.cells.findIndex((item) => item.id === "skin-photo");
+    if (photoIndex < 0) throw new Error("Missing cell skin-photo");
+    await Nb.runCell(photoIndex);
+    const waitFor = async (accept, timeoutMs, label) => {
+      const started = Date.now();
+      while (Date.now() - started < timeoutMs) {
+        if (accept()) return;
+        await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+      }
+      throw new Error(label + " timed out");
+    };
+    await waitFor(() => Snapshot.video?.videoWidth && !Snapshot.captureButton?.disabled,
+      15_000, "one-photo camera");
+    Snapshot.captureButton.click();
+    await waitFor(() => Snapshot.stream === null &&
+      !Snapshot.results?.classList.contains("hidden") &&
+      !Snapshot.message?.textContent.startsWith("Đang"), 35_000, "one-photo processing");
+    const photoEvidence = {
+      message: Snapshot.message.textContent,
+      streamStopped: Snapshot.stream === null,
+      resultCanvases: Snapshot.results.querySelectorAll("canvas").length,
+      outputWidth: Snapshot.outputCanvas.width,
+    };
     const output = (id) => Nb.cells.find((item) => item.id === id).outEl;
     const controlHost = document.createElement("div");
     document.body.appendChild(controlHost);
-    Cam.host = controlHost;
-    Cam.build();
+    Snapshot.build(controlHost);
     const controls = controlHost.innerText;
+    Snapshot.stop();
     controlHost.remove();
     return {
       grader: output("skin-check").innerText,
@@ -252,6 +277,7 @@ try {
       errors: ids.flatMap((id) => [...output(id).querySelectorAll(".err")].map((item) => item.innerText)),
       answerKey: Nb.storageKey(),
       controls,
+      photoEvidence,
       mechanisms: ids.filter((id) => output(id).querySelector(".mechanism-card")).length,
       fitsMobile: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       practiceSaveStillPresent: Boolean(localStorage.getItem("magic-dust-kit:skin-lab:skin:v3")),
@@ -269,9 +295,13 @@ try {
     throw new Error(`Expected at least 16 images and six mechanisms, got ${evidence.images} and ${evidence.mechanisms}.`);
   }
   if (!evidence.fitsMobile) throw new Error("Skin Lab overflows the 390 px mobile viewport.");
-  if (!evidence.controls.includes("Face Mesh") || evidence.controls.includes("Thiên Lôi") ||
-      evidence.controls.includes("Vạn Kiếm") || evidence.controls.includes("Hỏa Liên")) {
-    throw new Error(`Skin camera controls are wrong: ${evidence.controls}`);
+  if (!evidence.controls.includes("Chụp một tấm") || !evidence.controls.includes("Chọn ảnh từ máy") ||
+      evidence.controls.includes("Quay video")) {
+    throw new Error(`Skin photo controls are wrong: ${evidence.controls}`);
+  }
+  if (!evidence.photoEvidence.streamStopped || evidence.photoEvidence.resultCanvases !== 2 ||
+      evidence.photoEvidence.outputWidth !== 480) {
+    throw new Error(`One-photo processing did not finish correctly: ${JSON.stringify(evidence.photoEvidence)}`);
   }
   if (!evidence.answerKey.includes(":skin-answers:v3") || !evidence.practiceSaveStillPresent) {
     throw new Error("Practice and answer routes do not use separate localStorage records.");
@@ -294,7 +324,8 @@ try {
 
   console.log(
     `Browser OK (${REMOTE_BASE ? "live" : "local"}): autosave resumed by stable ID; ` +
-    `six mechanisms persisted; answer grader 5/5; ${evidence.images} illustrations; mobile fits; ` +
+    `six mechanisms persisted; one photo captured and camera stopped; answer grader 5/5; ` +
+    `${evidence.images} illustrations; mobile fits; ` +
     `main route ${original.cells} cells.`,
   );
 } finally {

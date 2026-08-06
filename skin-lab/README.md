@@ -1,7 +1,8 @@
 # Skin Lab
 
 Skin Lab là bài học xử lý ảnh chạy hoàn toàn trong trình duyệt tại `/skin-lab/`.
-Năm hàm bắt buộc dùng Python thuần; phần NumPy ở cuối là phần mở rộng ngắn.
+Năm hàm bắt buộc dùng NumPy, SciPy và Pillow. Cuối bài, học sinh chụp một ảnh,
+camera dừng, rồi Face Mesh và các hàm xử lý chạy một lần trên ảnh đó.
 
 Nguồn chuẩn:
 
@@ -22,5 +23,5 @@ node test-skin-browser.mjs
 ```
 
 Autosave chỉ lưu code, tiến độ và vị trí ô đang học trên đúng trình duyệt của
-thiết bị hiện tại. Ảnh camera không được ghi vào `localStorage`. Học sinh có thể
-bấm nút tải notebook nếu muốn mang bài sang thiết bị khác.
+thiết bị hiện tại. Ảnh vừa chụp không được ghi vào `localStorage`. Học sinh có
+thể bấm nút tải notebook nếu muốn mang bài sang thiết bị khác.

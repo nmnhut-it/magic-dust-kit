@@ -214,6 +214,27 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
   box-shadow:0 3px 0 var(--honey-line)}
 .gest:disabled{opacity:.45;cursor:not-allowed}
 
+/* Skin Lab captures one photo. The camera only provides the input, then stops. */
+.snapshot-lab{border:2px solid var(--mint-line);border-radius:var(--r-lon);overflow:hidden;
+  background:var(--paper-raised);color:var(--ink)}
+.snapshot-intro{padding:13px 15px;background:var(--mint-soft);border-bottom:2px solid var(--mint-line);
+  font-size:13px;line-height:1.6}
+.snapshot-live{width:min(100%,480px);aspect-ratio:4/3;margin:14px auto 0;background:var(--ink);
+  border:2px solid var(--mint-line);border-radius:var(--r-vua);overflow:hidden}
+.snapshot-live video{display:block;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+.snapshot-bar{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;padding:12px 14px}
+.snapshot-bar label.btn{display:inline-flex;align-items:center;cursor:pointer}
+.snapshot-message{margin:0;padding:11px 15px;border-top:2px solid var(--mint-line);
+  background:var(--paper-warm);color:var(--ink);font-size:12.5px;font-weight:700;line-height:1.55}
+.snapshot-results{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px;
+  border-top:2px solid var(--mint-line);background:var(--mint-soft)}
+.snapshot-results.hidden{display:none}
+.snapshot-results figure{min-width:0;margin:0;padding:8px;border:2px solid var(--mint-line);
+  border-radius:var(--r-vua);background:var(--paper-raised)}
+.snapshot-results canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;border-radius:var(--r-nho);
+  background:var(--paper-warm);image-rendering:auto}
+.snapshot-results figcaption{padding:8px 4px 2px;color:var(--ink);font-size:12px;font-weight:800;line-height:1.4}
+
 /* Sáu bảng cơ chế của Skin Lab: thao tác, phép tính và code nằm trong cùng một khung. */
 .mechanism-card{border:2px solid var(--mint-line);border-radius:var(--r-lon);overflow:hidden;
   background:var(--paper-raised);color:var(--ink)}
@@ -288,6 +309,7 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
   .body{padding-right:0}
   main{padding:16px 12px 90px}
   .brand small{display:none}
+  .snapshot-results{grid-template-columns:1fr;padding:10px}
   .mech-body{grid-template-columns:1fr;padding:10px}.mech-check{margin:0 10px 10px}
   .mech-swatches{grid-template-columns:1fr 1fr}.mechanism-card{border-radius:var(--r-vua)}
 }
