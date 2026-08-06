@@ -104,8 +104,7 @@ class TestTeachingHelpers(unittest.TestCase):
 
     def test_number_substitutions_match_the_lesson(self):
         blurred = (8 * 10 + 90) / 9
-        votes = (8 * 255 + 0) / 9
-        threshold = 255 * 5 / 9
+        neighbour_count = 8 * 1 + 0
         spot_redness = 225 - (62 + 66) / 2
         skin_redness = 183 - (127 + 103) / 2
         local_redness = (spot_redness + 24 * skin_redness) / 25
@@ -114,8 +113,8 @@ class TestTeachingHelpers(unittest.TestCase):
         ))
 
         self.assertAlmostEqual(blurred, 18.89, places=2)
-        self.assertAlmostEqual(votes, 226.67, places=2)
-        self.assertAlmostEqual(threshold, 141.67, places=2)
+        self.assertEqual(neighbour_count, 8)
+        self.assertGreaterEqual(neighbour_count, 5)
         self.assertAlmostEqual(spot_redness - local_redness, 89.28, places=2)
         self.assertEqual(softened, (194, 111, 94))
 

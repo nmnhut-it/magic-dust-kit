@@ -13,7 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HERE = pathlib.Path(__file__).resolve().parent
-COURSE_VERSION = "2026.08.06.3"
+COURSE_VERSION = "2026.08.06.4"
 PRACTICE_FILE = "Skin_Lab.ipynb"
 SOLUTION_FILE = "Skin_Lab_Answers.ipynb"
 TASK_ORDER = (
@@ -66,117 +66,114 @@ def read_task_blocks(file_name):
     return blocks
 
 
-TITLE = """# Skin Lab — Xử lý ảnh với NumPy, SciPy, Pillow và MediaPipe
+TITLE = """# Skin Lab — Máy tính thay đổi một pixel như thế nào?
 
-Trong bài này, em sẽ viết chương trình nhận một ảnh màu, tìm vùng da và vùng đỏ nổi bật, rồi chỉ làm mềm
-những pixel đã được chọn. **Pillow** đọc và hiển thị ảnh, **NumPy** giữ các con số của ảnh, còn **SciPy**
-thực hiện cùng một phép tính trên nhiều pixel.
+Ta sẽ bắt đầu bằng một ảnh rất nhỏ: **7 hàng × 7 cột**. Trong ảnh có vùng da, nền xanh và một chấm đỏ ở giữa.
+Ở mỗi bước, em chỉ cần theo dõi pixel giữa. Trang sẽ cho em thấy màu của pixel, các số được lấy ra, phép tính
+với những số đó và màu xuất hiện sau phép tính.
 
-Chương trình xử lý ảnh theo từng bước: lấy ảnh RGB từ camera, tách ba kênh màu, đánh dấu vùng da, đánh dấu
-vùng đỏ rồi làm mềm vùng đó. Hai ảnh đen trắng dùng để đánh dấu được gọi là `skin_mask` và `pimple_mask`:
-pixel màu trắng có giá trị `255` là vùng được chọn; pixel màu đen có giá trị `0` là vùng được giữ nguyên.
+Sau khi hiểu sáu bước trên ảnh nhỏ, em sẽ dùng **NumPy** và **SciPy** để làm đúng những việc đó trên cả ảnh.
+Cuối bài, **MediaPipe Face Mesh** giới hạn vùng được phép xử lý vào bên trong khuôn mặt.
 
-Ở phần cuối, MediaPipe Face Mesh tìm các điểm mốc quanh khuôn mặt và tạo `face_mask`. Chương trình chỉ
-đổi một pixel khi pixel đó vừa nằm trong khuôn mặt, vừa được `skin_mask` đánh dấu là vùng da.
+Đây là bài học về thuật toán xử lý ảnh, **không phải công cụ chẩn đoán hay đánh giá làn da**. Luật màu trong bài
+có thể nhận sai khi ánh sáng, camera, màu da hoặc màu nền thay đổi.
 
-Mỗi bước đều có phép tính bằng số, hình minh họa và một câu kết luận. Em có thể dùng phép tính để kiểm tra
-kết quả, rồi nhìn hình để biết chương trình đã chọn đúng vị trí hay chưa.
-
-Đây là bài học về cách chương trình xử lý ảnh, **không phải công cụ chẩn đoán hay đánh giá làn da**. Ánh sáng,
-camera và màu da khác nhau có thể làm các điều kiện RGB trong bài nhận sai.
-
-Trang sẽ tự lưu code và phần em đang làm trên máy này. Em có thể đóng trang rồi quay lại học tiếp.
-Ảnh camera không được lưu. Nếu muốn làm tiếp trên máy khác, hãy bấm **Tải notebook** để lưu bài thành một tệp.
+Trang tự lưu code, lựa chọn trong các bảng và chặng em đã hoàn thành trên máy này. Em có thể đóng trang rồi quay lại.
+Ảnh camera không được lưu. Muốn chuyển bài sang máy khác, em bấm **Tải notebook**.
 """
 
-SETUP = """## Chặng 0 — Chuẩn bị thư viện
+SETUP = """## Trước khi bắt đầu
 
-Chạy ô dưới để mở NumPy, SciPy, Pillow, hình minh họa, phần tự chấm và camera. Mỗi nhiệm vụ sẽ nói rõ dữ liệu
-đã cho, dữ liệu bên ngoài (INPUT), việc cần làm (PROCESS) và kết quả đúng (OUTPUT). Sau khi sửa một hàm,
-hãy chạy ô **Xem kết quả của hàm vừa viết** ngay bên dưới để kiểm tra.
+Chạy hai ô dưới. Ô đầu mở hình minh họa và camera. Ô thứ hai chuẩn bị NumPy, SciPy, Pillow cùng các con số dùng
+trong bài. Em chưa cần sửa hai ô này.
+
+Mỗi nhiệm vụ sau đó đều ghi rõ: dữ liệu nào đã cho sẵn, INPUT nào đến từ bên ngoài, em cần viết gì và OUTPUT nào
+chứng minh hàm đã đúng. Sau khi sửa một hàm, chạy ô xem kết quả ngay dưới hàm đó.
 """
 
-PHENOMENON = """## Bắt đầu từ màu trong ảnh
+PHENOMENON = """## Ta cần tạo ra những hình nào?
 
-Ảnh mẫu có nền xanh, một khuôn mặt và ba vùng đỏ được đặt trên má. Hình đầu tiên cho thấy bốn kết quả
-chương trình cần tạo: ảnh ban đầu, vùng da được đánh dấu, vùng đỏ được đánh dấu và ảnh sau khi làm mềm.
+Chạy ô dưới để xem ảnh ban đầu và ba kết quả cần tạo:
 
-Tiếp theo, ta xem một pixel da `(183, 127, 103)` và một pixel đỏ `(225, 62, 66)`. Mỗi bộ ba số lần lượt
-là lượng đỏ (R), xanh lá (G) và xanh dương (B) của pixel. Để xem riêng kênh R, chương trình giữ số R và
-đặt G, B về `0`. Hai kênh còn lại cũng được tách theo cách đó. Sau cùng, ba kênh được ghép lại để kiểm tra
-màu có giống ảnh ban đầu hay không.
+1. `skin_mask`: ô trắng là nơi luật màu tạm cho là da; ô đen là nơi không chọn.
+2. `pimple_mask`: ô trắng là vùng đỏ nổi bật cần làm mềm; ô đen là nơi giữ nguyên.
+3. Ảnh cuối: chỉ những ô trắng trong `pimple_mask` được thay bằng màu đã làm mềm.
+
+Trong hai mask, **255 nghĩa là chọn** và **0 nghĩa là không chọn**. Đây chỉ là hai số giúp chương trình ghi nhớ
+vị trí. Chúng không phải màu da và cũng không phải điểm đánh giá da.
 """
 
-NUMPY_INTRO = """## NumPy lưu ảnh thành một bảng số
+RGB_PIXEL = """## Cơ chế 1 — Một pixel là ba số RGB
 
-Pillow đọc tệp ảnh hoặc khung hình camera. `np.asarray(image)` đổi ảnh thành một bảng số NumPy.
-`pixels.shape` cho biết kích thước của bảng theo thứ tự `(chiều cao, chiều rộng, số kênh màu)`.
-Ví dụ, ảnh rộng 80 pixel và cao 60 pixel có `pixels.shape == (60, 80, 3)`. Số `3` là ba kênh R, G, B.
+Chạy bảng dưới rồi bấm vào pixel giữa của ảnh 7×7. Pixel đó có màu `(225, 62, 66)`, nghĩa là `R = 225`,
+`G = 62`, `B = 66`. Kéo từng thanh để xem khi chỉ một số đổi thì màu của pixel đổi ra sao.
 
-- `pixels[:, :, 0]` lấy cả kênh đỏ.
-- `pixels[:, :, 1]` lấy cả kênh xanh lá.
-- `pixels[:, :, 2]` lấy cả kênh xanh dương.
-- `np.stack((red, green, blue), axis=2)` ghép ba kênh thành ảnh RGB.
-
-Chạy hai ô dưới. OUTPUT phải có ảnh màu ban đầu, ba ảnh từng kênh, ảnh ghép lại và ảnh sai khác bằng 0.
+Khi tách kênh R, máy giữ `225` và đặt hai số còn lại về `0`, nên kết quả là `(225, 0, 0)`. Tách G và B cũng
+làm đúng một việc như vậy. Bảng sẽ yêu cầu em dùng cơ chế này với một bộ số chưa xuất hiện trong ví dụ.
 """
 
-LIBRARIES = """## Các hàm có sẵn giúp xử lý cả ảnh
+NUMPY_INTRO = """## Từ một pixel sang cả ảnh bằng NumPy
 
-Ta tính một ví dụ nhỏ trước để hiểu mỗi số đến từ đâu. Sau đó, chương trình gọi các hàm có sẵn để thực hiện
-cùng phép tính trên toàn bộ ảnh:
+Trong bảng vừa rồi, em đã chọn một ô bằng hàng và cột. NumPy dùng đúng cách đánh địa chỉ đó:
 
-| Cơ chế cần hiểu | Lệnh dùng trong dự án |
+- `pixels[3, 3]` lấy ba số RGB của pixel ở hàng 3, cột 3.
+- `pixels[:, :, 0]` lấy số R của **mọi pixel**.
+- `pixels[:, :, 1]` lấy số G của mọi pixel.
+- `pixels[:, :, 2]` lấy số B của mọi pixel.
+
+Pillow đọc ảnh. `np.asarray(image)` biến ảnh thành một bảng số NumPy tên là `pixels`. Nếu ảnh cao 60, rộng 80 và có ba
+kênh màu thì `pixels.shape` là `(60, 80, 3)`. Chạy hai ô dưới: OUTPUT sẽ ghi kích thước, ba số của một pixel,
+rồi hiện ảnh gốc bên cạnh ba kênh R, G, B.
+"""
+
+LIBRARIES = """## Thư viện làm lại cùng phép tính trên mọi pixel
+
+Các bảng tương tác cho em tính một pixel bằng số nhỏ. Trong dự án, ta gọi các hàm dưới đây để làm phép tính đó
+ở mọi vị trí của ảnh:
+
+| Việc cần làm | Hàm thực hiện việc đó |
 |---|---|
-| Nhân bảng trọng số với vùng lân cận rồi cộng | `scipy.ndimage.convolve` |
-| Tính trung bình độ đỏ trong cửa sổ 5×5 | `scipy.ndimage.uniform_filter` |
-| Mở rộng vùng được chọn thêm một pixel | `scipy.ndimage.maximum_filter` |
-| Chọn màu mới hoặc giữ màu cũ theo ảnh đánh dấu | `np.where` |
-| Giữ giá trị màu trong 0..255 | `np.clip` |
-| Đổi bảng số NumPy thành ảnh | `Image.fromarray` |
+| Nhân và cộng các số trong vùng 3×3 | `scipy.ndimage.convolve` |
+| Tính trung bình các số trong vùng 5×5 | `scipy.ndimage.uniform_filter` |
+| Biến một ô được chọn thành vùng 3×3 | `scipy.ndimage.maximum_filter` |
+| Chọn màu mới hoặc màu ban đầu cho từng pixel | `np.where` |
+| Giữ số màu trong khoảng 0 đến 255 | `np.clip` |
+| Biến bảng số trở lại thành ảnh | `Image.fromarray` |
 
-Em không cần tự viết hai vòng `for row` và `for column`. Nhiệm vụ của em là đưa đúng dữ liệu vào từng hàm,
-nói được phép tính đang làm gì và kiểm tra bảng số nhận được sau phép tính.
+Em không cần tự viết hai vòng `for row` và `for column`. Em cần chọn đúng bảng số đưa vào hàm, rồi kiểm tra
+OUTPUT bằng số và hình.
 """
 
-CONVOLUTION = """## Chặng 1 — Tính màu mới từ các pixel xung quanh
+CONVOLUTION = """## SciPy đếm hoặc trộn các pixel xung quanh ra sao?
 
-Ta dùng một bảng trọng số nhỏ, trong thư viện gọi là `kernel`. Với mỗi pixel, chương trình đặt bảng này lên vùng lân cận,
-nhân từng giá trị với trọng số nằm cùng vị trí, cộng các tích, rồi chia cho `divisor`.
+`convolve_layer` nhìn một vùng 3×3 quanh pixel đang tính. Nó nhân từng số trong vùng với số ở cùng vị trí trong
+`kernel`, cộng chín kết quả, rồi chia cho `divisor`.
 
-Ví dụ có tám ô bằng `10`, ô giữa bằng `90`, và chín trọng số đều bằng `1`:
+Ví dụ, tám ô xung quanh bằng `10`, ô giữa bằng `90`, còn chín số trong `kernel` đều bằng `1`:
 
 ```text
 total = 8 × 10 + 90 = 170
 new_value = 170 / 9 = 18.89
 ```
 
-Giá trị `90` giảm xuống gần các pixel xung quanh có giá trị `10`, nên điểm sáng bớt nổi bật. Đây là cách làm mờ ảnh.
+OUTPUT của pixel giữa là `18.89`. Số `90` đã được trộn với tám số `10`, nên pixel giữa bớt sáng.
 
-Trong dự án, `ndimage.convolve(values, weights, mode="nearest")` thực hiện phép nhân-cộng này ở mọi vị trí.
-`mode="nearest"` nghĩa là vị trí ngoài mép ảnh dùng giá trị của pixel biên gần nhất. Sau đó ta chia cả bảng kết quả cho
-`divisor`. Cơ chế vẫn là phép tính trên; SciPy chỉ thực hiện nó nhanh hơn vòng lặp Python.
+`ndimage.convolve` làm phép nhân rồi cộng này ở mọi pixel. `mode="nearest"` chỉ nói cách xử lý mép ảnh: nếu vùng 3×3
+đi ra ngoài ảnh, SciPy dùng lại giá trị của pixel biên gần nhất.
 """
 
-PREDICT = """### Em tính trước, máy kiểm tra sau
+TASK_CONVOLVE = """### Nhiệm vụ 1 — Hoàn thành `convolve_layer`
 
-Giá trị cho sẵn là cửa sổ 3×3 bên dưới. Hãy thay `___` bằng phép tính cho kết quả `170 / 9`.
-OUTPUT đúng phải in hai số giống nhau.
+- **Dữ liệu đã cho sẵn:** `layer`, `kernel`, `divisor`; NumPy và SciPy đã được mở.
+- **INPUT thật:** không có. Bộ tự chấm sẽ đưa một bảng 5×5 vào hàm.
+- **Em cần viết:** đưa `values` và `weights` vào `ndimage.convolve`, rồi chia kết quả cho `divisor`.
+- **OUTPUT để kiểm tra:** khi chỉ ô giữa của bảng bằng `9`, chín trọng số bằng `1` và `divisor = 9`, số ở giữa
+  bảng kết quả phải bằng `1`. Bảng INPUT vẫn phải giữ số `9` ban đầu.
 """
 
-TASK_CONVOLVE = """### Nhiệm vụ 1 — Nối dữ liệu vào `ndimage.convolve`
+EVIDENCE = """## Từ ba số RGB đến một ô trắng hoặc đen
 
-- Giá trị cho sẵn: `layer`, `kernel`, `divisor` là ba tham số của hàm; NumPy, SciPy đã được import.
-- INPUT từ bên ngoài: không có; bộ tự chấm gọi hàm với một bảng số cố định.
-- Việc cần làm (PROCESS): đổi `layer` và `kernel` thành bảng số `float32`; gọi `ndimage.convolve(values, weights, mode="nearest")`;
-  chia toàn bộ kết quả cho `divisor`.
-- Kết quả đúng (OUTPUT): trả một bảng số NumPy mới có kích thước `(5, 5)`; khi tâm của `layer` bằng `9`,
-  `kernel` gồm toàn số `1` và `divisor=9`, tâm của kết quả bằng `1`; `layer` ban đầu vẫn giữ tâm bằng `9`.
-"""
-
-EVIDENCE = """## Chặng 2 — Dùng ba số RGB để đánh dấu một pixel
-
-Một pixel được đo bằng ba phép tính. Với pixel da mẫu `(183, 127, 103)`:
+Ta xét pixel `(183, 127, 103)`. Máy gán `R = 183`, `G = 127`, `B = 103`, rồi thay đúng ba số đó vào:
 
 ```text
 brightness = (183 + 127 + 103) // 3 = 413 // 3 = 137
@@ -184,81 +181,85 @@ warmth = 183 - 103 = 80
 red_green_gap = 183 - 127 = 56
 ```
 
-Ba kết quả đều nằm trong giới hạn của bài, nên chương trình đánh dấu pixel này bằng `255`.
-Pixel nền xanh `(35, 80, 185)` có `warmth = 35 - 185 = -150`, không đạt `warmth >= 8`,
-nên pixel đó nhận giá trị `0`.
+Ba kết quả đều đạt các điều kiện trong code, nên OUTPUT của pixel này là `255`: ô trắng, được chọn.
+
+Với nền xanh `(35, 80, 185)`, `warmth = 35 - 185 = -150`. Điều kiện cần `warmth >= 8`, nên OUTPUT là `0`:
+ô đen, không chọn. Đây là một luật RGB viết tay để học cơ chế; nó không nhận đúng mọi màu da và mọi ánh sáng.
 """
 
-TASK_EVIDENCE = """### Nhiệm vụ 2 — Áp dụng điều kiện RGB cho một pixel hoặc cả ảnh
+TASK_EVIDENCE = """### Nhiệm vụ 2 — Hoàn thành `skin_evidence`
 
-- Giá trị cho sẵn: `red`, `green`, `blue` có thể là ba số hoặc ba bảng NumPy có cùng kích thước.
-- INPUT từ bên ngoài: chưa có ở bước này; màu camera sẽ đi vào sau qua `detect_skin`.
-- Việc cần làm (PROCESS): tính `brightness`, `warmth`, `red_green_gap`; nối từng điều kiện bằng `&`; dùng
-  `np.where(looks_like_skin, 255, 0).astype(np.uint8)`.
-- Kết quả đúng (OUTPUT): pixel da mẫu trả `255`, nền xanh trả `0`; khi nhận cả ảnh, hàm trả một bảng số `uint8`
-  cùng chiều cao và chiều rộng với ba kênh đầu vào.
+- **Dữ liệu đã cho sẵn:** `red`, `green`, `blue` là ba số, hoặc ba bảng số có cùng kích thước.
+- **INPUT thật:** chưa có ở đây. Sau này `detect_skin` sẽ đưa màu của ảnh hoặc camera vào hàm.
+- **Em cần viết:** tính `warmth = red - blue`, `red_green_gap = red - green`, rồi đưa `looks_like_skin` vào `np.where`.
+- **OUTPUT để kiểm tra:** `(183, 127, 103)` trả `255`; `(35, 80, 185)` trả `0`. Nếu INPUT là ba bảng, OUTPUT là
+  một bảng `uint8` có cùng số hàng và cột.
 """
 
-VOTES = """## Chặng 3 — Xét thêm tám pixel xung quanh
+VOTES = """## Vì sao phải nhìn thêm tám pixel xung quanh?
 
-Pixel đỏ `(225, 62, 66)` có `red_green_gap = 163`, vượt giới hạn `90`, nên khi xét riêng nó nhận giá trị `0`.
-Tám pixel da xung quanh đều nhận giá trị `255`:
+Pixel đỏ giữa ảnh không đạt luật RGB, nên `raw_mask` của nó là `0`. Tám pixel xung quanh đạt luật và có giá trị `255`.
+Trước khi đếm, chương trình đổi `255` thành `1`; số `0` vẫn là `0`:
 
 ```text
-average = (8 × 255 + 0) / 9 = 2040 / 9 = 226.67
-needed  = 5 × 255 / 9 = 141.67
-226.67 >= 141.67  →  skin_mask = 255
+count = 1 + 1 + 1 + 1 + 0 + 1 + 1 + 1 + 1 = 8
+8 >= 5  →  skin_mask của pixel giữa = 255
 ```
 
-Vì `226.67` lớn hơn `141.67`, pixel giữa vẫn được đánh dấu là vùng da. Kết quả của pixel giữa phụ thuộc
-vào cả chín pixel trong vùng 3×3, không chỉ phụ thuộc vào màu của riêng nó.
+Như vậy, pixel giữa vẫn nằm trong vùng được chọn vì có 8 trong 9 pixel đạt luật, nhiều hơn mức cần là 5.
+Ta đếm `0/1` vì kết quả dễ đọc hơn việc tính trung bình của `0/255`.
 """
 
-TASK_SKIN = """### Nhiệm vụ 3 — Đánh dấu vùng da trên cả ảnh
+TASK_SKIN = """### Nhiệm vụ 3 — Hoàn thành `detect_skin`
 
-- Giá trị cho sẵn: `img` là ảnh PIL; `SKIN_VOTE_KERNEL` và số pixel tối thiểu đã có sẵn.
-- INPUT từ bên ngoài: khi chạy camera, mỗi khung hình RGB là INPUT thật; bộ tự chấm dùng ảnh tổng hợp cố định.
-- Việc cần làm (PROCESS): `np.asarray` đổi ảnh thành bảng số; lấy ba kênh; gọi `skin_evidence`; gọi
-  `convolve_layer` để tính trung bình vùng 3×3; dùng `np.where` tạo `skin_mask` chỉ có `0` và `255`.
-- Kết quả đúng (OUTPUT): bảng số NumPy có kích thước `(height, width)` và kiểu số `uint8`; tâm ảnh da có một vùng đỏ vẫn bằng
-  `255`, còn tâm ảnh nền xanh bằng `0`.
+- **Dữ liệu đã cho sẵn:** ảnh PIL `img`, bảng 3×3 toàn số `1` và mức tối thiểu `5`.
+- **INPUT thật:** một ảnh; ở cuối bài, mỗi khung hình camera là một INPUT mới.
+- **Em cần viết:** đổi `raw_mask` từ `0/255` thành `binary` chỉ có `0/1`; dùng `convolve_layer` để đếm; so
+  `neighbour_count` với `SKIN_NEIGHBOURS_NEEDED`.
+- **OUTPUT để kiểm tra:** một bảng `uint8` chỉ có `0/255`. Pixel đỏ giữa vùng da phải là `255`; pixel giữa ảnh nền
+  xanh phải là `0`.
 """
 
-RED_GAP = """## Chặng 4 — So độ đỏ của pixel với vùng 5×5
+RED_GAP = """## Tìm một pixel đỏ hơn vùng ngay quanh nó
 
-Độ đỏ nổi trội của nốt đỏ là:
+Màu đỏ mạnh chưa đủ để kết luận, vì cả vùng có thể đang ở dưới ánh sáng đỏ. Ta so pixel giữa với vùng 5×5 quanh nó.
+Đầu tiên, chương trình tính một số tên là `redness`.
+
+Với pixel đỏ `(225, 62, 66)`:
 
 ```text
 redness_spot = 225 - (62 + 66) / 2 = 225 - 64 = 161
 ```
 
-Độ đỏ của một pixel da xung quanh là:
+Với pixel da `(183, 127, 103)`:
 
 ```text
 redness_skin = 183 - (127 + 103) / 2 = 183 - 115 = 68
 ```
 
-Giả sử cửa sổ 5×5 có một nốt đỏ và 24 pixel da:
+Trong vùng 5×5 có pixel đỏ ở giữa và 24 pixel da. Trung bình của 25 số `redness` là:
 
 ```text
 local_redness = (161 + 24 × 68) / 25 = 1793 / 25 = 71.72
 red_gap = 161 - 71.72 = 89.28
-89.28 >= PIMPLE_RED_GAP (24)  →  pixel được chọn tạm thời
+89.28 >= 24  →  chọn pixel giữa
 ```
+
+Sau đó, `maximum_filter` mở một ô được chọn thành vùng 3×3. Nhờ vậy, bước làm mềm không chỉ đổi đúng một chấm nhỏ.
 """
 
-TASK_PIMPLE = """### Nhiệm vụ 4 — Dùng hai hàm SciPy để tìm vùng đỏ nổi bật
+TASK_PIMPLE = """### Nhiệm vụ 4 — Hoàn thành `detect_pimples`
 
-- Giá trị cho sẵn: `img`, `skin_mask`, vùng tính trung bình 5×5 và mốc so sánh `24`.
-- INPUT từ bên ngoài: ảnh RGB và skin mask của bước trước; camera cung cấp ảnh khi chạy dự án cuối.
-- Việc cần làm (PROCESS): tính bảng `redness`; `uniform_filter(..., size=5)` lấy trung bình vùng 5×5;
-  so độ chênh với mốc `24`; `maximum_filter(..., size=3)` mở rộng vùng tạm được chọn thêm một pixel.
-- Kết quả đúng (OUTPUT): `pimple_mask` là bảng số `uint8`; tâm vùng đỏ bằng `255`, góc ảnh không có vùng đỏ bằng `0`.
+- **Dữ liệu đã cho sẵn:** ảnh `img`, `skin_mask`, vùng 5×5 và mốc so sánh `24`.
+- **INPUT thật:** ảnh RGB cùng `skin_mask` của ảnh đó.
+- **Em cần viết:** đưa `redness` vào `uniform_filter`; đưa `candidate` vào `maximum_filter`.
+- **OUTPUT để kiểm tra:** `pimple_mask` là bảng `uint8`; pixel giữa vùng đỏ bằng `255`, còn góc ảnh bằng `0`.
 """
 
-SOFTEN = """## Chặng 5 — Chỉ thay pixel nằm trong mask
+SOFTEN = """## Tính màu mới, rồi quyết định có dùng màu đó không
 
-Bảng trọng số làm mềm có số lớn hơn ở giữa:
+Đầu tiên, chương trình tính một màu mềm hơn cho pixel giữa. Bảng 3×3 cho pixel giữa trọng số `4`, bốn pixel
+sát cạnh trọng số `2`, bốn pixel ở góc trọng số `1`. Tổng chín trọng số là `16`:
 
 ```text
 1  2  1
@@ -266,7 +267,7 @@ Bảng trọng số làm mềm có số lớn hơn ở giữa:
 1  2  1
 ```
 
-Nếu tâm là `(225, 62, 66)` và tám pixel xung quanh đều là `(183, 127, 103)`:
+Pixel giữa là `(225, 62, 66)`. Tám pixel xung quanh đều là `(183, 127, 103)`. Tính riêng từng kênh:
 
 ```text
 new_red   = (4 × 225 + 12 × 183) / 16 = 3096 / 16 = 193.5 → 194
@@ -274,33 +275,37 @@ new_green = (4 ×  62 + 12 × 127) / 16 = 1772 / 16 = 110.75 → 111
 new_blue  = (4 ×  66 + 12 × 103) / 16 = 1500 / 16 = 93.75 → 94
 ```
 
-Pixel mới là `(194, 111, 94)`. Độ đỏ nổi trội giảm từ `161` xuống
-`194 - (111 + 94) / 2 = 91.5`. Pixel ở xa vùng được đánh dấu phải giữ nguyên.
+Màu mềm là `(194, 111, 94)`. Sau đó `np.where` nhìn `pimple_mask` tại đúng vị trí này:
+
+- mask bằng `255` → dùng màu mềm `(194, 111, 94)`;
+- mask bằng `0` → giữ màu ban đầu `(225, 62, 66)`.
+
+Vì vậy chương trình có thể tính màu mềm cho cả ảnh, nhưng chỉ thay các pixel đã được chọn.
 """
 
-TASK_REMOVE = """### Nhiệm vụ 5 — Ghép ảnh bằng `np.where`
+TASK_REMOVE = """### Nhiệm vụ 5 — Hoàn thành `remove_pimples`
 
-- Giá trị cho sẵn: `img` là ảnh cần xử lý; các bảng trọng số và bốn hàm trước đã có.
-- INPUT từ bên ngoài: một ảnh PIL; ở phần camera, đây là khung hình thật vừa được trình duyệt nhận.
-- Việc cần làm (PROCESS): tạo `skin_mask` và `pimple_mask`; thêm một chiều vào bảng trọng số để bảng có kích thước
-  `(3, 3, 1)`, nhờ đó SciPy không trộn R/G/B;
-  làm mềm ba kênh trong một lần gọi; `np.where(pimple_mask[:, :, None] == 255, softened, pixels)`
-  chọn màu mềm trong mask và giữ màu gốc ở ngoài mask.
-- Kết quả đúng (OUTPUT): trả ảnh PIL cùng kích thước; độ đỏ ở tâm giảm, pixel xa giữ nguyên, ảnh đầu vào không bị sửa.
+- **Dữ liệu đã cho sẵn:** ảnh `img`, bảng trọng số và bốn hàm em vừa hoàn thành.
+- **INPUT thật:** một ảnh PIL; cuối bài, đây là khung hình camera vừa nhận được.
+- **Em cần viết:** đưa `pixels` vào `ndimage.convolve`; đưa `pimple_mask` vào điều kiện của `np.where`.
+  `pimple_mask[:, :, None]` dùng cùng một lựa chọn cho cả ba số R, G, B của mỗi pixel.
+- **OUTPUT để kiểm tra:** một ảnh PIL cùng kích thước. Pixel đỏ giữa ảnh bớt nổi bật, pixel ở góc giữ nguyên và ảnh INPUT
+  không bị sửa trực tiếp.
 """
 
-CHECK = """## Tự chấm phần chính
+CHECK = """## Kiểm tra năm hàm
 
-Bấm chạy để kiểm tra từng hàm. Khi đạt `5/5`, tiến độ được tự lưu. Nếu em quay lại vào hôm
-sau, trang vẫn nhớ code và các chặng đã vượt qua.
+Chạy ô dưới. Mỗi dòng sẽ ghi tên hàm, hàm đã đúng hay chưa và lý do nếu chưa đúng. OUTPUT cuối cùng cần là
+`Kết quả: 5/5 phần đã đúng.` Trang tự lưu code, kết quả này và sáu bảng cơ chế để em có thể làm tiếp vào lần sau.
 """
 
-DEMO = """## Xem toàn bộ các bước xử lý
+DEMO = """## Nối năm hàm thành một chương trình
 
-Kết quả (OUTPUT) gồm sáu hình: ảnh RGB, vùng da đen trắng, ảnh gốc có vùng da phủ màu vàng, vùng đỏ đen trắng,
-ảnh gốc có vùng đỏ phủ màu đỏ và ảnh cuối. Ảnh phủ màu vẫn giữ màu gốc bên dưới, nên em biết chính xác
-chương trình đã chọn pixel nào. Nếu vùng được chọn sai, hãy kiểm tra các điều kiện phát hiện. Nếu vùng được
-chọn đúng nhưng ảnh cuối chưa đúng, hãy kiểm tra bảng trọng số làm mềm và điều kiện của `np.where`.
+Chạy ô dưới. OUTPUT có sáu hình theo đúng thứ tự dữ liệu đi qua chương trình: ảnh RGB → `skin_mask` → vị trí
+`skin_mask` phủ lên ảnh → `pimple_mask` → vị trí `pimple_mask` phủ lên ảnh → ảnh cuối.
+
+Lớp màu phủ cho biết **đúng vị trí pixel** mà mask đã chọn. Nếu vị trí chọn sai, kiểm tra ba phép tính RGB, số đếm 3×3
+hoặc độ chênh màu đỏ. Nếu vị trí đúng nhưng màu cuối sai, kiểm tra bảng trọng số và `np.where`.
 """
 
 NUMPY_MASK = """### Cùng một luật RGB, nhưng áp dụng cho cả ảnh
@@ -311,9 +316,11 @@ một lưới `True/False`. `np.where` đổi lưới đó thành mask `255/0`.
 
 NUMPY_FILTERS = """## Thử thêm vài cách đổi ảnh quen thuộc
 
-Chạy hai ô dưới để xem cách đảo màu, tăng sáng, giữ một kênh màu, làm mờ, làm nét và tìm đường biên.
-NumPy tính trực tiếp trên từng số trong bảng; SciPy dùng bảng trọng số để làm mờ, làm nét và tìm đường biên.
-Hãy so các hình rồi chỉ ra: cách nào đổi mọi pixel, cách nào dùng các pixel xung quanh, và bảng nào có trọng số âm.
+Chạy hai ô dưới để xem sáu phép đổi ảnh. Dưới mỗi hình đều có tên phép đổi. Khi so với ảnh gốc, em hãy trả lời:
+
+1. Phép nào chỉ đổi các số của chính pixel đang xét?
+2. Phép nào phải lấy thêm số từ các pixel xung quanh?
+3. Với bảng làm nét, pixel giữa được nhân với số nào?
 """
 
 NUMPY_CREATE = """### Tự sửa một phép đổi màu bằng NumPy
@@ -331,16 +338,27 @@ khác nhau, cùng một ảnh cận cảnh bề mặt da. Nguồn: [William Stit
 [Eddie Kopp](https://commons.wikimedia.org/wiki/File:Young_woman%27s_face_(Unsplash).jpg) và
 [Montavius Howard](https://commons.wikimedia.org/wiki/File:Human_skin_close-up.jpg).
 
-Chạy `try_public_photo(0)`, rồi đổi thành `1` hoặc `2`. Kết quả (OUTPUT) cho thấy ảnh thật, vùng được đánh dấu
-là da, vùng đỏ được chọn và ảnh sau khi xử lý. Mục tiêu là tìm giới hạn của thuật toán, không phải nhận xét về người trong ảnh.
+Chạy `try_public_photo(0)`, rồi đổi số cuối thành `1` hoặc `2`. Mỗi lần chạy, OUTPUT cho thấy bốn hình có nhãn:
+ảnh INPUT, `skin_mask`, `pimple_mask` và ảnh cuối. Hãy nhìn vị trí ô trắng trong hai mask để tìm chỗ luật màu nhận sai.
+Mục tiêu là kiểm tra giới hạn của code, không phải nhận xét về người trong ảnh.
 """
 
-FACE_MESH = """## Bài tập lớn — Giới hạn vùng xử lý bằng MediaPipe Face Mesh
+FACE_GATE = """## Cơ chế 6 — Chỉ đổi pixel khi hai điều kiện cùng đúng
 
-Luật RGB chỉ nhìn màu, nên có thể nhận nhầm tường, tóc hoặc áo. MediaPipe Face Mesh giải quyết một câu hỏi khác:
-**khuôn mặt đang nằm ở đâu?** Face Mesh tìm tối đa 478 điểm mốc trên khung hình khi bật `refineLandmarks`.
-Ta lấy các điểm quanh viền mặt, chẳng hạn `10` ở trán, `454` bên phải, `152` ở cằm và
-`234` bên trái, rồi nối chúng thành một đa giác trắng trên nền đen.
+Luật RGB có thể chọn nhầm một vật có màu gần giống da. Face Mesh bổ sung một câu hỏi: pixel này có nằm trong khuôn mặt không?
+
+- `face_mask = 1`: pixel nằm trong đường bao khuôn mặt.
+- `skin_mask = 1`: pixel đạt luật màu và đủ số pixel lân cận.
+
+Chương trình tính `allowed = face_mask & skin_mask`. Chỉ trường hợp `1 & 1` cho kết quả `1`. Ba trường hợp còn lại
+đều giữ màu ban đầu. Chạy bảng dưới và thử đủ bốn cặp số.
+"""
+
+FACE_MESH = """## MediaPipe tạo `face_mask` như thế nào?
+
+Face Mesh nhận ảnh và trả về tối đa 478 điểm trên khuôn mặt. Mỗi điểm có vị trí ngang và dọc. Ta chọn các điểm chạy
+quanh viền mặt, trong đó có điểm `10` gần trán, `454` bên phải, `152` gần cằm và `234` bên trái. Nối các điểm này
+thành một đường khép kín rồi tô phần bên trong bằng `1`; phần bên ngoài là `0`. Đó là `face_mask`.
 
 ```text
 face_mask = pixel nằm trong đường bao khuôn mặt
@@ -349,18 +367,19 @@ allowed   = face_mask & skin_mask
 output    = np.where(allowed[..., None], cleaned, original)
 ```
 
-`[..., None]` thêm một chiều vào bảng đánh dấu hai chiều để cùng một lựa chọn được áp dụng cho cả R, G và B.
-Face Mesh chỉ giới hạn vùng được phép xử lý; nó không chẩn đoán da và không tự quyết định pixel nào là vùng đỏ.
+`allowed[..., None]` dùng cùng giá trị `allowed` cho cả ba số R, G, B của pixel. Face Mesh chỉ cho biết vùng khuôn mặt;
+nó không chẩn đoán da và không tự tìm vùng đỏ.
 """
 
-CAMERA = """## Chạy dự án với INPUT thật từ camera
+CAMERA = """## Chạy với INPUT thật từ camera
 
-Camera là dữ liệu bên ngoài (INPUT) của bài. Mỗi khung 480×360 được xử lý ngay trong trình duyệt. Chế độ mặc định
-tính trên ảnh 240×180 rồi phóng lên và làm mượt phần nằm giữa các pixel. Nếu máy khỏe, chọn **Nét (320×240)**;
-nếu máy chậm, chọn **Tiết kiệm (160×120)**.
+Mỗi khung hình camera đi qua đúng các bước em vừa học. Trên màn hình, bật **Hiện đường viền Face Mesh** để thấy vùng
+MediaPipe tìm được. Chọn **Nét (320×240)** nếu hình còn rỗ và máy chạy ổn; chọn **Cân bằng (240×180)** hoặc
+**Tiết kiệm (160×120)** nếu máy xử lý chậm. Trình duyệt phóng kết quả lên 480×360 và làm mượt khi hiển thị, nên độ nét
+phụ thuộc cả kích thước xử lý lẫn camera thật.
 
-MediaPipe vẽ đường bao khuôn mặt và tạo `face_mask`. NumPy và SciPy chỉ đổi pixel nằm trong vùng đó.
-Trang không tự lưu ảnh camera. Nếu camera bị chặn, em vẫn hoàn thành bài bằng ảnh tổng hợp và ba ảnh công khai.
+Ảnh được xử lý ngay trong trình duyệt và không được đưa vào localStorage. Nếu camera bị chặn, em vẫn có thể hoàn thành
+toàn bộ bài bằng ảnh 7×7, ảnh tổng hợp và ba ảnh công khai ở trên.
 """
 
 REFLECT = """## Ghi lại điều em quan sát được
@@ -426,42 +445,48 @@ def build_skin_cells(solution):
     return [
         markdown_cell("skin-title", title),
         markdown_cell("skin-setup-note", SETUP),
-        code_cell("skin-setup", "import magic_mirror\nmagic_mirror.skin_intro()"),
+        code_cell("skin-setup", "import magic_mirror\nmagic_mirror.skin_intro()", ("autoload",)),
+        code_cell("skin-library-setup", blocks["shared"], ("autoload",)),
         markdown_cell("skin-phenomenon", PHENOMENON),
         code_cell("skin-overview", "magic_mirror.show_skin_pipeline_overview()"),
+        markdown_cell("skin-rgb-pixel-note", RGB_PIXEL),
+        code_cell("skin-mechanism-rgb", 'magic_mirror.show_mechanism("rgb_pixel")',
+                  ("concept:rgb_pixel",)),
         code_cell("skin-pixel-channels", "magic_mirror.show_skin_pixel_channels()"),
         markdown_cell("numpy-intro", NUMPY_INTRO),
         code_cell("numpy-array", NUMPY_ARRAY_CODE),
         code_cell("numpy-channels", "magic_mirror.show_numpy_channels()"),
         markdown_cell("skin-library-map", LIBRARIES),
-        markdown_cell("skin-convolution", CONVOLUTION),
-        code_cell("skin-convolution-math", "magic_mirror.show_convolution_math()"),
-        markdown_cell("skin-predict-note", PREDICT),
-        code_cell("skin-predict", PREDICT_A if solution else PREDICT_Q),
-        markdown_cell("skin-task-convolve-note", TASK_CONVOLVE),
-        code_cell("task-convolve-layer", blocks["shared"] + "\n\n" + blocks["convolve_layer"],
-                  ("autoload", "task:convolve_layer")),
-        code_cell("skin-preview-convolution", "magic_mirror.preview_library_convolution()"),
         markdown_cell("skin-evidence", EVIDENCE),
-        code_cell("skin-evidence-math", "magic_mirror.show_skin_evidence_math()"),
+        code_cell("skin-mechanism-rule", 'magic_mirror.show_mechanism("rgb_rule")',
+                  ("concept:rgb_rule",)),
         markdown_cell("skin-task-evidence-note", TASK_EVIDENCE),
         code_cell("task-skin-evidence", blocks["skin_evidence"],
                   ("autoload", "task:skin_evidence")),
         code_cell("skin-preview-evidence", "magic_mirror.preview_skin_evidence()"),
         markdown_cell("skin-votes", VOTES),
-        code_cell("skin-vote-math", "magic_mirror.show_skin_vote_math()"),
+        code_cell("skin-mechanism-neighbours", 'magic_mirror.show_mechanism("neighbours")',
+                  ("concept:neighbours",)),
+        markdown_cell("skin-convolution", CONVOLUTION),
+        code_cell("skin-convolution-math", "magic_mirror.show_convolution_math()"),
+        markdown_cell("skin-task-convolve-note", TASK_CONVOLVE),
+        code_cell("task-convolve-layer", blocks["convolve_layer"],
+                  ("autoload", "task:convolve_layer")),
+        code_cell("skin-preview-convolution", "magic_mirror.preview_library_convolution()"),
         markdown_cell("skin-task-detect-note", TASK_SKIN),
         code_cell("task-detect-skin", blocks["detect_skin"],
                   ("autoload", "task:detect_skin")),
         code_cell("skin-preview-mask", "magic_mirror.preview_skin_mask()"),
         markdown_cell("skin-red-gap", RED_GAP),
-        code_cell("skin-red-gap-math", "magic_mirror.show_red_gap_math()"),
+        code_cell("skin-mechanism-red-spot", 'magic_mirror.show_mechanism("red_spot")',
+                  ("concept:red_spot",)),
         markdown_cell("skin-task-pimple-note", TASK_PIMPLE),
         code_cell("task-detect-pimples", blocks["detect_pimples"],
                   ("autoload", "task:detect_pimples")),
         code_cell("skin-preview-pimples", "magic_mirror.preview_pimple_mask()"),
         markdown_cell("skin-soften", SOFTEN),
-        code_cell("skin-soften-math", "magic_mirror.show_soften_math()"),
+        code_cell("skin-mechanism-soften", 'magic_mirror.show_mechanism("soften")',
+                  ("concept:soften",)),
         markdown_cell("skin-task-remove-note", TASK_REMOVE),
         code_cell("task-remove-pimples", blocks["remove_pimples"],
                   ("autoload", "task:remove_pimples")),
@@ -478,6 +503,9 @@ def build_skin_cells(solution):
         markdown_cell("skin-public-images-note", PUBLIC_IMAGES),
         code_cell("skin-public-gallery", "magic_mirror.show_public_photo_gallery()"),
         code_cell("skin-public-test", "magic_mirror.try_public_photo(0)"),
+        markdown_cell("skin-face-gate-note", FACE_GATE),
+        code_cell("skin-mechanism-face", 'magic_mirror.show_mechanism("face_gate")',
+                  ("concept:face_gate",)),
         markdown_cell("skin-face-mesh-note", FACE_MESH),
         code_cell("skin-face-mesh-map", "magic_mirror.show_face_mesh_map()"),
         code_cell("skin-face-mask-pipeline", "magic_mirror.show_face_mask_pipeline()"),

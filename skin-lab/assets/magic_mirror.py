@@ -596,6 +596,14 @@ def show(value):
         js.MagicMirrorUI.emit("text", repr(value))
 
 
+def show_mechanism(kind):
+    """Mở bảng thao tác giúp học sinh kiểm tra một cơ chế trước khi đọc code."""
+    ui = getattr(js, "MagicMirrorUI", None)
+    if ui is None or not hasattr(ui, "mechanism"):
+        raise MagicMirrorError("Không mở được bảng cơ chế. Hãy tải lại trang bằng Ctrl+F5.")
+    ui.mechanism(kind, kind)
+
+
 def intro():
     """Print the finger-count table and the handful of commands worth remembering."""
     print("magic_mirror đã sẵn sàng. Giơ mấy ngón tay thì được hiệu ứng gì:")
@@ -708,11 +716,10 @@ def process_skin(image, small_size, face_mask=None):
 def skin_intro():
     """Print the few commands worth remembering in the isolated Skin Lab route."""
     print("Skin Lab đã sẵn sàng.")
-    print("Các bước xử lý: ảnh RGB -> vùng da -> vùng đỏ -> giới hạn trong khuôn mặt -> làm mềm vùng được chọn.")
-    print("Face Mesh có sẵn sẽ tìm đường bao khuôn mặt; em không cần tự huấn luyện chương trình nhận diện.")
-    print("Mỗi phần có phép tính, hình màu và lời giải thích. Bài này không dùng để chẩn đoán da.")
-    print("Code và phần đang học được tự lưu trên máy này; ảnh camera không được lưu.")
-    print("Lệnh: show_skin_pixel_channels() | check_skin_code() | skin_demo() | run() | stop()")
+    print("Em sẽ theo dõi một pixel: lấy ba số RGB, kiểm tra điều kiện, nhìn các pixel xung quanh rồi chọn màu đầu ra.")
+    print("Sau mỗi ví dụ số đều có hình cho biết pixel nào đang được nói đến.")
+    print("Face Mesh có sẵn sẽ tìm đường bao khuôn mặt; em không phải huấn luyện một mô hình mới.")
+    print("Trang tự lưu code và tiến độ, nhưng không lưu ảnh camera. Bài này không dùng để chẩn đoán da.")
 
 
 def set_spark(color=None, count=None):
@@ -1081,18 +1088,18 @@ def show_skin_evidence_math():
 
 
 def show_skin_vote_math():
-    """Show how eight neighbouring skin votes retain a rejected centre pixel."""
+    """Show how eight neighbouring 1 values retain a rejected centre pixel."""
     image = _canvas(CELL * 3 + 145, CELL * 3)
     for row in range(3):
         for column in range(3):
-            value = 0 if (row, column) == (1, 1) else 255
+            value = 0 if (row, column) == (1, 1) else 1
             _square(image, column * CELL, row * CELL, _grey(value), value)
-    _text(image, (CELL * 3 + 8, 10), "8 x 255 + 0 = 2040")
-    _text(image, (CELL * 3 + 8, 32), "trung bình = 226.67")
-    _text(image, (CELL * 3 + 8, 54), "mức cần = 141.67")
-    _text(image, (CELL * 3 + 8, 72), "226.67 >= 141.67 -> 255")
-    print("Tám giá trị 255 và một giá trị 0 có trung bình là 226.67.")
-    print("Mức cần đạt là 141.67. Vì 226.67 lớn hơn, pixel giữa vẫn được đánh dấu là vùng da.")
+    _text(image, (CELL * 3 + 8, 10), "8 ô x 1 + 1 ô x 0 = 8")
+    _text(image, (CELL * 3 + 8, 32), "cần ít nhất 5 ô")
+    _text(image, (CELL * 3 + 8, 54), "8 >= 5 -> chọn")
+    _text(image, (CELL * 3 + 8, 72), "skin_mask ở giữa = 255")
+    print("Vùng 3×3 có tám số 1 và một số 0, nên neighbour_count = 8.")
+    print("Cần ít nhất 5. Vì 8 >= 5, skin_mask của pixel giữa bằng 255.")
     return _zoom(image)
 
 

@@ -61,9 +61,8 @@ class TestSkinNotebook(unittest.TestCase):
             "8 × 10 + 90 = 170",
             "170 / 9 = 18.89",
             "brightness = (183 + 127 + 103) // 3 = 413 // 3 = 137",
-            "(8 × 255 + 0) / 9 = 2040 / 9 = 226.67",
-            "226.67",
-            "141.67",
+            "1 + 1 + 1 + 1 + 0 + 1 + 1 + 1 + 1 = 8",
+            "8 >= 5",
             "89.28",
             "(194, 111, 94)",
         ):
@@ -85,21 +84,36 @@ class TestSkinNotebook(unittest.TestCase):
             "skin-pixel-channels", "numpy-channels", "skin-convolution-math",
             "skin-preview-convolution", "skin-preview-evidence", "skin-preview-mask",
             "skin-preview-pimples", "skin-preview-cleanup", "skin-demo",
+            "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
+            "skin-mechanism-red-spot", "skin-mechanism-soften", "skin-mechanism-face",
         ):
             self.assertIn(cell_id, ids)
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
-        self.assertIn("phép tính bằng số", lesson)
-        self.assertIn("Ảnh phủ màu vẫn giữ màu gốc", lesson)
+        self.assertIn("các số được lấy ra, phép tính", lesson)
+        self.assertIn("đúng vị trí pixel", lesson)
+
+    def test_six_mechanisms_have_stable_concept_tags(self):
+        concepts = {
+            tag.removeprefix("concept:"): cell
+            for cell in self.practice["cells"]
+            for tag in cell.get("metadata", {}).get("tags", [])
+            if tag.startswith("concept:")
+        }
+        self.assertEqual(set(concepts), {
+            "rgb_pixel", "rgb_rule", "neighbours", "red_spot", "soften", "face_gate",
+        })
+        for concept, cell in concepts.items():
+            self.assertIn(f'show_mechanism("{concept}")', source(cell))
 
     def test_learner_prose_defines_terms_and_avoids_translated_shorthand(self):
         markdown = "\n".join(
             source(cell) for cell in self.practice["cells"] if cell["cell_type"] == "markdown"
         )
-        self.assertIn("được gọi là `skin_mask` và `pimple_mask`", markdown)
-        self.assertIn("giá trị `255` là vùng được chọn", markdown)
-        self.assertIn("giá trị `0` là vùng được giữ nguyên", markdown)
+        self.assertIn("`skin_mask`: ô trắng", markdown)
+        self.assertIn("255 nghĩa là chọn", markdown)
+        self.assertIn("0 nghĩa là không chọn", markdown)
         self.assertIn("bảng số NumPy", markdown)
-        self.assertIn("478 điểm mốc", markdown)
+        self.assertIn("tối đa 478 điểm", markdown)
         for phrase in (
             "pipeline", "hình màu/overlay", "478 landmark", "cho phiếu",
             "ba đèn R, G, B", "không tin một pixel", "API thư viện",
@@ -121,9 +135,9 @@ class TestSkinNotebook(unittest.TestCase):
                     "remove_pimples": "remove-note",
                 }[task]
             )
-            self.assertRegex(task_text, r"(?i)giá trị cho sẵn|given")
+            self.assertRegex(task_text, r"(?i)dữ liệu đã cho sẵn|given")
             self.assertIn("INPUT", task_text)
-            self.assertIn("PROCESS", task_text)
+            self.assertIn("Em cần viết", task_text)
             self.assertIn("OUTPUT", task_text)
         self.assertIn("Ảnh camera không được lưu", lesson)
 
@@ -140,7 +154,7 @@ class TestSkinNotebook(unittest.TestCase):
         answer_ids = [cell["id"] for cell in self.answers["cells"]]
         self.assertEqual(practice_ids, answer_ids)
         self.assertEqual(len(practice_ids), len(set(practice_ids)))
-        self.assertEqual(len(practice_ids), 55)
+        self.assertEqual(len(practice_ids), 58)
         for notebook in (self.practice, self.answers):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)
@@ -155,7 +169,7 @@ class TestSkinNotebook(unittest.TestCase):
     def test_runtime_saves_by_stable_id_and_never_persists_camera_images(self):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         self.assertIn("magic-dust-kit:skin-lab:", runtime)
-        self.assertIn("cells: {}, passed: [], lastCellId: null", runtime)
+        self.assertIn("cells: {}, passed: [], widgets: {}, concepts: []", runtime)
         self.assertIn("Object.fromEntries(Nb.cells.map", runtime)
         self.assertIn('user: cell.id.startsWith("user-")', runtime)
         self.assertIn("Ô do học sinh tự thêm", runtime)
@@ -163,6 +177,11 @@ class TestSkinNotebook(unittest.TestCase):
         self.assertIn("Tiếp tục từ chỗ đang học", runtime)
         self.assertIn("window.confirm", runtime)
         self.assertIn("storageSchema: 3", runtime)
+        self.assertIn("showMechanism(id, kind)", runtime)
+        self.assertIn("recordConcept(id)", runtime)
+        self.assertIn("saveWidget(id, state)", runtime)
+        practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
+        self.assertLess(practice_page.index("assets/skin-mechanisms.js"), practice_page.index("assets/notebook.js"))
         persistence = re.search(r"persist\(\) \{(.+?)\n  \},", runtime, re.DOTALL)
         self.assertIsNotNone(persistence)
         for forbidden in ("Cam.stream", "toDataURL", "canvas", "imageData"):
@@ -183,11 +202,21 @@ class TestSkinNotebook(unittest.TestCase):
     def test_face_mesh_is_the_camera_capstone_and_spells_are_not_skin_controls(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
-        for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "478 điểm mốc"):
+        for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "tối đa 478 điểm"):
             self.assertIn(phrase, lesson)
         self.assertIn("@mediapipe/face_mesh", runtime)
         self.assertIn("if (!SKIN)", runtime)
         self.assertIn('"Hiện đường viền Face Mesh"', runtime)
+
+    def test_camera_has_smooth_display_and_three_quality_levels(self):
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        styles = (ROOT / "assets" / "notebook.css").read_text(encoding="utf-8")
+        for label in ("Tiết kiệm (160×120)", "Cân bằng (240×180)", "Nét (320×240)"):
+            self.assertIn(label, runtime)
+        self.assertIn(".cam-out{image-rendering:auto", styles)
+        self.assertIn("Trình duyệt phóng kết quả lên 480×360 và làm mượt", "\n".join(
+            source(cell) for cell in self.practice["cells"]
+        ))
 
 
 if __name__ == "__main__":

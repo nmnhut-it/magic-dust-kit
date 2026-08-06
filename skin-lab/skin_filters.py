@@ -70,11 +70,11 @@ def skin_evidence(red, green, blue):
 
 # === TASK: detect_skin ===
 def detect_skin(img):
-    """Tạo ảnh đánh dấu vùng da từ ba kênh màu và vùng 3x3."""
+    """Tạo ảnh đánh dấu vùng da bằng cách đếm kết quả trong vùng 3x3."""
     # NHIỆM VỤ 3.
     # 1. Đổi ảnh PIL thành bảng pixels có kích thước (height, width, 3).
     # 2. Đưa ba kênh màu vào skin_evidence để tạo raw_mask.
-    # 3. Tính mức trung bình trong vùng 3x3 bằng convolve_layer.
+    # 3. Đổi 255 thành 1, rồi đếm số pixel đạt luật trong vùng 3x3.
     # 4. Dùng np.where để tạo skin_mask chỉ gồm 0 và 255.
     pixels = np.asarray(img.convert("RGB"), dtype=np.int16)
     raw_mask = skin_evidence(
@@ -82,9 +82,9 @@ def detect_skin(img):
         pixels[:, :, 1],
         pixels[:, :, 2],
     )
-    votes = convolve_layer(___, SKIN_VOTE_KERNEL, 9)
-    needed = MASK_ON * SKIN_NEIGHBOURS_NEEDED / 9
-    return np.where(___ >= needed, MASK_ON, MASK_OFF).astype(np.uint8)
+    binary = (raw_mask == MASK_ON).astype(np.float32)
+    neighbour_count = convolve_layer(___, SKIN_VOTE_KERNEL, 1)
+    return np.where(___ >= SKIN_NEIGHBOURS_NEEDED, MASK_ON, MASK_OFF).astype(np.uint8)
 
 
 # === TASK: detect_pimples ===

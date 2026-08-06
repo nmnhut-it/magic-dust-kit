@@ -53,16 +53,18 @@ def skin_evidence(red, green, blue):
 
 # === TASK: detect_skin ===
 def detect_skin(img):
-    """Tạo ảnh đánh dấu vùng da từ ba kênh màu và vùng 3x3."""
+    """Tạo ảnh đánh dấu vùng da bằng cách đếm kết quả trong vùng 3x3."""
     pixels = np.asarray(img.convert("RGB"), dtype=np.int16)
     raw_mask = skin_evidence(
         pixels[:, :, 0],
         pixels[:, :, 1],
         pixels[:, :, 2],
     )
-    votes = convolve_layer(raw_mask, SKIN_VOTE_KERNEL, 9)
-    needed = MASK_ON * SKIN_NEIGHBOURS_NEEDED / 9
-    return np.where(votes >= needed, MASK_ON, MASK_OFF).astype(np.uint8)
+    binary = (raw_mask == MASK_ON).astype(np.float32)
+    neighbour_count = convolve_layer(binary, SKIN_VOTE_KERNEL, 1)
+    return np.where(
+        neighbour_count >= SKIN_NEIGHBOURS_NEEDED, MASK_ON, MASK_OFF
+    ).astype(np.uint8)
 
 
 # === TASK: detect_pimples ===

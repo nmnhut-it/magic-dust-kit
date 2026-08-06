@@ -34,6 +34,7 @@ const browser = spawn(browserPath, [
   "--disable-gpu",
   "--disable-extensions",
   "--no-first-run",
+  "--window-size=390,844",
   `--user-data-dir=${profile}`,
   `--remote-debugging-port=${DEBUG_PORT}`,
   PRACTICE_URL,
@@ -110,7 +111,7 @@ async function notebookState(cdp) {
   return result.result.value;
 }
 
-async function waitForNotebook(cdp, mode, label, expectedCells = 55) {
+async function waitForNotebook(cdp, mode, label, expectedCells = 58) {
   const state = await poll(
     () => notebookState(cdp),
     (value) => value?.page === mode && (value.state === "ready" || value.state === "error"),
@@ -138,6 +139,46 @@ try {
 
   cdp = await connectCdp(page.webSocketDebuggerUrl);
   await waitForNotebook(cdp, "skin", "practice route");
+  console.log("Browser check: practice notebook and Pyodide are ready.");
+
+  const mechanisms = await cdp.evaluate(`(async () => {
+    const checks = [
+      ["skin-mechanism-rgb", "(120, 0, 0)"],
+      ["skin-mechanism-rule", "0 — không chọn"],
+      ["skin-mechanism-neighbours", "255 — giữ vùng này"],
+      ["skin-mechanism-red-spot", "Có, vì"],
+      ["skin-mechanism-soften", "(170, 110, 95)"],
+      ["skin-mechanism-face", "Giữ màu ban đầu"],
+    ];
+    for (const [id, answer] of checks) {
+      const index = Nb.cells.findIndex((item) => item.id === id);
+      if (index < 0) throw new Error("Missing mechanism cell " + id);
+      await Nb.runCell(index);
+      const buttons = [...Nb.cells[index].outEl.querySelectorAll(".mech-answer")];
+      const correct = buttons.find((button) => button.textContent.startsWith(answer));
+      if (!correct) throw new Error("Missing answer " + answer + "; output=" + Nb.cells[index].outEl.innerText);
+      correct.click();
+      if (!Nb.cells[index].outEl.querySelector(".mech-code pre")) {
+        throw new Error("Equivalent code stayed locked for " + id);
+      }
+    }
+    Nb.persist();
+    return {
+      concepts: Nb.saved.concepts,
+      widgetIds: Object.keys(Nb.saved.widgets),
+      doneCells: document.querySelectorAll(".cell.done").length,
+    };
+  })()`);
+  if (mechanisms.exceptionDetails) {
+    throw new Error(`Mechanism evaluation exception: ${JSON.stringify(mechanisms.exceptionDetails)}`);
+  }
+  if (!mechanisms.result?.value) throw new Error(`Mechanism evaluation failed: ${JSON.stringify(mechanisms)}`);
+  const mechanismEvidence = mechanisms.result.value;
+  if (mechanismEvidence.concepts.length !== 6 || mechanismEvidence.widgetIds.length !== 6 ||
+      mechanismEvidence.doneCells < 6) {
+    throw new Error(`Mechanism progress was not saved: ${JSON.stringify(mechanismEvidence)}`);
+  }
+  console.log("Browser check: six mechanism answers and widget states persisted.");
 
   const saved = await cdp.evaluate(`(() => {
     const cell = Nb.cells.find((item) => item.id === "task-convolve-layer");
@@ -158,12 +199,15 @@ try {
   if (!savedJson.cells["user-browser-check"].user) {
     throw new Error("Autosave did not mark the student-created cell for restoration.");
   }
+  if (savedJson.concepts.length !== 6 || Object.keys(savedJson.widgets).length !== 6) {
+    throw new Error("Autosave did not keep all six mechanism states.");
+  }
   if (savedText.includes("data:image") || savedText.includes("base64,")) {
     throw new Error("Autosave unexpectedly contains image or camera frame data.");
   }
 
   await cdp.evaluate("location.reload()");
-  await waitForNotebook(cdp, "skin", "resumed practice route", 56);
+  await waitForNotebook(cdp, "skin", "resumed practice route", 59);
   const resumed = await poll(async () => {
     const result = await cdp.evaluate(`({
       source: Nb.cells.find((item) => item.id === "task-convolve-layer")?.source,
@@ -175,15 +219,18 @@ try {
   }, (value) => value?.source?.includes("autosave-browser-check")
     && value?.userSource === "observation = 89.28" && value?.resume, 10_000, "resume banner");
   if (!resumed.key.includes(":skin:v3")) throw new Error(`Unexpected practice storage key: ${resumed.key}`);
+  console.log("Browser check: edited code, user cell, and progress survived reload.");
 
   await cdp.evaluate(`location.href = ${JSON.stringify(ANSWER_URL)}`);
   await waitForNotebook(cdp, "skin-answers", "answer route");
+  console.log("Browser check: answer notebook and Pyodide are ready.");
   const run = await cdp.evaluate(`(async () => {
     const ids = [
       "skin-setup", "skin-overview", "skin-pixel-channels", "numpy-channels",
+      "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
       "skin-convolution-math", "skin-preview-convolution", "skin-preview-evidence",
-      "skin-vote-math", "skin-preview-mask", "skin-red-gap-math",
-      "skin-preview-pimples", "skin-soften-math", "skin-preview-cleanup",
+      "skin-preview-mask", "skin-mechanism-red-spot", "skin-preview-pimples",
+      "skin-mechanism-soften", "skin-preview-cleanup", "skin-mechanism-face",
       "skin-check", "skin-demo", "numpy-filter-gallery", "numpy-kernel-gallery",
       "skin-public-gallery", "skin-public-test", "skin-face-mesh-map", "skin-face-mask-pipeline",
     ];
@@ -205,6 +252,8 @@ try {
       errors: ids.flatMap((id) => [...output(id).querySelectorAll(".err")].map((item) => item.innerText)),
       answerKey: Nb.storageKey(),
       controls,
+      mechanisms: ids.filter((id) => output(id).querySelector(".mechanism-card")).length,
+      fitsMobile: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       practiceSaveStillPresent: Boolean(localStorage.getItem("magic-dust-kit:skin-lab:skin:v3")),
     };
   })()`);
@@ -216,7 +265,10 @@ try {
   if (!evidence.grader.includes("Kết quả: 5/5")) {
     throw new Error(`The browser grader did not reach 5/5: ${evidence.grader}`);
   }
-  if (evidence.images < 19) throw new Error(`Expected at least 19 rendered illustrations, got ${evidence.images}`);
+  if (evidence.images < 16 || evidence.mechanisms !== 6) {
+    throw new Error(`Expected at least 16 images and six mechanisms, got ${evidence.images} and ${evidence.mechanisms}.`);
+  }
+  if (!evidence.fitsMobile) throw new Error("Skin Lab overflows the 390 px mobile viewport.");
   if (!evidence.controls.includes("Face Mesh") || evidence.controls.includes("Thiên Lôi") ||
       evidence.controls.includes("Vạn Kiếm") || evidence.controls.includes("Hỏa Liên")) {
     throw new Error(`Skin camera controls are wrong: ${evidence.controls}`);
@@ -242,7 +294,8 @@ try {
 
   console.log(
     `Browser OK (${REMOTE_BASE ? "live" : "local"}): autosave resumed by stable ID; ` +
-    `answer grader 5/5; ${evidence.images} illustrations; main route ${original.cells} cells.`,
+    `six mechanisms persisted; answer grader 5/5; ${evidence.images} illustrations; mobile fits; ` +
+    `main route ${original.cells} cells.`,
   );
 } finally {
   if (cdp) cdp.close();

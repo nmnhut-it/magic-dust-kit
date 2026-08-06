@@ -214,6 +214,61 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
   box-shadow:0 3px 0 var(--honey-line)}
 .gest:disabled{opacity:.45;cursor:not-allowed}
 
+/* Sáu bảng cơ chế của Skin Lab: thao tác, phép tính và code nằm trong cùng một khung. */
+.mechanism-card{border:2px solid var(--mint-line);border-radius:var(--r-lon);overflow:hidden;
+  background:var(--paper-raised);color:var(--ink)}
+.mechanism-card.passed{border-color:var(--success-ink)}
+.mech-header{padding:16px 18px;background:var(--mint-soft);border-bottom:2px solid var(--mint-line)}
+.mech-header h3{margin:5px 0;font-size:18px}.mech-header p{margin:0;color:var(--ink-muted)}
+.mech-step{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--honey-soft);
+  color:var(--honey-ink);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.mechanism-card.passed .mech-step{background:var(--success-soft);color:var(--success-ink)}
+.mech-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px}
+.mech-panel,.mech-check{min-width:0;border:2px solid var(--mint-line);border-radius:var(--r-vua);
+  padding:13px;background:var(--paper-warm)}
+.mech-panel h4,.mech-check h4{margin:0 0 10px;font-size:13px;color:var(--ink)}
+.mech-check{margin:0 14px 14px;background:var(--paper-raised)}
+.mech-check>p{margin:.45em 0}.mech-choices,.mech-answers,.mech-toggle-row{display:flex;flex-wrap:wrap;gap:7px}
+.mech-choice,.mech-answer{border:2px solid var(--mint-line);border-radius:999px;padding:7px 11px;
+  background:var(--paper-raised);color:var(--ink);font:700 12px/1.25 var(--sans)}
+.mech-choice:hover,.mech-answer:hover,.mech-choice.selected,.mech-answer.selected{
+  background:var(--honey-soft);border-color:var(--honey-line);color:var(--honey-ink)}
+.mech-answer{border-radius:var(--r-nho)}
+.mech-pixel-grid,.mech-binary-grid,.mech-weight-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;
+  width:min(100%,210px);margin:8px auto}
+.mech-pixel-grid{grid-template-columns:repeat(7,1fr);aspect-ratio:1}
+.mech-pixel{min-width:0;aspect-ratio:1;border:1px solid var(--paper-raised);border-radius:3px;padding:0}
+.mech-pixel.selected{outline:3px solid var(--honey-line);outline-offset:1px}
+.mech-readout,.mech-equation{font:700 12px/1.5 var(--mono);overflow-wrap:anywhere}
+.mech-range{display:grid;grid-template-columns:22px 38px minmax(0,1fr);gap:6px;align-items:center;
+  margin:7px 0;font-size:12px;font-weight:800}.mech-range input{width:100%;accent-color:var(--honey-line)}
+.mech-swatches{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.mech-swatch{min-height:72px;border:2px solid var(--mint-line);border-radius:var(--r-nho);display:flex;
+  align-items:flex-end;overflow:hidden}.mech-swatch span{width:100%;padding:5px 7px;background:var(--paper-raised);
+  color:var(--ink);font:700 10.5px/1.25 var(--mono)}
+.mech-conclusion{font-weight:700}.mech-calculations p{margin:6px 0;font:700 11.5px/1.45 var(--mono)}
+.mech-result{padding:9px 11px;border:2px solid var(--mint-line);border-radius:var(--r-nho);font-weight:800}
+.mech-result.yes{background:var(--success-soft);border-color:var(--success-ink);color:var(--success-ink)}
+.mech-result.no{background:var(--danger-soft);border-color:var(--danger-ink);color:var(--danger-ink)}
+.mech-locked{color:var(--ink-muted);font-weight:700}
+.mech-binary{aspect-ratio:1;border:2px solid var(--mint-line);border-radius:var(--r-nho);
+  background:var(--paper-raised);color:var(--ink);font:800 16px/1 var(--mono)}
+.mech-binary.on{background:var(--success-soft);border-color:var(--success-ink);color:var(--success-ink)}
+.mech-five-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:10px auto;width:min(100%,250px)}
+.mech-five-grid span,.mech-weight-grid span{aspect-ratio:1;display:grid;place-items:center;border:1px solid var(--mint-line);
+  border-radius:5px;background:var(--paper-raised);font:800 11px/1 var(--mono)}
+.mech-five-grid .middle{border:3px solid var(--honey-line)}
+.mech-five-grid .selected{background:var(--success-soft);color:var(--success-ink)}
+.mech-toggle-row{align-items:center;margin:8px 0}.mech-toggle-row strong{min-width:86px;font-family:var(--mono)}
+.mech-truth-table{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.mech-truth-table span{padding:7px;border:1px solid var(--mint-line);border-radius:6px;background:var(--paper-raised);
+  font:700 12px/1 var(--mono)}.mech-truth-table .active{background:var(--honey-soft);border-color:var(--honey-line)}
+.mech-feedback{padding:8px 10px;border-radius:var(--r-nho);font-weight:800}
+.mech-feedback.correct{background:var(--success-soft);color:var(--success-ink)}
+.mech-feedback.wrong{background:var(--danger-soft);color:var(--danger-ink)}
+.mech-code{margin-top:12px}.mech-code pre{margin:6px 0 0;padding:10px 12px;border-radius:var(--r-nho);
+  background:var(--paper-warm);border:2px solid var(--mint-line);font:12px/1.55 var(--mono);white-space:pre-wrap}
+
 /* thêm ô + chân trang */
 .addbar{display:flex;justify-content:center;padding:9px 0 3px;opacity:0;transition:opacity .15s}
 .addbar:hover,.cell.active+.addbar{opacity:1}
@@ -233,6 +288,8 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
   .body{padding-right:0}
   main{padding:16px 12px 90px}
   .brand small{display:none}
+  .mech-body{grid-template-columns:1fr;padding:10px}.mech-check{margin:0 10px 10px}
+  .mech-swatches{grid-template-columns:1fr 1fr}.mechanism-card{border-radius:var(--r-vua)}
 }
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}

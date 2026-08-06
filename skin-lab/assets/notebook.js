@@ -904,6 +904,7 @@ window.MagicMirrorUI = {
   start: () => Cam.start(),
   stop: () => Cam.stop(),
   emit: (kind, data) => Nb.emit(kind, data),
+  mechanism: (id, kind) => Nb.showMechanism(id, kind),
   progress: (taskId, passed) => Nb.recordTask(taskId, Boolean(passed)),
   /** magic_mirror.set_spark() gọi vào đây để đổi màu / số lượng bụi phép. */
   configureSparks: (color, perFrame) => {
@@ -929,7 +930,7 @@ const Nb = {
     return {
       schema: CFG.storageSchema,
       courseVersion: PAGE.courseVersion,
-      cells: {}, passed: [], lastCellId: null, updatedAt: null,
+      cells: {}, passed: [], widgets: {}, concepts: [], lastCellId: null, updatedAt: null,
     };
   },
 
@@ -952,6 +953,10 @@ const Nb = {
     const rawSaved = Nb.readSaved();
     Nb.saved = rawSaved && !Array.isArray(rawSaved) ? Object.assign(Nb.emptySaved(), rawSaved) : Nb.emptySaved();
     if (!Nb.saved.cells || typeof Nb.saved.cells !== "object") Nb.saved.cells = {};
+    if (!Nb.saved.widgets || typeof Nb.saved.widgets !== "object" || Array.isArray(Nb.saved.widgets)) {
+      Nb.saved.widgets = {};
+    }
+    if (!Array.isArray(Nb.saved.concepts)) Nb.saved.concepts = [];
     Nb.cells = (json.cells || []).map((c, idx) => ({
       id: c.id || c.metadata?.stable_id || `cell-${idx}`,
       type: c.cell_type === "markdown" ? "markdown" : "code",
@@ -1032,6 +1037,40 @@ const Nb = {
     Nb.persist();
   },
 
+  saveWidget(id, state) {
+    if (!Nb.saved) Nb.saved = Nb.emptySaved();
+    Nb.saved.widgets[id] = state;
+    Nb.scheduleSave();
+  },
+
+  recordConcept(id) {
+    if (!Nb.saved) Nb.saved = Nb.emptySaved();
+    const done = new Set(Nb.saved.concepts || []);
+    done.add(id);
+    Nb.saved.concepts = [...done];
+    const cell = Nb.cells.find((item) => item.tags.includes(`concept:${id}`));
+    if (cell?.el) cell.el.classList.add("done");
+    Nb.persist();
+  },
+
+  showMechanism(id, kind) {
+    if (!Nb.currentOutput) return;
+    if (!window.SkinMechanisms) {
+      Nb.appendText(Nb.currentOutput, "err", "Không mở được bảng cơ chế. Hãy tải lại trang.\n");
+      return;
+    }
+    const host = document.createElement("div");
+    Nb.currentOutput.appendChild(host);
+    window.SkinMechanisms.mount(host, {
+      id,
+      kind,
+      state: Nb.saved?.widgets?.[id] || {},
+      completed: (Nb.saved?.concepts || []).includes(id),
+      onChange: (state) => Nb.saveWidget(id, state),
+      onPass: () => Nb.recordConcept(id),
+    });
+  },
+
   render() {
     const root = document.getElementById("notebook");
     root.textContent = "";
@@ -1062,6 +1101,8 @@ const Nb = {
     el.dataset.cellId = cell.id;
     const taskTag = cell.tags.find((tag) => tag.startsWith("task:"));
     if (taskTag && new Set(Nb.saved?.passed || []).has(taskTag.slice(5))) el.classList.add("done");
+    const conceptTag = cell.tags.find((tag) => tag.startsWith("concept:"));
+    if (conceptTag && new Set(Nb.saved?.concepts || []).has(conceptTag.slice(8))) el.classList.add("done");
     el.onmousedown = () => Nb.focusCell(idx, false);
 
     const gutter = document.createElement("div");
