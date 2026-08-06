@@ -96,6 +96,30 @@ const MD = {
 
   row(line) { return line.replace(/^\||\|$/g, "").split("|").map((c) => MD.inline(c.trim())); },
 
+  /** Danh sách có dòng nối và mục con: dòng lùi đầu (không phải mục mới) nối vào
+   *  mục phía trên; mục lùi sâu hơn thành <ol>/<ul> lồng — trước đây cả hai đều
+   *  làm gãy danh sách giữa chừng và mất số thứ tự của các bước. */
+  list(lines, start) {
+    const isItem = (text) => /^\s*([-*+]|\d+\.)\s+/.test(text);
+    const indentOf = (text) => (text.match(/^\s*/) || [""])[0].length;
+    let i = start;
+    const parse = (indent) => {
+      const ordered = /^\s*\d+\./.test(lines[i]);
+      let html = "";
+      while (i < lines.length && isItem(lines[i]) && indentOf(lines[i]) === indent) {
+        let text = lines[i].replace(/^\s*([-*+]|\d+\.)\s+/, "");
+        for (i++; i < lines.length && lines[i].trim() && !isItem(lines[i]) && indentOf(lines[i]) > indent; i++) {
+          text += " " + lines[i].trim();
+        }
+        let nested = "";
+        if (i < lines.length && isItem(lines[i]) && indentOf(lines[i]) > indent) nested = parse(indentOf(lines[i]));
+        html += `<li>${MD.inline(text)}${nested}</li>`;
+      }
+      return `<${ordered ? "ol" : "ul"}>${html}</${ordered ? "ol" : "ul"}>`;
+    };
+    return { html: parse(indentOf(lines[start])), next: i };
+  },
+
   render(src) {
     const lines = src.split("\n");
     const out = [];
@@ -114,12 +138,9 @@ const MD = {
         out.push("<table><thead><tr>" + head.map((c) => `<th>${c}</th>`).join("") + "</tr></thead><tbody>" +
           rows.map((r) => "<tr>" + r.map((c) => `<td>${c}</td>`).join("") + "</tr>").join("") + "</tbody></table>");
       } else if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
-        const ordered = /^\s*\d+\./.test(line);
-        const items = [];
-        for (; i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i]); i++) {
-          items.push(`<li>${MD.inline(lines[i].replace(/^\s*([-*+]|\d+\.)\s+/, ""))}</li>`);
-        }
-        out.push(`<${ordered ? "ol" : "ul"}>${items.join("")}</${ordered ? "ol" : "ul"}>`);
+        const list = MD.list(lines, i);
+        out.push(list.html);
+        i = list.next;
       } else if (/^#{1,6}\s/.test(line)) {
         const level = line.match(/^#+/)[0].length;
         out.push(`<h${level}>${MD.inline(line.slice(level + 1))}</h${level}>`);
@@ -274,7 +295,13 @@ const Kernel = {
       kept.push(line.replace(/^\s+File "<exec>", line (\d+).*$/, "In this code cell, line $1:"));
     }
     const hasUserFrame = kept.some((line) => line.startsWith("In this code cell"));
-    return kept.filter((line) => line.trim() && (hasUserFrame || !line.startsWith(pythonErrorHeader))).join("\n");
+    const shortened = kept.filter((line) => line.trim() && (hasUserFrame || !line.startsWith(pythonErrorHeader))).join("\n");
+    // NameError về '___' nghĩa là học sinh chưa điền chỗ trống — dịch hộ các em
+    // thay vì bắt các em tự luận ra từ traceback.
+    if (String(text).includes("'___'")) {
+      return shortened + "\n→ A ___ blank is still in this code. Replace every ___ with your answer, then run the cell again.";
+    }
+    return shortened;
   },
 
   /** Gọi một hàm trong magic_mirror, tự dọn proxy. */
@@ -1237,6 +1264,9 @@ const Nb = {
       });
     }
     Nb.cells.forEach((cell) => {
+      // Chỉ ô code mới giữ bản đã lưu: code là bài làm của học sinh, còn chữ giảng
+      // (markdown) phải nhận bản cập nhật mỗi lần bài học được sửa trên máy chủ.
+      if (cell.type !== "code") return;
       if (Object.prototype.hasOwnProperty.call(Nb.saved.cells, cell.id)) {
         cell.source = typeof Nb.saved.cells[cell.id] === "string"
           ? Nb.saved.cells[cell.id]

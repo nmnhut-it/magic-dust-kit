@@ -1860,6 +1860,9 @@ def _try_skin(name, test):
     except Exception as error:
         problem = "%s: %s" % (type(error).__name__, error)
     if problem:
+        if "'___'" in problem:
+            problem = ("the function still contains ___ blanks; replace each ___ "
+                       "in its cell, run that cell, then check again")
         print("  FIX   %s -> %s" % (name, problem))
         return False
     print("   OK   %s" % name)

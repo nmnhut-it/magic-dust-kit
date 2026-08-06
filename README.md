@@ -5,13 +5,14 @@
 Bạn vừa bước qua Gương Vô Cực. Đây là xưởng của bạn: mã nguồn của chính đồ chơi
 bạn vừa chơi. **Bạn viết Python, và Python của bạn điều khiển camera thật.**
 
-Trong này có ba trang:
+Trong này có bốn trang:
 
 | | |
 |---|---|
 | `index.html` (trang chủ) | **Trang làm bài — vào đây trước.** Chín ô kiểu sổ tay: gõ Python, bấm CHẠY, máy chấm ngay và dựng ẢNH VÀO / ẢNH RA bằng chính code bạn vừa viết. Xong năm ô bắt buộc thì cổng sang sân khấu mở. Cuối trang có BẢNG ĐIỂM trên 10 để chụp màn hình gửi bố mẹ |
 | `san-khau.html` | **Sân khấu thật** — camera bật lên, tay bạn hiện trong khung, và mã Python bạn vừa viết quyết định phép nào hiện ra |
 | `lessons/islandFXFORGE.html` | **Đảo GƯƠNG VÔ CỰC** — nơi bạn học lật ảnh, ghép lớp, chỉnh sáng trên lưới số nhỏ |
+| `skin-lab/index.html` | **Skin Lab** (bài đọc tiếng Anh) — sổ tay NumPy + SciPy: sáu cơ chế ảnh đánh số 1–6, năm hàm điền chỗ trống, chụp đúng một tấm ảnh để chạy cả quy trình với Face Mesh; xem `skin-lab/README.md` |
 
 **Không cài Python cũng học được.** Python chạy sẵn trong trình duyệt (Pyodide),
 bài lưu trong `localStorage` của chính máy bạn. Mở trang chủ, làm, rồi bấm nút

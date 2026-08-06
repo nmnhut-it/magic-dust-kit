@@ -253,6 +253,18 @@ class TestTeachingHelpers(unittest.TestCase):
         self.assertEqual(gallery.size, (616, 172))
         self.assertGreater(len(gallery.getcolors(maxcolors=gallery.width * gallery.height) or []), 100)
 
+    def test_grader_translates_unfilled_blanks_into_plain_instructions(self):
+        def unfilled():
+            raise NameError("name '___' is not defined")
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            passed = magic_mirror._try_skin("convolve_layer  (apply a kernel)", unfilled)
+        report = output.getvalue()
+        self.assertFalse(passed)
+        self.assertIn("still contains ___ blanks", report)
+        self.assertNotIn("NameError", report)
+
     def test_solution_uses_vectorized_image_libraries(self):
         source = (Path(__file__).parent / "skin_filters_solution.py").read_text(encoding="utf-8")
         for call in (

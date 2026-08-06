@@ -113,7 +113,7 @@ async function notebookState(cdp) {
   return result.result.value;
 }
 
-async function waitForNotebook(cdp, mode, label, expectedCells = 69) {
+async function waitForNotebook(cdp, mode, label, expectedCells = 70) {
   const state = await poll(
     () => notebookState(cdp),
     (value) => value?.page === mode && (value.state === "ready" || value.state === "error"),
@@ -211,6 +211,35 @@ try {
   }
   console.log("Browser check: eight mechanism answers and widget states persisted.");
 
+  const blanks = await cdp.evaluate(`(async () => {
+    const runById = async (id) => {
+      const index = Nb.cells.findIndex((item) => item.id === id);
+      if (index < 0) throw new Error("Missing cell " + id);
+      await Nb.runCell(index);
+      return Nb.cells[index].outEl.innerText;
+    };
+    await runById("task-skin-evidence");
+    const preview = await runById("skin-preview-evidence");
+    const grader = await runById("skin-check");
+    const note = document.querySelector('[data-cell-id="skin-task-evidence-note"] .md');
+    return { preview, grader, nestedBlankSteps: note ? note.querySelectorAll("ul ol li").length : -1 };
+  })()`);
+  if (blanks.exceptionDetails) {
+    throw new Error(`Blank-hint evaluation exception: ${JSON.stringify(blanks.exceptionDetails)}`);
+  }
+  const blankEvidence = blanks.result?.value;
+  if (!blankEvidence) throw new Error(`Blank-hint evaluation failed: ${JSON.stringify(blanks)}`);
+  if (!blankEvidence.preview.includes("Replace every ___ with your answer")) {
+    throw new Error(`Unfilled-blank run did not explain itself: ${blankEvidence.preview}`);
+  }
+  if (!blankEvidence.grader.includes("still contains ___ blanks")) {
+    throw new Error(`The grader did not translate the ___ blank: ${blankEvidence.grader}`);
+  }
+  if (blankEvidence.nestedBlankSteps !== 3) {
+    throw new Error(`Task 1's fill-the-blank guide should render as a nested 3-step list, got ${blankEvidence.nestedBlankSteps}.`);
+  }
+  console.log("Browser check: unfilled ___ blanks produce plain-words guidance.");
+
   const saved = await cdp.evaluate(`(() => {
     const cell = Nb.cells.find((item) => item.id === "task-convolve-layer");
     cell.source += "\\n# autosave-browser-check";
@@ -238,7 +267,7 @@ try {
   }
 
   await cdp.evaluate("location.reload()");
-  await waitForNotebook(cdp, "skin", "resumed practice route", 70);
+  await waitForNotebook(cdp, "skin", "resumed practice route", 71);
   const resumed = await poll(async () => {
     const result = await cdp.evaluate(`({
       source: Nb.cells.find((item) => item.id === "task-convolve-layer")?.source,

@@ -29,12 +29,12 @@ class TestSkinNotebook(unittest.TestCase):
         practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
         answer_page = (ROOT / "dap-an.html").read_text(encoding="utf-8")
         self.assertIn('notebook: "Skin_Lab.ipynb"', practice_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.8", practice_page)
-        self.assertIn("assets/skin-mechanisms.js?v=2026.08.06.8", practice_page)
+        self.assertIn("assets/notebook.js?v=2026.08.06.9", practice_page)
+        self.assertIn("assets/skin-mechanisms.js?v=2026.08.06.9", practice_page)
         self.assertIn('href="dap-an.html"', practice_page)
         self.assertIn('href="../index.html"', practice_page)
         self.assertIn('notebook: "Skin_Lab_Answers.ipynb"', answer_page)
-        self.assertIn("assets/notebook.js?v=2026.08.06.8", answer_page)
+        self.assertIn("assets/notebook.js?v=2026.08.06.9", answer_page)
         self.assertIn('href="./"', answer_page)
         self.assertIn('href="../index.html"', answer_page)
 
@@ -174,6 +174,60 @@ class TestSkinNotebook(unittest.TestCase):
             self.assertIn("OUTPUT", task_text)
         self.assertIn("A captured or uploaded image is never", lesson)
 
+    def test_task_notes_and_starter_comments_agree_on_one_numbering(self):
+        note_ids = {
+            "skin_evidence": "skin-task-evidence-note",
+            "convolve_layer": "skin-task-convolve-note",
+            "detect_skin": "skin-task-detect-note",
+            "detect_pimples": "skin-task-pimple-note",
+            "remove_pimples": "skin-task-remove-note",
+        }
+        blank_counts = {
+            "skin_evidence": "three", "convolve_layer": "three",
+            "detect_skin": "two", "detect_pimples": "two", "remove_pimples": "two",
+        }
+        teaching_order = (
+            "skin_evidence", "convolve_layer", "detect_skin",
+            "detect_pimples", "remove_pimples",
+        )
+        cells = {cell["id"]: cell for cell in self.practice["cells"]}
+        for number, task in enumerate(teaching_order, start=1):
+            note = source(cells[note_ids[task]])
+            code = source(cells["task-" + task.replace("_", "-")])
+            self.assertIn(f"Coding task {number} of 5 — complete `{task}`", note)
+            self.assertIn(f"fill the {blank_counts[task]} `___` blanks", note)
+            self.assertIn(f"# TASK {number} - fill the {blank_counts[task]} ___ blanks", code)
+
+    def test_learner_survival_kit_covers_cells_errors_and_vocabulary(self):
+        cells = {cell["id"]: cell for cell in self.practice["cells"]}
+        setup = source(cells["skin-setup-note"])
+        self.assertIn("The four kinds of cells on this page", setup)
+        self.assertIn("If red error text appears", setup)
+        self.assertIn("`name '___' is not defined`", setup)
+        self.assertIn("An error never deletes your work.", setup)
+        glossary = source(cells["skin-glossary"])
+        for word in ("pixel", "channel", "mask", "threshold", "kernel",
+                     "convolution", "divisor", "overlay"):
+            self.assertIn(f"| {word} |", glossary)
+
+    def test_mechanism_trail_is_numbered_one_to_six_without_gaps(self):
+        markdown = "\n".join(
+            source(cell) for cell in self.practice["cells"] if cell["cell_type"] == "markdown"
+        )
+        for number in range(1, 7):
+            self.assertIn(f"## Mechanism {number} — ", markdown)
+        self.assertNotIn("Investigation", markdown)
+        panels = (ROOT / "assets" / "skin-mechanisms.js").read_text(encoding="utf-8")
+        for number in range(1, 7):
+            self.assertIn(f"Mechanism {number} —", panels)
+
+    def test_runtime_translates_blanks_and_refreshes_teaching_text(self):
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        self.assertIn("Replace every ___ with your answer", runtime)
+        self.assertIn('if (cell.type !== "code") return;', runtime)
+        helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
+        self.assertIn("still contains ___ blanks", helpers)
+
     def test_route_has_no_training_dependency_or_diagnostic_claim(self):
         code = (ROOT / "skin_filters_solution.py").read_text(encoding="utf-8").lower()
         for dependency in ("tensorflow", "torch", "sklearn", "keras", "model.fit"):
@@ -187,7 +241,7 @@ class TestSkinNotebook(unittest.TestCase):
         answer_ids = [cell["id"] for cell in self.answers["cells"]]
         self.assertEqual(practice_ids, answer_ids)
         self.assertEqual(len(practice_ids), len(set(practice_ids)))
-        self.assertEqual(len(practice_ids), 69)
+        self.assertEqual(len(practice_ids), 70)
         for notebook in (self.practice, self.answers):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)

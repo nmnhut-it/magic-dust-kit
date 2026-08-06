@@ -23,15 +23,6 @@ SKIN_NEIGHBOURS_NEEDED = 5
 PIMPLE_RED_GAP = 24
 
 
-# === TASK: convolve_layer ===
-def convolve_layer(layer, kernel, divisor):
-    """Apply a SciPy kernel and return a new NumPy array."""
-    values = np.asarray(layer, dtype=np.float32)
-    weights = np.asarray(kernel, dtype=np.float32)
-    filtered = ndimage.convolve(values, weights, mode="nearest")
-    return filtered / divisor
-
-
 # === TASK: skin_evidence ===
 def skin_evidence(red, green, blue):
     """Apply one RGB rule to a pixel or to three complete NumPy channels."""
@@ -49,6 +40,15 @@ def skin_evidence(red, green, blue):
     )
     result = np.where(looks_like_skin, MASK_ON, MASK_OFF).astype(np.uint8)
     return int(result) if result.ndim == 0 else result
+
+
+# === TASK: convolve_layer ===
+def convolve_layer(layer, kernel, divisor):
+    """Apply a SciPy kernel and return a new NumPy array."""
+    values = np.asarray(layer, dtype=np.float32)
+    weights = np.asarray(kernel, dtype=np.float32)
+    filtered = ndimage.convolve(values, weights, mode="nearest")
+    return filtered / divisor
 
 
 # === TASK: detect_skin ===
