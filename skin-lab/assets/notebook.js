@@ -505,7 +505,7 @@ const Cam = {
     } catch (error) {
       Cam.faceMesh = null;
       Cam.faceLandmarks = [];
-      Cam.msgEl.textContent = "Không tải được MediaPipe Face Mesh; camera vẫn chạy nhưng face mask đang tắt.";
+      Cam.msgEl.textContent = "Không tải được MediaPipe Face Mesh; camera vẫn chạy nhưng vùng giới hạn khuôn mặt đang tắt.";
     }
   },
 

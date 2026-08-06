@@ -74,7 +74,7 @@ class TestSkinNotebook(unittest.TestCase):
         for phrase in (
             "np.asarray", ".shape", "np.where", "np.clip", "Image.fromarray",
             "ndimage.convolve", "ndimage.uniform_filter", "ndimage.maximum_filter",
-            "không viết vòng lặp Python cho từng pixel",
+            "không cần tự viết hai vòng `for row` và `for column`",
         ):
             self.assertIn(phrase, lesson)
         self.assertNotIn("không thuộc 5 phần bắt buộc", lesson)
@@ -88,8 +88,24 @@ class TestSkinNotebook(unittest.TestCase):
         ):
             self.assertIn(cell_id, ids)
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
-        self.assertIn("con số cụ thể", lesson)
-        self.assertIn("Overlay giữ màu gốc", lesson)
+        self.assertIn("phép tính bằng số", lesson)
+        self.assertIn("Ảnh phủ màu vẫn giữ màu gốc", lesson)
+
+    def test_learner_prose_defines_terms_and_avoids_translated_shorthand(self):
+        markdown = "\n".join(
+            source(cell) for cell in self.practice["cells"] if cell["cell_type"] == "markdown"
+        )
+        self.assertIn("được gọi là `skin_mask` và `pimple_mask`", markdown)
+        self.assertIn("giá trị `255` là vùng được chọn", markdown)
+        self.assertIn("giá trị `0` là vùng được giữ nguyên", markdown)
+        self.assertIn("bảng số NumPy", markdown)
+        self.assertIn("478 điểm mốc", markdown)
+        for phrase in (
+            "pipeline", "hình màu/overlay", "478 landmark", "cho phiếu",
+            "ba đèn R, G, B", "không tin một pixel", "API thư viện",
+            "NumPy array mới shape", "array `uint8`",
+        ):
+            self.assertNotIn(phrase.lower(), markdown.lower())
 
     def test_tasks_name_given_input_process_and_output(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
@@ -167,7 +183,7 @@ class TestSkinNotebook(unittest.TestCase):
     def test_face_mesh_is_the_camera_capstone_and_spells_are_not_skin_controls(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
-        for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "478 landmark"):
+        for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "478 điểm mốc"):
             self.assertIn(phrase, lesson)
         self.assertIn("@mediapipe/face_mesh", runtime)
         self.assertIn("if (!SKIN)", runtime)

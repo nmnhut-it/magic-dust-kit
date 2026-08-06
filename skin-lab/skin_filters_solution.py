@@ -25,7 +25,7 @@ PIMPLE_RED_GAP = 24
 
 # === TASK: convolve_layer ===
 def convolve_layer(layer, kernel, divisor):
-    """Áp dụng kernel bằng SciPy và trả một NumPy array mới."""
+    """Dùng bảng trọng số với SciPy và trả về một bảng số NumPy mới."""
     values = np.asarray(layer, dtype=np.float32)
     weights = np.asarray(kernel, dtype=np.float32)
     filtered = ndimage.convolve(values, weights, mode="nearest")
@@ -53,7 +53,7 @@ def skin_evidence(red, green, blue):
 
 # === TASK: detect_skin ===
 def detect_skin(img):
-    """Tạo mask vùng da từ ba kênh màu và phiếu của cửa sổ 3x3."""
+    """Tạo ảnh đánh dấu vùng da từ ba kênh màu và vùng 3x3."""
     pixels = np.asarray(img.convert("RGB"), dtype=np.int16)
     raw_mask = skin_evidence(
         pixels[:, :, 0],
@@ -67,7 +67,7 @@ def detect_skin(img):
 
 # === TASK: detect_pimples ===
 def detect_pimples(img, skin_mask):
-    """Tìm điểm đỏ hơn vùng 5x5 rồi mở rộng candidate thêm một pixel."""
+    """Tìm điểm đỏ nổi bật trong vùng 5x5 rồi mở rộng vùng được chọn."""
     pixels = np.asarray(img.convert("RGB"), dtype=np.float32)
     red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
     redness = np.maximum(0, red - (green + blue) / 2)
@@ -82,7 +82,7 @@ def detect_pimples(img, skin_mask):
 
 # === TASK: remove_pimples ===
 def remove_pimples(img):
-    """Làm mềm nơi pimple mask bật và giữ nguyên mọi pixel còn lại."""
+    """Làm mềm nơi pimple_mask bằng 255 và giữ nguyên mọi pixel còn lại."""
     source = img.convert("RGB")
     pixels = np.asarray(source, dtype=np.float32)
     skin_mask = detect_skin(source)

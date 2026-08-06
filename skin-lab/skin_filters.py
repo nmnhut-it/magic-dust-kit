@@ -34,12 +34,12 @@ PIMPLE_RED_GAP = 24
 
 # === TASK: convolve_layer ===
 def convolve_layer(layer, kernel, divisor):
-    """Áp dụng kernel bằng SciPy và trả một NumPy array mới."""
+    """Dùng bảng trọng số với SciPy và trả về một bảng số NumPy mới."""
     # NHIỆM VỤ 1.
     # Giá trị cho sẵn: layer, kernel và divisor.
-    # 1. Đổi layer và kernel thành NumPy array có dtype np.float32.
+    # 1. Đổi layer và kernel thành bảng số NumPy có kiểu số np.float32.
     # 2. Gọi ndimage.convolve(values, weights, mode="nearest").
-    # 3. Chia toàn bộ array kết quả cho divisor rồi return.
+    # 3. Chia toàn bộ bảng kết quả cho divisor rồi trả về.
     values = np.asarray(layer, dtype=np.float32)
     weights = np.asarray(kernel, dtype=np.float32)
     filtered = ndimage.convolve(___, ___, mode="nearest")
@@ -54,8 +54,8 @@ def skin_evidence(red, green, blue):
     blue = np.asarray(blue, dtype=np.int16)
 
     # NHIỆM VỤ 2.
-    # Tính ba array brightness, warmth và red_green_gap.
-    # Dùng &, không dùng and, vì mỗi điều kiện đang chạy trên cả lưới pixel.
+    # Tính ba bảng brightness, warmth và red_green_gap.
+    # Dùng &, không dùng and, vì mỗi điều kiện được áp dụng cho cả ảnh.
     brightness = (red + green + blue) // 3
     warmth = ___
     red_green_gap = ___
@@ -70,12 +70,12 @@ def skin_evidence(red, green, blue):
 
 # === TASK: detect_skin ===
 def detect_skin(img):
-    """Tạo mask vùng da từ ba kênh màu và phiếu của cửa sổ 3x3."""
+    """Tạo ảnh đánh dấu vùng da từ ba kênh màu và vùng 3x3."""
     # NHIỆM VỤ 3.
-    # 1. Đổi ảnh PIL thành pixels có shape (height, width, 3).
+    # 1. Đổi ảnh PIL thành bảng pixels có kích thước (height, width, 3).
     # 2. Đưa ba kênh màu vào skin_evidence để tạo raw_mask.
-    # 3. Lấy mức phiếu trung bình 3x3 bằng convolve_layer.
-    # 4. Dùng np.where để đổi mức phiếu thành mask 0/255.
+    # 3. Tính mức trung bình trong vùng 3x3 bằng convolve_layer.
+    # 4. Dùng np.where để tạo skin_mask chỉ gồm 0 và 255.
     pixels = np.asarray(img.convert("RGB"), dtype=np.int16)
     raw_mask = skin_evidence(
         pixels[:, :, 0],
@@ -89,10 +89,10 @@ def detect_skin(img):
 
 # === TASK: detect_pimples ===
 def detect_pimples(img, skin_mask):
-    """Tìm điểm đỏ hơn vùng 5x5 rồi mở rộng candidate thêm một pixel."""
+    """Tìm điểm đỏ nổi bật trong vùng 5x5 rồi mở rộng vùng được chọn."""
     # NHIỆM VỤ 4.
     # uniform_filter tính trung bình vùng 5x5.
-    # maximum_filter mở rộng mỗi candidate sang các pixel sát bên.
+    # maximum_filter mở rộng vùng tạm được chọn sang các pixel sát bên.
     pixels = np.asarray(img.convert("RGB"), dtype=np.float32)
     red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
     redness = np.maximum(0, red - (green + blue) / 2)
@@ -107,12 +107,12 @@ def detect_pimples(img, skin_mask):
 
 # === TASK: remove_pimples ===
 def remove_pimples(img):
-    """Làm mềm nơi pimple mask bật và giữ nguyên mọi pixel còn lại."""
+    """Làm mềm nơi pimple_mask bằng 255 và giữ nguyên mọi pixel còn lại."""
     # NHIỆM VỤ 5.
     # 1. Tạo skin_mask và pimple_mask bằng hai hàm trước.
-    # 2. Biến kernel 3x3 thành shape (3, 3, 1) để không trộn R, G, B với nhau.
+    # 2. Thêm một chiều để kernel có kích thước (3, 3, 1), nhờ đó không trộn R, G, B.
     # 3. ndimage.convolve làm mềm ba kênh trong một lần gọi.
-    # 4. np.where chỉ lấy màu mềm ở nơi pimple_mask bật.
+    # 4. np.where chỉ lấy màu mềm ở nơi pimple_mask bằng 255.
     source = img.convert("RGB")
     pixels = np.asarray(source, dtype=np.float32)
     skin_mask = detect_skin(source)
