@@ -33,7 +33,7 @@ assert.deepEqual(mechanisms.calculateSoften({ mask: 0 }).output, [225, 62, 66]);
 
 assert.deepEqual(mechanisms.calculateFace({ face: 1, skin: 0 }), {
   allowed: false,
-  output: "Giữ màu ban đầu",
+  output: "Keep the original colour",
 });
 assert.equal(mechanisms.calculateFace({ face: 1, skin: 1 }).allowed, true);
 

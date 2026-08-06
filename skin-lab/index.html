@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Skin Lab — NumPy, SciPy và Face Mesh</title>
+<title>Skin Lab — NumPy, SciPy, and Face Mesh</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>%F0%9F%94%AC</text></svg>">
 <link rel="stylesheet" href="assets/notebook.css">
 </head>
@@ -14,36 +14,36 @@
     <div class="brand">
       <div class="logo">🔬</div>
       <div>
-        <h1>Skin Lab — NumPy và Face Mesh</h1>
-        <small>Tách ba kênh RGB, đánh dấu vùng cần đổi và xử lý ảnh bằng thư viện</small>
+        <h1>Skin Lab — NumPy and Face Mesh</h1>
+        <small>Separate RGB channels, build masks, and process one photograph</small>
       </div>
     </div>
-    <a class="btn" href="dap-an.html" title="Xem bài giải mẫu">🔑 Bài giải</a>
-    <a class="btn" href="../index.html" title="Về Xưởng Mật Ngữ">⌂ Trang chính</a>
-    <button class="btn icon" id="openBtn" title="Mở file .ipynb đã lưu từ máy">📂</button>
-    <button class="btn primary" id="runAllBtn" disabled>▶ Chạy tất cả</button>
-    <button class="btn icon" id="restartBtn" disabled title="Khởi động lại Python và xóa hết kết quả">⟳</button>
-    <button class="btn icon" id="saveBtn" title="Tải bài em vừa làm về máy">⬇</button>
-    <button class="btn icon" id="resetBtn" title="Bỏ hết code đã sửa, quay về đề bài gốc">↺</button>
-    <span class="kernel" id="kernelPill" data-state="loading"><span class="dot"></span><span id="kernelText">Đang khởi động…</span></span>
-    <span class="save-state" id="saveState">Chưa có thay đổi</span>
+    <a class="btn" href="dap-an.html" title="Open the worked answer notebook">🔑 Answer key</a>
+    <a class="btn" href="../index.html" title="Return to Magic Dust">⌂ Main page</a>
+    <button class="btn icon" id="openBtn" title="Open a saved .ipynb file">📂</button>
+    <button class="btn primary" id="runAllBtn" disabled>▶ Run all</button>
+    <button class="btn icon" id="restartBtn" disabled title="Restart Python and clear all outputs">⟳</button>
+    <button class="btn icon" id="saveBtn" title="Download your notebook">⬇</button>
+    <button class="btn icon" id="resetBtn" title="Discard edits and restore the starter notebook">↺</button>
+    <span class="kernel" id="kernelPill" data-state="loading"><span class="dot"></span><span id="kernelText">Starting…</span></span>
+    <span class="save-state" id="saveState">No changes yet</span>
   </div>
 </header>
 
 <main>
   <div class="banner hidden" id="banner"></div>
-  <div id="notebook"><div class="boot"><div class="spin"></div>Đang tải Skin Lab…</div></div>
+  <div id="notebook"><div class="boot"><div class="spin"></div>Loading Skin Lab…</div></div>
   <div class="hint">
-    <span><kbd>Shift</kbd>+<kbd>Enter</kbd> chạy ô rồi xuống ô kế</span>
-    <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> chạy tại chỗ</span>
-    <span>Nháy đúp vào phần chữ để sửa</span>
-    <span>Bài của em được lưu tự động trong trình duyệt</span>
+    <span><kbd>Shift</kbd>+<kbd>Enter</kbd> runs the cell and moves down</span>
+    <span><kbd>Ctrl</kbd>+<kbd>Enter</kbd> runs the current cell</span>
+    <span>Double-click text to edit it</span>
+    <span>Your work is saved automatically in this browser</span>
   </div>
 </main>
 
 <input type="file" id="filePicker" accept=".ipynb" hidden>
 
-<script>window.MM_PAGE = { notebook: "Skin_Lab.ipynb", mode: "skin", courseVersion: "2026.08.06.5" };</script>
+<script>window.MM_PAGE = { notebook: "Skin_Lab.ipynb", mode: "skin", courseVersion: "2026.08.06.6" };</script>
 <script src="assets/skin-mechanisms.js"></script>
 <script src="assets/notebook.js"></script>
 </body>

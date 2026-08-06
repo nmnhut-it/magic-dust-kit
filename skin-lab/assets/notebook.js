@@ -27,9 +27,9 @@ const CFG = {
   },
   capture: { w: 480, h: 360 },
   quality: [
-    { label: "Tiết kiệm (160×120)", w: 160, h: 120 },
-    { label: "Cân bằng (240×180)", w: 240, h: 180 },
-    { label: "Nét (320×240)", w: 320, h: 240 },
+    { label: "Fast (160×120)", w: 160, h: 120 },
+    { label: "Balanced (240×180)", w: 240, h: 180 },
+    { label: "Detailed (320×240)", w: 320, h: 240 },
   ],
   defaultQuality: 1,
   fingerMax: 5,
@@ -59,20 +59,20 @@ const CFG = {
 };
 
 const T = {
-  kernel: { loading: "Đang tải Python…", ready: "Kernel sẵn sàng", busy: "Đang chạy…", error: "Kernel lỗi" },
-  skipCell: "Ô này chỉ chạy trên Colab / máy cá nhân — bấm ▶ nếu vẫn muốn thử",
-  fileHint: "<strong>Đang mở bằng giao thức <code>file://</code>.</strong> Trình duyệt sẽ chặn việc đọc file " +
-    "<code>.ipynb</code> và có thể chặn cả camera. Hãy mở terminal tại thư mục dự án, chạy " +
-    "<code>python -m http.server 8000</code> rồi vào <code>http://localhost:8000</code>.",
-  loadFail: (f) => `<strong>Không đọc được <code>${f}</code>.</strong> Hãy chắc chắn file nằm cùng thư mục với ` +
-    `trang này, hoặc bấm <em>📂 Mở file</em> để chọn notebook từ máy.`,
-  camDenied: "Không mở được camera: ",
-  camManual: "Không tải được bộ nhận diện tay — hãy bấm nút số ngón bên dưới để đổi bộ lọc.",
-  bootFail: "Không tải được Pyodide. Kiểm tra kết nối mạng rồi tải lại trang.",
-  fingerBtn: (n) => `${n} ngón`,
-  holdHint: "Xòe cả 5 ngón và giữ yên để lật ảnh",
-  holdDone: "Lật rồi!",
-  sparkHint: "Giơ ngón cái + ngón út để triệu hồi bụi phép",
+  kernel: { loading: "Loading Python…", ready: "Kernel ready", busy: "Running…", error: "Kernel error" },
+  skipCell: "This cell is intended for Colab or a local Python install — press ▶ to run it anyway",
+  fileHint: "<strong>This page is open with <code>file://</code>.</strong> The browser will block the notebook file " +
+    "and may block the camera. Open a terminal in the project folder, run " +
+    "<code>python -m http.server 8000</code>, then visit <code>http://localhost:8000</code>.",
+  loadFail: (f) => `<strong>Could not read <code>${f}</code>.</strong> Check that it is beside this page, ` +
+    `or press <em>📂 Open file</em> to choose a notebook from this device.`,
+  camDenied: "Could not open the camera: ",
+  camManual: "The hand detector could not load. Use the numbered buttons below instead.",
+  bootFail: "Pyodide could not load. Check the connection and reload the page.",
+  fingerBtn: (n) => `${n} fingers`,
+  holdHint: "Hold all 5 fingers open to flip the image",
+  holdDone: "Flipped!",
+  sparkHint: "Raise your thumb and little finger to create particles",
 };
 
 const PAGE = Object.assign(
@@ -194,9 +194,9 @@ const Kernel = {
     }
     if (!indexURL) { Kernel.setState("error", T.bootFail); return; }
 
-    Kernel.setState("loading", "Đang tải Python…");
+    Kernel.setState("loading", "Loading Python…");
     Kernel.py = await loadPyodide({ indexURL });
-    Kernel.setState("loading", "Đang tải NumPy + SciPy + Pillow…");
+    Kernel.setState("loading", "Loading NumPy + SciPy + Pillow…");
     await Kernel.py.loadPackage(CFG.pyodide.packages);
     // `batched` gọi mỗi dòng một lần và bỏ ký tự xuống dòng — trả lại cho đúng.
     Kernel.py.setStdout({ batched: (s) => Kernel.sink && Kernel.sink("out", s + "\n") });
@@ -230,7 +230,7 @@ const Kernel = {
   async restart() {
     Cam.stop();
     Snapshot.stop();
-    Kernel.setState("loading", "Đang khởi động lại…");
+    Kernel.setState("loading", "Restarting…");
     Kernel.py = null;
     await Kernel.boot();
   },
@@ -270,9 +270,9 @@ const Kernel = {
       if (/^\s+File "/.test(line)) skipping = internal.test(line);
       else if (!/^\s/.test(line)) skipping = false;
       if (skipping) continue;
-      kept.push(line.replace(/^\s+File "<exec>", line (\d+).*$/, "Trong ô code, dòng $1:"));
+      kept.push(line.replace(/^\s+File "<exec>", line (\d+).*$/, "In this code cell, line $1:"));
     }
-    const hasUserFrame = kept.some((line) => line.startsWith("Trong ô code"));
+    const hasUserFrame = kept.some((line) => line.startsWith("In this code cell"));
     return kept.filter((line) => line.trim() && (hasUserFrame || !line.startsWith(pythonErrorHeader))).join("\n");
   },
 
@@ -903,7 +903,8 @@ const Cam = {
 /* ------------------------ chụp một ảnh cho Skin Lab ------------------------ */
 const Snapshot = {
   host: null, wrap: null, stream: null, video: null, sourceCanvas: null,
-  inputCanvas: null, outputCanvas: null, message: null, captureButton: null,
+  inputCanvas: null, skinCanvas: null, spotCanvas: null, differenceCanvas: null,
+  outputCanvas: null, message: null, captureButton: null,
   results: null, faceMesh: null,
 
   start() {
@@ -921,8 +922,8 @@ const Snapshot = {
 
     const intro = document.createElement("div");
     intro.className = "snapshot-intro";
-    intro.innerHTML = "<strong>INPUT là một tấm ảnh.</strong> Căn khuôn mặt vào khung rồi bấm Chụp một tấm. " +
-      "Camera sẽ dừng ngay; NumPy, SciPy và Face Mesh chỉ chạy một lần trên ảnh vừa chụp.";
+    intro.innerHTML = "<strong>INPUT is one still image.</strong> Place one face in the frame, then press Capture one photo. " +
+      "The camera stops immediately; NumPy, SciPy, and Face Mesh run once on that image.";
 
     const live = document.createElement("div");
     live.className = "snapshot-live";
@@ -934,13 +935,13 @@ const Snapshot = {
     bar.className = "snapshot-bar";
     const capture = document.createElement("button");
     capture.type = "button"; capture.className = "btn primary";
-    capture.textContent = "Chụp một tấm"; capture.disabled = true;
+    capture.textContent = "Capture one photo"; capture.disabled = true;
     capture.onclick = () => Snapshot.capturePhoto();
     const retry = document.createElement("button");
-    retry.type = "button"; retry.className = "btn"; retry.textContent = "Mở lại camera";
+    retry.type = "button"; retry.className = "btn"; retry.textContent = "Open camera again";
     retry.onclick = () => Snapshot.openCamera();
     const choose = document.createElement("label");
-    choose.className = "btn"; choose.textContent = "Chọn ảnh từ máy";
+    choose.className = "btn"; choose.textContent = "Choose an image file";
     const picker = document.createElement("input");
     picker.type = "file"; picker.accept = "image/*"; picker.hidden = true;
     picker.onchange = () => Snapshot.useFile(picker.files?.[0]);
@@ -949,7 +950,7 @@ const Snapshot = {
 
     const message = document.createElement("p");
     message.className = "snapshot-message";
-    message.textContent = "Đang xin quyền mở camera…";
+    message.textContent = "Requesting camera access…";
 
     const results = document.createElement("div");
     results.className = "snapshot-results hidden";
@@ -961,13 +962,17 @@ const Snapshot = {
       results.appendChild(figure);
       return canvas;
     };
-    const inputCanvas = makeResult("Ảnh vừa chụp và đường bao Face Mesh");
-    const outputCanvas = makeResult("OUTPUT sau khi chạy NumPy và SciPy");
+    const inputCanvas = makeResult("1 · INPUT with Face Mesh outline");
+    const skinCanvas = makeResult("2 · Skin region allowed for smoothing");
+    const spotCanvas = makeResult("3 · Red region with stronger smoothing");
+    const differenceCanvas = makeResult("4 · Changed colours, magnified ×6");
+    const outputCanvas = makeResult("5 · OUTPUT: red correction, smoothing, and brightness");
 
     wrap.append(intro, live, bar, message, results);
     host.appendChild(wrap);
     Object.assign(Snapshot, {
-      wrap, video, captureButton: capture, message, results, inputCanvas, outputCanvas,
+      wrap, video, captureButton: capture, message, results,
+      inputCanvas, skinCanvas, spotCanvas, differenceCanvas, outputCanvas,
     });
     return wrap;
   },
@@ -976,7 +981,7 @@ const Snapshot = {
     Snapshot.stopStream();
     if (!Snapshot.video || !Snapshot.message) return;
     Snapshot.captureButton.disabled = true;
-    Snapshot.message.textContent = "Đang xin quyền mở camera…";
+    Snapshot.message.textContent = "Requesting camera access…";
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("camera unavailable");
       Snapshot.stream = await navigator.mediaDevices.getUserMedia({
@@ -986,11 +991,11 @@ const Snapshot = {
       Snapshot.video.srcObject = Snapshot.stream;
       await Snapshot.video.play();
       Snapshot.captureButton.disabled = false;
-      Snapshot.message.textContent = "Camera đã sẵn sàng. Bấm Chụp một tấm; camera sẽ dừng ngay sau đó.";
+      Snapshot.message.textContent = "Camera ready. Press Capture one photo; the camera will stop immediately.";
     } catch (error) {
       Snapshot.stopStream();
-      Snapshot.message.textContent = "Không mở được camera. Camera có thể đang được Zoom, Meet hoặc ứng dụng khác sử dụng. " +
-        "Hãy đóng ứng dụng đó và bấm Mở lại camera, hoặc bấm Chọn ảnh từ máy.";
+      Snapshot.message.textContent = "The camera could not start. Zoom, Meet, or another app may be using it. " +
+        "Close that app and press Open camera again, or choose an image file.";
     }
   },
 
@@ -1005,7 +1010,7 @@ const Snapshot = {
 
   capturePhoto() {
     if (!Snapshot.video?.videoWidth) {
-      Snapshot.message.textContent = "Camera chưa có hình. Chờ một chút rồi bấm Chụp một tấm lần nữa.";
+      Snapshot.message.textContent = "The camera has not produced a frame yet. Wait a moment and capture again.";
       return;
     }
     const canvas = document.createElement("canvas");
@@ -1030,7 +1035,7 @@ const Snapshot = {
       bitmap.close?.();
       await Snapshot.processCanvas(canvas);
     } catch (error) {
-      Snapshot.message.textContent = "Không đọc được tệp ảnh này. Hãy chọn ảnh JPG, PNG hoặc WebP khác.";
+      Snapshot.message.textContent = "This image file could not be read. Choose another JPG, PNG, or WebP file.";
     }
   },
 
@@ -1102,14 +1107,14 @@ const Snapshot = {
 
   async processCanvas(canvas) {
     if (!Kernel.py || Kernel.state !== "ready") {
-      Snapshot.message.textContent = "Python chưa sẵn sàng. Chờ góc trên bên phải hiện Kernel sẵn sàng rồi thử lại.";
+      Snapshot.message.textContent = "Python is not ready. Wait for Kernel ready in the top-right corner, then try again.";
       return;
     }
     Snapshot.results.classList.remove("hidden");
     const inputContext = Snapshot.inputCanvas.getContext("2d");
     inputContext.clearRect(0, 0, CFG.capture.w, CFG.capture.h);
     inputContext.drawImage(canvas, 0, 0);
-    Snapshot.message.textContent = "Đang dùng Face Mesh để tìm đường bao khuôn mặt…";
+    Snapshot.message.textContent = "Face Mesh is finding the face outline…";
     const landmarks = await Snapshot.detectFace(canvas);
     Snapshot.drawFaceOutline(Snapshot.inputCanvas, landmarks);
 
@@ -1118,18 +1123,28 @@ const Snapshot = {
       .getImageData(0, 0, CFG.capture.w, CFG.capture.h).data;
     const faceMask = landmarks.length ? Snapshot.faceMaskBytes(landmarks, level.w, level.h) : null;
     try {
-      const bytes = Kernel.callBridge("_frame", [
+      const packed = new Uint8Array(Kernel.callBridge("_skin_snapshot", [
         new Uint8Array(source.buffer.slice(0)), CFG.capture.w, CFG.capture.h,
-        CFG.fingerMax, level.w, level.h, 0, faceMask,
-      ]);
-      Snapshot.outputCanvas.getContext("2d").putImageData(
-        new ImageData(new Uint8ClampedArray(bytes), CFG.capture.w, CFG.capture.h), 0, 0);
-      Snapshot.message.textContent = landmarks.length
-        ? "Đã tìm thấy khuôn mặt. OUTPUT chỉ đổi pixel nằm trong face_mask và vùng mà thuật toán đã chọn."
-        : "Face Mesh chưa tìm thấy khuôn mặt. NumPy và SciPy vẫn chạy một lần trên toàn bộ ảnh để em xem kết quả.";
+        level.w, level.h, faceMask,
+      ]));
+      const frameLength = CFG.capture.w * CFG.capture.h * 4;
+      const targets = [Snapshot.skinCanvas, Snapshot.spotCanvas,
+        Snapshot.differenceCanvas, Snapshot.outputCanvas];
+      if (packed.length !== frameLength * targets.length) {
+        throw new Error("Python did not return all four explanation panels.");
+      }
+      targets.forEach((target, index) => {
+        const frame = packed.slice(index * frameLength, (index + 1) * frameLength);
+        target.getContext("2d").putImageData(
+          new ImageData(new Uint8ClampedArray(frame), CFG.capture.w, CFG.capture.h), 0, 0);
+      });
+      const report = Kernel.callBridge("_skin_snapshot_report", []);
+      Snapshot.message.textContent = (landmarks.length
+        ? "Face Mesh limited changes to the face region. "
+        : "Face Mesh did not find a face; the colour rules are selecting the skin region without a face boundary. ") + report;
     } catch (error) {
       Snapshot.outputCanvas.getContext("2d").drawImage(canvas, 0, 0);
-      Snapshot.message.textContent = "Chưa chạy được ảnh: " + String(error?.message || error).split("\n").pop();
+      Snapshot.message.textContent = "The image could not be processed: " + String(error?.message || error).split("\n").pop();
     }
   },
 
@@ -1246,7 +1261,7 @@ const Nb = {
 
   scheduleSave() {
     clearTimeout(Nb.saveTimer);
-    Nb.noteSave("Đang tự lưu…");
+    Nb.noteSave("Saving…");
     Nb.saveTimer = setTimeout(() => Nb.persist(), CFG.saveDelayMs);
   },
 
@@ -1262,10 +1277,10 @@ const Nb = {
     try {
       localStorage.setItem(Nb.storageKey(), JSON.stringify(Nb.saved));
       Nb.storageAvailable = true;
-      Nb.noteSave("Đã tự lưu");
+      Nb.noteSave("Saved automatically");
     } catch {
       Nb.storageAvailable = false;
-      Nb.noteSave("Không tự lưu được — hãy tải notebook", true);
+      Nb.noteSave("Autosave failed — download the notebook", true);
     }
   },
 
@@ -1305,7 +1320,7 @@ const Nb = {
   showMechanism(id, kind) {
     if (!Nb.currentOutput) return;
     if (!window.SkinMechanisms) {
-      Nb.appendText(Nb.currentOutput, "err", "Không mở được bảng cơ chế. Hãy tải lại trang.\n");
+      Nb.appendText(Nb.currentOutput, "err", "The mechanism panel could not open. Reload the page.\n");
       return;
     }
     const host = document.createElement("div");
@@ -1333,7 +1348,7 @@ const Nb = {
     const bar = document.createElement("div");
     bar.className = "addbar";
     const add = document.createElement("button");
-    add.className = "btn"; add.textContent = "+ Ô code";
+    add.className = "btn"; add.textContent = "+ Code cell";
     add.onclick = () => {
       Nb.cells.splice(idx + 1, 0, {
         id: `user-${Date.now()}`, type: "code", source: "", tags: [], editing: false, count: null,
@@ -1360,7 +1375,7 @@ const Nb = {
     prompt.className = "prompt";
     prompt.textContent = cell.type === "code" ? `In [${cell.count === null ? " " : cell.count}]:` : "";
     const run = document.createElement("button");
-    run.className = "run-btn"; run.textContent = "▶"; run.title = "Chạy ô này";
+    run.className = "run-btn"; run.textContent = "▶"; run.title = "Run this cell";
     run.onclick = (e) => { e.stopPropagation(); Nb.runCell(idx); };
     gutter.append(prompt, run);
 
@@ -1444,7 +1459,7 @@ const Nb = {
     const target = Nb.cells.find((cell) => cell.id === Nb.saved.lastCellId);
     if (!target?.el) return;
     App.banner(
-      `Bài của em đã được tự lưu trên máy này. <button class="btn resume" id="resumeBtn">Tiếp tục từ chỗ đang học</button>`,
+      `Your work was saved in this browser. <button class="btn resume" id="resumeBtn">Continue where you stopped</button>`,
       false,
     );
     document.getElementById("resumeBtn").onclick = () => {
@@ -1573,7 +1588,7 @@ const App = {
     document.getElementById("runAllBtn").onclick = () => Nb.runAll();
     document.getElementById("restartBtn").onclick = async () => { Nb.clearOutputs(); await Kernel.restart(); };
     document.getElementById("resetBtn").onclick = () => {
-      if (!window.confirm("Xóa toàn bộ code và tiến độ Skin Lab đã tự lưu trên máy này?")) return;
+      if (!window.confirm("Delete all Skin Lab code and progress saved in this browser?")) return;
       localStorage.removeItem(Nb.storageKey());
       Cam.stop();
       Snapshot.stop();

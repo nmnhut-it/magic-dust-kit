@@ -58,7 +58,7 @@ class TestSkinNotebook(unittest.TestCase):
     def test_lesson_shows_the_exact_number_substitutions(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
         for phrase in (
-            "8 × 10 + 90 = 170",
+            "8 × 10 + 1 × 90 = 170",
             "170 / 9 = 18.89",
             "brightness = (183 + 127 + 103) // 3 = 413 // 3 = 137",
             "1 + 1 + 1 + 1 + 0 + 1 + 1 + 1 + 1 = 8",
@@ -73,10 +73,21 @@ class TestSkinNotebook(unittest.TestCase):
         for phrase in (
             "np.asarray", ".shape", "np.where", "np.clip", "Image.fromarray",
             "ndimage.convolve", "ndimage.uniform_filter", "ndimage.maximum_filter",
-            "không cần tự viết hai vòng `for row` và `for column`",
+            "You do not need a Python loop for every row and column",
         ):
             self.assertIn(phrase, lesson)
-        self.assertNotIn("không thuộc 5 phần bắt buộc", lesson)
+        self.assertNotIn("not part of the five required functions", lesson)
+
+    def test_students_see_a_literal_rgb_matrix_before_image_filters(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        matrix_cell = next(cell for cell in self.practice["cells"] if cell["id"] == "numpy-array")
+        matrix_source = source(matrix_cell)
+        self.assertIn("np.array([", matrix_source)
+        self.assertIn("[[255, 0, 0], [0, 255, 0], [0, 0, 255]]", matrix_source)
+        self.assertIn('print("R matrix:', matrix_source)
+        self.assertIn('print("G matrix:', matrix_source)
+        self.assertIn('print("B matrix:', matrix_source)
+        self.assertLess(lesson.index("3 × 3 colour matrix"), lesson.index("turn RGB evidence into 0 or 255"))
 
     def test_every_stage_has_numbers_images_and_explanatory_preview(self):
         ids = {cell["id"] for cell in self.practice["cells"]}
@@ -89,8 +100,8 @@ class TestSkinNotebook(unittest.TestCase):
         ):
             self.assertIn(cell_id, ids)
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
-        self.assertIn("các số được lấy ra, phép tính", lesson)
-        self.assertIn("đúng vị trí pixel", lesson)
+        self.assertIn("numbers show the calculation", lesson)
+        self.assertIn("exact selected locations", lesson)
 
     def test_six_mechanisms_have_stable_concept_tags(self):
         concepts = {
@@ -109,17 +120,29 @@ class TestSkinNotebook(unittest.TestCase):
         markdown = "\n".join(
             source(cell) for cell in self.practice["cells"] if cell["cell_type"] == "markdown"
         )
-        self.assertIn("`skin_mask`: ô trắng", markdown)
-        self.assertIn("255 nghĩa là chọn", markdown)
-        self.assertIn("0 nghĩa là không chọn", markdown)
-        self.assertIn("bảng số NumPy", markdown)
-        self.assertIn("tối đa 478 điểm", markdown)
+        self.assertIn("`skin_mask`: white (`255`)", markdown)
+        self.assertIn("black (`0`) means", markdown)
+        self.assertIn("NumPy array", markdown)
+        self.assertIn("up to 478 landmark points", markdown)
         for phrase in (
-            "pipeline", "hình màu/overlay", "478 landmark", "cho phiếu",
-            "ba đèn R, G, B", "không tin một pixel", "API thư viện",
-            "NumPy array mới shape", "array `uint8`",
+            "hình màu/overlay", "cho phiếu", "ba đèn R, G, B",
+            "không tin một pixel", "API thư viện", "NumPy array mới shape",
         ):
             self.assertNotIn(phrase.lower(), markdown.lower())
+
+    def test_student_facing_lesson_and_route_are_english(self):
+        notebook_text = "\n".join(source(cell) for cell in self.practice["cells"])
+        route_text = "\n".join((
+            (ROOT / "index.html").read_text(encoding="utf-8"),
+            (ROOT / "dap-an.html").read_text(encoding="utf-8"),
+            (ROOT / "assets" / "skin-mechanisms.js").read_text(encoding="utf-8"),
+        ))
+        for old_phrase in (
+            "Em cần viết", "Dữ liệu đã cho sẵn", "Chụp một tấm", "Vùng da",
+            "Kết quả:", "Cơ chế", "Bài giải", "Chạy tất cả", "Chọn ảnh từ máy",
+        ):
+            self.assertNotIn(old_phrase, notebook_text)
+            self.assertNotIn(old_phrase, route_text)
 
     def test_tasks_name_given_input_process_and_output(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
@@ -135,26 +158,26 @@ class TestSkinNotebook(unittest.TestCase):
                     "remove_pimples": "remove-note",
                 }[task]
             )
-            self.assertRegex(task_text, r"(?i)dữ liệu đã cho sẵn|given")
+            self.assertIn("**Given:**", task_text)
             self.assertIn("INPUT", task_text)
-            self.assertIn("Em cần viết", task_text)
+            self.assertIn("PROCESS", task_text)
             self.assertIn("OUTPUT", task_text)
-        self.assertIn("Ảnh em chụp chỉ được dùng để tạo OUTPUT", lesson)
+        self.assertIn("A captured or uploaded image is never", lesson)
 
     def test_route_has_no_training_dependency_or_diagnostic_claim(self):
         code = (ROOT / "skin_filters_solution.py").read_text(encoding="utf-8").lower()
         for dependency in ("tensorflow", "torch", "sklearn", "keras", "model.fit"):
             self.assertNotIn(dependency, code)
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
-        self.assertIn("không phải công cụ chẩn đoán hay đánh giá làn da", lesson)
-        self.assertIn("ảnh tổng hợp", lesson)
+        self.assertIn("not a diagnostic tool", lesson)
+        self.assertIn("drawn face", lesson)
 
     def test_notebooks_have_matching_stable_ids_and_clean_outputs(self):
         practice_ids = [cell["id"] for cell in self.practice["cells"]]
         answer_ids = [cell["id"] for cell in self.answers["cells"]]
         self.assertEqual(practice_ids, answer_ids)
         self.assertEqual(len(practice_ids), len(set(practice_ids)))
-        self.assertEqual(len(practice_ids), 58)
+        self.assertEqual(len(practice_ids), 61)
         for notebook in (self.practice, self.answers):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)
@@ -174,7 +197,7 @@ class TestSkinNotebook(unittest.TestCase):
         self.assertIn('user: cell.id.startsWith("user-")', runtime)
         self.assertIn("Ô do học sinh tự thêm", runtime)
         self.assertIn('tags.includes("autoload")', runtime)
-        self.assertIn("Tiếp tục từ chỗ đang học", runtime)
+        self.assertIn("Continue where you stopped", runtime)
         self.assertIn("window.confirm", runtime)
         self.assertIn("storageSchema: 3", runtime)
         self.assertIn("showMechanism(id, kind)", runtime)
@@ -202,17 +225,32 @@ class TestSkinNotebook(unittest.TestCase):
     def test_face_mesh_is_the_one_photo_capstone(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
-        for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "tối đa 478 điểm"):
+        for phrase in ("MediaPipe Face Mesh", "face_mask", "skin_mask", "allowed", "up to 478 landmark points"):
             self.assertIn(phrase, lesson)
         self.assertIn("@mediapipe/face_mesh", runtime)
-        self.assertIn("Chụp một tấm", lesson)
-        self.assertIn("Chụp một tấm", runtime)
-        self.assertIn("Chọn ảnh từ máy", runtime)
+        self.assertIn("Capture one photo", lesson)
+        self.assertIn("Capture one photo", runtime)
+        self.assertIn("Choose an image file", runtime)
         self.assertIn("Snapshot.stopStream();", runtime)
         self.assertIn("faceMaskBytes(landmarks", runtime)
+        self.assertIn('Kernel.callBridge("_skin_snapshot"', runtime)
+        self.assertIn("Snapshot.differenceCanvas", runtime)
         photo_cell = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-photo")
         self.assertEqual(source(photo_cell), "magic_mirror.capture_skin_photo()")
         self.assertNotIn("magic_mirror.run()", lesson)
+
+    def test_capstone_exposes_kernel_smoothing_and_brightness_controls(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        settings = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-pipeline-settings")
+        self.assertIn("autoload", settings["metadata"]["tags"])
+        for phrase in (
+            'kernel_choice = "balanced"', "SOFTEN_KERNEL = kernel_options[kernel_choice]",
+            "skin_smooth_strength = 0.55", "spot_smooth_strength = 0.90",
+            "skin_brightness = 10", "skin_kernel_passes = 2",
+            "mixed = 200 × (1 - 0.55) + 188 × 0.55",
+            "skin region", "red region", "difference panel",
+        ):
+            self.assertIn(phrase, lesson)
 
     def test_one_photo_uses_high_quality_smooth_display(self):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
@@ -220,7 +258,7 @@ class TestSkinNotebook(unittest.TestCase):
         self.assertIn("const level = CFG.quality[2]", runtime)
         self.assertIn(".snapshot-results canvas", styles)
         self.assertIn("image-rendering:auto", styles)
-        self.assertIn("kích thước xử lý 320×240 và hiển thị ở 480×360", "\n".join(
+        self.assertIn("Processing uses 320 × 240 pixels and displays at 480 × 360", "\n".join(
             source(cell) for cell in self.practice["cells"]
         ))
 

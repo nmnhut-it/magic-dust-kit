@@ -1,19 +1,20 @@
 # Skin Lab
 
-Skin Lab là bài học xử lý ảnh chạy hoàn toàn trong trình duyệt tại `/skin-lab/`.
-Năm hàm bắt buộc dùng NumPy, SciPy và Pillow. Cuối bài, học sinh chụp một ảnh,
-camera dừng, rồi Face Mesh và các hàm xử lý chạy một lần trên ảnh đó.
+Skin Lab is a browser-based image-processing lesson served at `/skin-lab/`.
+Students complete five functions with NumPy, SciPy, and Pillow. In the capstone,
+they capture or select one still image, then Face Mesh and the image pipeline run
+once on that image. There is no live video-processing activity.
 
-Nguồn chuẩn:
+Source files:
 
-- `build_notebooks.py`: nội dung và thứ tự các ô notebook.
-- `skin_filters.py`: code bài tập.
-- `skin_filters_solution.py`: code đáp án.
-- `assets/magic_mirror.py`: minh hoạ có số + hình + giải thích, dữ liệu ảnh và bộ chấm.
-- `assets/photos/`: ba ảnh CC0 được lưu cục bộ cùng ghi chú nguồn; không hotlink.
-- `assets/notebook.js`: giao diện notebook và autosave bằng `localStorage`.
+- `build_notebooks.py`: notebook content and cell order.
+- `skin_filters.py`: student starter code.
+- `skin_filters_solution.py`: worked code.
+- `assets/magic_mirror.py`: numerical and visual explanations, image data, and grader.
+- `assets/photos/`: three locally bundled CC0 images and their source notes.
+- `assets/notebook.js`: notebook UI and `localStorage` autosave.
 
-Sau khi sửa nguồn, sinh lại notebook và kiểm tra:
+After changing a source file, regenerate the notebooks and run the checks:
 
 ```powershell
 python build_notebooks.py
@@ -22,6 +23,6 @@ node --check assets/notebook.js
 node test-skin-browser.mjs
 ```
 
-Autosave chỉ lưu code, tiến độ và vị trí ô đang học trên đúng trình duyệt của
-thiết bị hiện tại. Ảnh vừa chụp không được ghi vào `localStorage`. Học sinh có
-thể bấm nút tải notebook nếu muốn mang bài sang thiết bị khác.
+Autosave stores code, progress, mechanism state, and the current cell in this
+browser. A captured or uploaded image is not written to `localStorage`.
+Students can download the notebook to move their code to another device.

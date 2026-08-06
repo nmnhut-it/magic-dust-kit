@@ -37,8 +37,8 @@ layer and a no-training skin / red-spot pipeline:
 The filter functions are looked up in the notebook on EVERY frame, so re-running
 the filter cell changes the live picture immediately - no camera restart needed.
 
-All printed text is Vietnamese on purpose: the code is English so it reads like
-real Python, the explanations are in the students' own language.
+Skin Lab prints learner-facing text in English. Other Magic Mirror routes keep
+their original language and behaviour.
 """
 import base64
 import io
@@ -58,9 +58,9 @@ OUTPUT_SIZE = (480, 360)
 DEMO_SIZE = (80, 60)
 PUBLIC_PHOTO_DIR = Path(__file__).resolve().parent / "photos"
 PUBLIC_PHOTOS = (
-    ("face-portrait-william-stitt.jpg", "CHÂN DUNG 1 · WILLIAM STITT"),
-    ("face-portrait-eddie-kopp.jpg", "CHÂN DUNG 2 · EDDIE KOPP"),
-    ("human-skin-closeup.jpg", "BỀ MẶT DA · M. HOWARD"),
+    ("face-portrait-william-stitt.jpg", "PORTRAIT 1 · WILLIAM STITT"),
+    ("face-portrait-eddie-kopp.jpg", "PORTRAIT 2 · EDDIE KOPP"),
+    ("human-skin-closeup.jpg", "SKIN CLOSE-UP · M. HOWARD"),
 )
 
 # How many fingers runs which function. None means "leave the picture alone".
@@ -436,14 +436,14 @@ def _student_function(name):
     """Fetch a function the student wrote in the notebook, or explain what is missing."""
     function = getattr(__main__, name, None)
     if not callable(function):
-        raise MagicMirrorError("Chưa có hàm %s() - hãy chạy ô code bộ lọc trước." % name)
+        raise MagicMirrorError("Function %s() is not defined yet. Run its code cell first." % name)
     return function
 
 
 def _require_image(value, name):
     if not isinstance(value, Image.Image):
         raise MagicMirrorError(
-            "%s() phải trả về ảnh, nhưng đang trả về %s (thiếu return?)"
+            "%s() must return an image, but returned %s. Is return missing?"
             % (name, type(value).__name__))
     return value
 
@@ -589,7 +589,7 @@ def capture_skin_photo():
     """Open the one-photo input used by the Skin Lab capstone."""
     ui = getattr(js, "MagicMirrorUI", None)
     if ui is None or not hasattr(ui, "snapshot"):
-        raise MagicMirrorError("Không mở được công cụ chụp ảnh. Hãy tải lại trang bằng Ctrl+F5.")
+        raise MagicMirrorError("The still-image tool could not open. Reload the page with Ctrl+F5.")
     ui.snapshot()
 
 
@@ -609,7 +609,7 @@ def show_mechanism(kind):
     """Mở bảng thao tác giúp học sinh kiểm tra một cơ chế trước khi đọc code."""
     ui = getattr(js, "MagicMirrorUI", None)
     if ui is None or not hasattr(ui, "mechanism"):
-        raise MagicMirrorError("Không mở được bảng cơ chế. Hãy tải lại trang bằng Ctrl+F5.")
+        raise MagicMirrorError("The mechanism panel could not open. Reload the page with Ctrl+F5.")
     ui.mechanism(kind, kind)
 
 
@@ -724,12 +724,12 @@ def process_skin(image, small_size, face_mask=None):
 
 def skin_intro():
     """Print the few commands worth remembering in the isolated Skin Lab route."""
-    print("Skin Lab đã sẵn sàng.")
-    print("Em sẽ theo dõi một pixel: lấy ba số RGB, kiểm tra điều kiện, nhìn các pixel xung quanh rồi chọn màu đầu ra.")
-    print("Sau mỗi ví dụ số đều có hình cho biết pixel nào đang được nói đến.")
-    print("Face Mesh có sẵn sẽ tìm đường bao khuôn mặt; em không phải huấn luyện một mô hình mới.")
-    print("Trang tự lưu code và tiến độ. Tấm ảnh em chụp không được đưa vào phần tự lưu.")
-    print("Bài này không dùng để chẩn đoán da.")
+    print("Skin Lab is ready.")
+    print("Follow one pixel: read its RGB values, test conditions, inspect its neighbours, and choose an output colour.")
+    print("Each numerical example includes a picture that shows the exact pixel or region being discussed.")
+    print("Face Mesh supplies a face outline; you do not need to train a model.")
+    print("The page saves code and progress. A captured image is not included in that saved data.")
+    print("This lesson is not a diagnostic tool.")
 
 
 def set_spark(color=None, count=None):
@@ -903,7 +903,7 @@ def _image_grid(tiles, labels, columns=3, tile_size=(160, 120),
 
 def show_skin_pixel_channels():
     """Break one skin pixel and one red spot into coloured R/G/B lamps, then rebuild them."""
-    samples = (("PIXEL DA", SKIN_TONE), ("PIXEL ĐỎ", PIMPLE_RED))
+    samples = (("SKIN-COLOURED PIXEL", SKIN_TONE), ("RED PIXEL", PIMPLE_RED))
     cell_width, cell_height = 112, 92
     gap = 6
     board = Image.new("RGB", (cell_width * 5 + gap * 4, cell_height * 2 + gap), PAPER_WARM)
@@ -924,15 +924,44 @@ def show_skin_pixel_channels():
                 radius=8, fill=fill, outline=(255, 255, 255), width=2,
             )
             _text(board, (x + 7, y + 7), label, INK)
-    print("Pixel da (183, 127, 103) được tách thành ba kênh R, G, B rồi ghép lại đúng màu ban đầu.")
-    print("Pixel đỏ (225, 62, 66) có R lớn hơn G và B; Chặng 4 sẽ đo chính độ chênh này.")
+    print("The pixel (183, 127, 103) is separated into R, G, and B, then rebuilt as the original colour.")
+    print("The red pixel (225, 62, 66) has a larger R value than G or B; a later step measures that difference.")
     return board
 
 
+def _rgb_matrix_picture(pixels, channel=None):
+    """Draw a 3x3 colour matrix and write the channel value inside every cell."""
+    values = np.asarray(pixels, dtype=np.uint8)
+    cell = 72
+    picture = Image.new("RGB", (values.shape[1] * cell, values.shape[0] * cell), PAPER_WARM)
+    draw = ImageDraw.Draw(picture)
+    for row in range(values.shape[0]):
+        for column in range(values.shape[1]):
+            red, green, blue = (int(value) for value in values[row, column])
+            if channel is None:
+                fill = (red, green, blue)
+                lines = ("R=%d" % red, "G=%d" % green, "B=%d" % blue)
+            else:
+                level = (red, green, blue)[channel]
+                fill = tuple(level if index == channel else 0 for index in range(3))
+                lines = (str(level),)
+            x, y = column * cell, row * cell
+            draw.rectangle((x, y, x + cell - 1, y + cell - 1), fill=fill, outline=PAPER_RAISED, width=2)
+            label_height = 14 * len(lines) + 4
+            draw.rectangle((x + 4, y + 4, x + cell - 4, y + 4 + label_height), fill=PAPER_RAISED)
+            for index, line in enumerate(lines):
+                _text(picture, (x + 8, y + 7 + index * 14), line, INK)
+    return picture
+
+
 def show_numpy_channels():
-    """Show an RGB image, its coloured channels, and an exact np.stack rebuild."""
-    original = skin_sample_image()
-    pixels = np.asarray(original, dtype=np.uint8)
+    """Show a literal 3x3 RGB matrix, its number channels, and an exact rebuild."""
+    pixels = np.array([
+        [[255, 0, 0], [0, 255, 0], [0, 0, 255]],
+        [[255, 255, 0], [0, 255, 255], [255, 0, 255]],
+        [[183, 127, 103], [225, 62, 66], [35, 80, 185]],
+    ], dtype=np.uint8)
+    original = Image.fromarray(pixels, "RGB")
     red_only = np.zeros_like(pixels)
     green_only = np.zeros_like(pixels)
     blue_only = np.zeros_like(pixels)
@@ -943,15 +972,21 @@ def show_numpy_channels():
         (pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]), axis=2,
     )
     difference = np.abs(rebuilt.astype(np.int16) - pixels.astype(np.int16)).astype(np.uint8)
-    print("Bảng pixels có kích thước %s: cao %d, rộng %d và có ba kênh R/G/B." %
+    print("pixels has shape %s: height %d, width %d, and three RGB channels." %
           (pixels.shape, pixels.shape[0], pixels.shape[1]))
-    print("np.stack((red, green, blue), axis=2) ghép ba kênh lại; sai khác lớn nhất = %d." %
+    print("R matrix =", pixels[:, :, 0].tolist())
+    print("G matrix =", pixels[:, :, 1].tolist())
+    print("B matrix =", pixels[:, :, 2].tolist())
+    print("At row 2, column 0: R=183, G=127, B=103 -> RGB (183, 127, 103).")
+    print("np.stack((red, green, blue), axis=2) rebuilds the image; maximum difference = %d." %
           int(difference.max()))
     return _image_grid(
-        (original, _numpy_picture(red_only), _numpy_picture(green_only),
-         _numpy_picture(blue_only), _numpy_picture(rebuilt), _numpy_picture(difference)),
-        ("ẢNH RGB", "KÊNH ĐỎ", "KÊNH XANH LÁ",
-         "KÊNH XANH DƯƠNG", "GHÉP LẠI RGB", "SAI KHÁC = 0"),
+        (_rgb_matrix_picture(pixels), _rgb_matrix_picture(red_only, 0),
+         _rgb_matrix_picture(green_only, 1), _rgb_matrix_picture(blue_only, 2),
+         _rgb_matrix_picture(rebuilt), _rgb_matrix_picture(difference)),
+        ("RGB MATRIX", "R NUMBER MATRIX", "G NUMBER MATRIX",
+         "B NUMBER MATRIX", "REBUILT RGB", "DIFFERENCE = 0"),
+        columns=2, tile_size=(216, 216),
     )
 
 
@@ -959,7 +994,7 @@ def _public_photo(file_name, size=None):
     """Load a bundled CC0 image; the browser installs the same files beside this module."""
     path = PUBLIC_PHOTO_DIR / file_name
     if not path.exists():
-        raise MagicMirrorError("Thiếu ảnh minh họa %s; hãy tải lại trang bằng HTTP." % file_name)
+        raise MagicMirrorError("The bundled image %s is missing. Reload the lesson over HTTP." % file_name)
     with Image.open(path) as source:
         photo = ImageOps.exif_transpose(source).convert("RGB")
     return ImageOps.fit(photo, size, method=Image.Resampling.LANCZOS) if size else photo
@@ -969,8 +1004,8 @@ def show_public_photo_gallery():
     """Show locally bundled CC0 inputs with different tones, lighting, and texture."""
     pictures = [_public_photo(file_name, (200, 150)) for file_name, _ in PUBLIC_PHOTOS]
     labels = [label for _, label in PUBLIC_PHOTOS]
-    print("Ba ảnh CC0 đã được lưu sẵn trong bài; trang không tải ảnh trực tiếp từ nơi khác.")
-    print("Màu da và ánh sáng khác nhau giúp em kiểm tra giới hạn của luật RGB viết tay.")
+    print("Three CC0 images are bundled with the lesson; the page does not hotlink them from another site.")
+    print("Different tones and lighting help you test where the hand-written RGB rule succeeds or fails.")
     return _image_grid(pictures, labels, columns=3, tile_size=(200, 150),
                        resample=Image.Resampling.LANCZOS)
 
@@ -978,22 +1013,22 @@ def show_public_photo_gallery():
 def try_public_photo(index=0):
     """Run the student's complete pipeline on one public photo and expose every decision."""
     if not 0 <= int(index) < len(PUBLIC_PHOTOS):
-        raise MagicMirrorError("index phải là 0, 1 hoặc 2.")
+        raise MagicMirrorError("index must be 0, 1, or 2.")
     file_name, label = PUBLIC_PHOTOS[int(index)]
     original = _public_photo(file_name, (200, 150))
     skin_mask = np.asarray(_student_function("detect_skin")(original))
     pimple_mask = np.asarray(_student_function("detect_pimples")(original, skin_mask))
     cleaned = _require_image(_student_function("remove_pimples")(original), "remove_pimples")
-    print("Ảnh %d: %s. Hãy tìm vùng nhận thiếu hoặc nhận nhầm; đây là phép thử, không phải kết luận về da." %
+    print("Image %d: %s. Find missed or wrongly selected regions; this is a code test, not a claim about skin." %
           (int(index), label))
-    print("Vùng da được đánh dấu: %d/%d pixel. Vùng đỏ được đánh dấu: %d/%d pixel." %
+    print("Skin region: %d/%d pixels. Locally red region: %d/%d pixels." %
           (int((skin_mask > 0).sum()), skin_mask.size,
            int((pimple_mask > 0).sum()), pimple_mask.size))
-    print("Màu vàng chỉ vị trí skin_mask=255; màu đỏ chỉ vị trí pimple_mask=255; hình cuối là kết quả (OUTPUT).")
+    print("Yellow shows skin_mask=255; red shows pimple_mask=255; the final panel is the OUTPUT.")
     return _image_grid(
         (original, _mask_overlay(original, skin_mask, (255, 210, 80)),
          _mask_overlay(original, pimple_mask, (255, 35, 45), 0.7), cleaned),
-        ("ẢNH CÔNG KHAI", "VÙNG DA", "VÙNG ĐỎ", "KẾT QUẢ"),
+        ("PUBLIC INPUT", "SKIN REGION", "RED REGION", "OUTPUT"),
         columns=2, tile_size=(240, 180), resample=Image.Resampling.LANCZOS,
     )
 
@@ -1012,8 +1047,8 @@ def show_face_mesh_map():
     for landmark_id, (x, y) in points.items():
         draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill=(80, 238, 220, 255))
         _text(image, (x + 8, y - 8), str(landmark_id), INK)
-    print("Face Mesh tìm tối đa 478 điểm mốc khi bật refineLandmarks.")
-    print("Trình duyệt nối các điểm 10, 454, 152 và 234 thành đường bao của face_mask.")
+    print("Face Mesh returns up to 478 landmarks when refineLandmarks is enabled.")
+    print("The browser joins boundary points including 10, 454, 152, and 234 to create face_mask.")
     return image
 
 
@@ -1026,15 +1061,15 @@ def show_face_mask_pipeline():
                  + ((y - height / 2) / (height * .44)) ** 2 <= 1)
     skin_mask = np.asarray(_student_function("detect_skin")(original)) > 0
     allowed = face_mask & skin_mask
-    print("Dấu & chỉ chọn pixel khi face_mask và skin_mask cùng đúng.")
-    print("face_mask chọn %d pixel; skin_mask chọn %d pixel; cả hai cùng chọn %d pixel." %
+    print("The & operation selects a pixel only when both face_mask and skin_mask are true.")
+    print("face_mask selects %d pixels; skin_mask selects %d pixels; both select %d pixels." %
           (int(face_mask.sum()), int(skin_mask.sum()), int(allowed.sum())))
-    print("np.where(allowed[..., None], cleaned, original) chỉ đổi vùng được cả hai ảnh đánh dấu chọn.")
+    print("np.where(allowed[..., None], cleaned, original) changes only the locations selected by both masks.")
     return _image_grid(
         (original, _mask_picture(face_mask, (95, 238, 220)),
          _mask_picture(skin_mask, (245, 204, 166)),
          _mask_overlay(original, allowed, (255, 210, 80), 0.65)),
-        ("ẢNH INPUT", "VÙNG KHUÔN MẶT", "VÙNG DA RGB", "VÙNG ĐƯỢC PHÉP ĐỔI"),
+        ("INPUT", "FACE REGION", "RGB SKIN REGION", "ALLOWED REGION"),
         columns=2, tile_size=(240, 180),
     )
 
@@ -1057,11 +1092,11 @@ def show_skin_pipeline_overview():
         x, y = width * spot_x // 100, height * spot_y // 100
         spot_draw.ellipse((x - 2, y - 2, x + 2, y + 2), fill=PIMPLE_RED)
         clean_draw.ellipse((x - 2, y - 2, x + 2, y + 2), fill=SKIN_TONE)
-    print("Bước 1 lấy ảnh màu; bước 2 đánh dấu vùng da; bước 3 đánh dấu vùng đỏ; bước 4 chỉ đổi màu vùng đỏ.")
-    print("Đây là kết quả cần đạt. Sau khi em viết code, skin_demo() sẽ tính lại bằng chính năm hàm đó.")
+    print("Step 1 reads RGB; step 2 marks a skin region; step 3 marks locally red areas; step 4 changes selected colours.")
+    print("This is the target. After you write the code, skin_demo() recalculates it with your five functions.")
     return _tile_board(
         (original, skin_picture, spot_picture, cleaned),
-        ("1 ẢNH ĐẦU VÀO", "2 VÙNG DA", "3 VÙNG ĐỎ", "4 KẾT QUẢ"),
+        ("1 INPUT", "2 SKIN REGION", "3 RED REGION", "4 OUTPUT"),
     )
 
 
@@ -1075,25 +1110,25 @@ def show_convolution_math():
             _square(image, column * CELL, row * CELL, _grey(value), value)
     _text(image, (CELL * 3 + 8, 12), "8 x 10 + 90 = 170")
     _text(image, (CELL * 3 + 8, 34), "170 / 9 = 18.89")
-    _text(image, (CELL * 3 + 8, 56), "tâm: 90 -> 18.89")
-    print("Tám pixel xung quanh đóng góp 8 × 10 = 80.")
-    print("Cộng pixel giữa: 80 + 90 = 170. Chia 9: 170 / 9 = 18.89.")
+    _text(image, (CELL * 3 + 8, 56), "centre: 90 -> 18.89")
+    print("The eight outer pixels contribute 8 × 10 = 80.")
+    print("Add the centre: 80 + 90 = 170. Divide by 9: 170 / 9 = 18.89.")
     return _zoom(image)
 
 
 def show_skin_evidence_math():
     """Show substituted RGB evidence for one accepted and one rejected pixel."""
-    print("Pixel da mẫu (183, 127, 103): brightness=137, warmth=80, red_green_gap=56 -> 255.")
-    print("Pixel nền xanh (35, 80, 185): brightness=100, warmth=-150, red_green_gap=-45 -> 0.")
-    return _math_card("TÍNH TỪ BA SỐ RGB", (
-        "PIXEL DA (183,127,103):",
+    print("Sample pixel (183, 127, 103): brightness=137, warmth=80, red_green_gap=56 -> 255.")
+    print("Blue background (35, 80, 185): brightness=100, warmth=-150, red_green_gap=-45 -> 0.")
+    return _math_card("CALCULATE FROM RGB", (
+        "SAMPLE PIXEL (183,127,103):",
         "brightness = 413 // 3 = 137",
         "warmth = 183 - 103 = 80",
         "red_green_gap = 183 - 127 = 56",
-        "đạt mọi điều kiện -> 255",
+        "all conditions pass -> 255",
         "",
-        "NỀN XANH (35,80,185): warmth = -150",
-        "không đạt warmth >= 8 -> 0",
+        "BLUE BACKGROUND: warmth = -150",
+        "warmth >= 8 fails -> 0",
     ))
 
 
@@ -1104,39 +1139,39 @@ def show_skin_vote_math():
         for column in range(3):
             value = 0 if (row, column) == (1, 1) else 1
             _square(image, column * CELL, row * CELL, _grey(value), value)
-    _text(image, (CELL * 3 + 8, 10), "8 ô x 1 + 1 ô x 0 = 8")
-    _text(image, (CELL * 3 + 8, 32), "cần ít nhất 5 ô")
-    _text(image, (CELL * 3 + 8, 54), "8 >= 5 -> chọn")
-    _text(image, (CELL * 3 + 8, 72), "skin_mask ở giữa = 255")
-    print("Vùng 3×3 có tám số 1 và một số 0, nên neighbour_count = 8.")
-    print("Cần ít nhất 5. Vì 8 >= 5, skin_mask của pixel giữa bằng 255.")
+    _text(image, (CELL * 3 + 8, 10), "8 cells x 1 + 1 x 0 = 8")
+    _text(image, (CELL * 3 + 8, 32), "at least 5 required")
+    _text(image, (CELL * 3 + 8, 54), "8 >= 5 -> select")
+    _text(image, (CELL * 3 + 8, 72), "centre skin_mask = 255")
+    print("The 3 × 3 area contains eight 1 values and one 0, so neighbour_count = 8.")
+    print("At least 5 are required. Since 8 >= 5, the centre skin_mask value is 255.")
     return _zoom(image)
 
 
 def show_red_gap_math():
     """Show the 5x5 local-redness substitution for the synthetic red spot."""
-    print("Chấm đỏ có redness=161; pixel da xung quanh có redness=68.")
-    print("Trung bình 5×5 là 71.72; red_gap=89.28, lớn hơn ngưỡng 24.")
-    return _math_card("ĐỘ ĐỎ TRONG VÙNG 5x5", (
+    print("The red point has redness=161; the surrounding pixels have redness=68.")
+    print("The 5 × 5 mean is 71.72; red_gap=89.28, which is above the threshold 24.")
+    return _math_card("REDNESS IN A 5x5 AREA", (
         "spot = 225 - (62 + 66) / 2 = 161",
         "skin = 183 - (127 + 103) / 2 = 68",
         "local = (161 + 24 x 68) / 25",
         "      = 1793 / 25 = 71.72",
         "red_gap = 161 - 71.72 = 89.28",
-        "89.28 >= 24 -> chọn pixel này",
+        "89.28 >= 24 -> select this pixel",
     ))
 
 
 def show_soften_math():
     """Show the per-channel weighted substitution for selective softening."""
-    print("Bảng trọng số 1-2-1 đổi pixel giữa thành (194, 111, 94).")
-    print("Độ đỏ nổi trội giảm từ 161 xuống 91.5; pixel ngoài vùng đánh dấu giữ nguyên.")
-    return _math_card("LÀM MỀM BẰNG BẢNG 1-2-1", (
+    print("The 1-2-1 kernel changes the centre pixel to (194, 111, 94).")
+    print("Excess redness falls from 161 to 91.5; pixels outside the mask stay unchanged.")
+    return _math_card("SMOOTH WITH A 1-2-1 KERNEL", (
         "R: (4x225 + 12x183) / 16 = 193.5 -> 194",
         "G: (4x 62 + 12x127) / 16 = 110.75 -> 111",
         "B: (4x 66 + 12x103) / 16 = 93.75 -> 94",
-        "pixel mới = (194, 111, 94)",
-        "độ đỏ mới = 194 - (111 + 94) / 2 = 91.5",
+        "new pixel = (194, 111, 94)",
+        "new redness = 194 - (111 + 94) / 2 = 91.5",
     ), width=310)
 
 
@@ -1144,9 +1179,9 @@ def show_numpy_mask(mask):
     """Render a two-dimensional NumPy 0/255 mask."""
     array = np.asarray(mask)
     if array.ndim != 2:
-        raise MagicMirrorError("Ảnh đánh dấu phải là một bảng hai chiều: chiều cao và chiều rộng.")
+        raise MagicMirrorError("A mask must be a two-dimensional array: height and width.")
     picture = Image.fromarray(np.where(array > 0, 255, 0).astype(np.uint8), "L").convert("RGB")
-    print("Ảnh đánh dấu có kích thước %s và chọn %d pixel." % (array.shape, int((array > 0).sum())))
+    print("The mask has shape %s and selects %d pixels." % (array.shape, int((array > 0).sum())))
     return picture.resize(OUTPUT_SIZE, Image.Resampling.NEAREST)
 
 
@@ -1161,7 +1196,7 @@ def _numpy_convolve(pixels, kernel, divisor=1):
 def _numpy_picture(array):
     array = np.asarray(array)
     if array.ndim != 3 or array.shape[2] != 3:
-        raise MagicMirrorError("Hàm phải trả một bảng số có kích thước (height, width, 3).")
+        raise MagicMirrorError("The function must return an array with shape (height, width, 3).")
     return Image.fromarray(np.clip(array, 0, 255).astype(np.uint8), "RGB")
 
 
@@ -1173,10 +1208,10 @@ def numpy_filter_gallery():
     brighter = np.clip(pixels + 35, 0, 255)
     red_only = pixels.copy()
     red_only[:, :, 1:] = 0
-    print("Đảo màu dùng 255 - pixels; tăng sáng dùng np.clip; giữ đỏ gán hai kênh còn lại bằng 0.")
+    print("Invert uses 255 - pixels; brightness uses np.clip; red-only sets the other two channels to zero.")
     return _tile_board(
         (original, _numpy_picture(inverted), _numpy_picture(brighter), _numpy_picture(red_only)),
-        ("ẢNH GỐC", "ĐẢO MÀU", "TĂNG SÁNG +35", "CHỈ GIỮ KÊNH ĐỎ"),
+        ("INPUT", "INVERT", "BRIGHTNESS +35", "RED CHANNEL ONLY"),
     )
 
 
@@ -1187,12 +1222,12 @@ def numpy_kernel_gallery():
     blur = ((1, 1, 1), (1, 1, 1), (1, 1, 1))
     sharpen = ((0, -1, 0), (-1, 5, -1), (0, -1, 0))
     edge = ((-1, -1, -1), (-1, 8, -1), (-1, -1, -1))
-    print("Cùng một hàm tính; chỉ thay bảng trọng số để làm mờ, làm nét hoặc tìm đường biên.")
+    print("The calculation function stays the same; only the kernel changes for blur, sharpen, or edge detection.")
     return _tile_board(
         (original, _numpy_picture(_numpy_convolve(pixels, blur, 9)),
          _numpy_picture(_numpy_convolve(pixels, sharpen)),
          _numpy_picture(_numpy_convolve(pixels, edge))),
-        ("ẢNH GỐC", "LÀM MỜ / 9", "LÀM NÉT", "ĐƯỜNG BIÊN"),
+        ("INPUT", "BLUR / 9", "SHARPEN", "EDGES"),
     )
 
 
@@ -1203,10 +1238,10 @@ def preview_numpy_filter(function):
     before = source.copy()
     result = np.asarray(function(source))
     if not np.array_equal(source, before):
-        raise MagicMirrorError("Hàm đang sửa trực tiếp bảng đầu vào; hãy tạo result = pixels.copy().")
+        raise MagicMirrorError("The function edited its input array. Start with result = pixels.copy().")
     filtered = _numpy_picture(result)
-    print("Ảnh đầu vào giữ nguyên. Bảng kết quả có kích thước %s và kiểu số %s." % (result.shape, result.dtype))
-    return _tile_board((original, filtered), ("ẢNH ĐẦU VÀO", "ẢNH SAU KHI ĐỔI"))
+    print("The input stayed unchanged. The result has shape %s and dtype %s." % (result.shape, result.dtype))
+    return _tile_board((original, filtered), ("INPUT", "FILTERED OUTPUT"))
 
 
 def skin_sample_image(size=DEMO_SIZE):
@@ -1239,8 +1274,8 @@ def skin_sample_image(size=DEMO_SIZE):
 
 def show_skin_sample():
     """Show the fixed Skin Lab input before students write any detector."""
-    print("Ảnh mẫu có nền xanh, khuôn mặt và ba vùng đỏ được đặt trên má.")
-    print("Đây là ảnh cho sẵn để em học cơ chế trước khi tự chụp một tấm ở cuối bài.")
+    print("The supplied image has a blue background, a drawn face, and three red points on the cheeks.")
+    print("Use it to learn the mechanism before testing one photograph at the end.")
     return skin_sample_image().resize(OUTPUT_SIZE, Image.Resampling.NEAREST)
 
 
@@ -1260,6 +1295,224 @@ def _mask_overlay(image, mask, color, alpha=0.55):
     return Image.fromarray(np.clip(np.rint(base), 0, 255).astype(np.uint8), "RGB")
 
 
+_snapshot_status = ""
+
+
+def _pipeline_number(name, default, minimum, maximum):
+    """Read one learner setting from the notebook and keep it in a safe range."""
+    value = getattr(__main__, name, default)
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        raise MagicMirrorError("%s must be a number from %s to %s." % (name, minimum, maximum))
+    if not minimum <= value <= maximum:
+        raise MagicMirrorError("%s must be between %s and %s." % (name, minimum, maximum))
+    return value
+
+
+def _pipeline_settings():
+    """Validate the kernel and strengths that learners may edit in the capstone cell."""
+    kernel = np.asarray(getattr(__main__, "SOFTEN_KERNEL", SKIN_SOFTEN_KERNEL), dtype=np.float32)
+    if kernel.shape != (3, 3):
+        raise MagicMirrorError("SOFTEN_KERNEL must have exactly 3 rows and 3 columns.")
+    if not np.isfinite(kernel).all() or (kernel < 0).any() or float(kernel.sum()) <= 0:
+        raise MagicMirrorError("The nine SOFTEN_KERNEL weights must be non-negative and their total must exceed 0.")
+    return {
+        "kernel": kernel,
+        "kernel_choice": str(getattr(__main__, "kernel_choice", "balanced")),
+        "skin_strength": _pipeline_number("skin_smooth_strength", 0.55, 0, 1),
+        "spot_strength": _pipeline_number("spot_smooth_strength", 0.90, 0, 1),
+        "brightness": _pipeline_number("skin_brightness", 10, -25, 25),
+        "passes": int(_pipeline_number("skin_kernel_passes", 2, 1, 4)),
+        "redness_sensitivity": _pipeline_number("redness_sensitivity", 1.6, 0.5, 4),
+    }
+
+
+def _adaptive_skin_pipeline(image, face_mask=None):
+    """Run the capstone pipeline and retain masks/numbers for learner-facing evidence."""
+    settings = _pipeline_settings()
+    source = image.convert("RGB")
+    pixels = np.asarray(source, dtype=np.float32)
+    height, width = pixels.shape[:2]
+
+    if face_mask is None:
+        face = np.ones((height, width), dtype=bool)
+    else:
+        face = np.asarray(face_mask) > 0
+        if face.shape != (height, width):
+            raise MagicMirrorError("face_mask must have the same height and width as the image.")
+        inset = ndimage.binary_erosion(face, iterations=max(1, min(height, width) // 120))
+        if inset.any():
+            face = inset
+
+    red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
+    luminance = 0.299 * red + 0.587 * green + 0.114 * blue
+    blue_difference = 128 - 0.168736 * red - 0.331264 * green + 0.5 * blue
+    red_difference = 128 + 0.5 * red - 0.418688 * green - 0.081312 * blue
+    colour_skin = (
+        (luminance >= 25)
+        & (blue_difference >= 65) & (blue_difference <= 150)
+        & (red_difference >= 110) & (red_difference <= 205)
+    )
+
+    basic_skin = np.asarray(_student_function("detect_skin")(source)) > 0
+    if basic_skin.shape != (height, width):
+        raise MagicMirrorError("detect_skin must return a mask with the image's height and width.")
+    skin = face & (colour_skin | basic_skin)
+    skin = ndimage.uniform_filter(skin.astype(np.float32), size=5, mode="nearest") >= 0.45
+    skin &= face
+
+    edge_x = ndimage.sobel(luminance, axis=1, mode="nearest")
+    edge_y = ndimage.sobel(luminance, axis=0, mode="nearest")
+    edge_strength = np.hypot(edge_x, edge_y)
+    skin_edges = edge_strength[skin]
+    edge_limit = max(18.0, float(np.percentile(skin_edges, 82))) if skin_edges.size else 18.0
+    protected = ndimage.binary_dilation(edge_strength >= edge_limit, iterations=1) & face
+    allowed = skin & ~protected
+
+    student_spots = np.asarray(_student_function("detect_pimples")(source, basic_skin.astype(np.uint8) * 255)) > 0
+    redness = red - (green + blue) / 2
+    local_redness = ndimage.gaussian_filter(redness, sigma=3, mode="nearest")
+    red_residual = redness - local_redness
+    samples = red_residual[allowed]
+    if samples.size:
+        median = float(np.median(samples))
+        mad = float(np.median(np.abs(samples - median)))
+        red_limit = max(4.0, median + settings["redness_sensitivity"] * max(1.5, 1.4826 * mad))
+    else:
+        red_limit = 4.0
+    adaptive_spots = red_residual >= red_limit
+    spots = ndimage.binary_dilation(student_spots | adaptive_spots, iterations=1) & allowed
+
+    student_cleaned = np.asarray(
+        _require_image(_student_function("remove_pimples")(source), "remove_pimples"),
+        dtype=np.float32,
+    )
+    kernel = settings["kernel"][:, :, None]
+    softened = pixels.copy()
+    for _ in range(settings["passes"]):
+        softened = ndimage.convolve(softened, kernel, mode="nearest") / float(kernel.sum())
+
+    detail_keep = 1 - ndimage.gaussian_filter(protected.astype(np.float32), sigma=0.8)
+    skin_alpha = np.clip(
+        ndimage.gaussian_filter(allowed.astype(np.float32), sigma=1.2)
+        * settings["skin_strength"] * detail_keep * face,
+        0, 1,
+    )
+    spot_alpha = np.clip(
+        ndimage.gaussian_filter(spots.astype(np.float32), sigma=0.9)
+        * settings["spot_strength"] * detail_keep * face,
+        0, 1,
+    )
+    result = pixels * (1 - skin_alpha[:, :, None]) + softened * skin_alpha[:, :, None]
+    spot_target = (student_cleaned + softened) / 2
+    result = result * (1 - spot_alpha[:, :, None]) + spot_target * spot_alpha[:, :, None]
+    brightness_alpha = np.clip(
+        ndimage.gaussian_filter(allowed.astype(np.float32), sigma=1.5) * detail_keep * face,
+        0, 1,
+    )
+    result += settings["brightness"] * brightness_alpha[:, :, None]
+    output = np.clip(np.rint(result), 0, 255).astype(np.uint8)
+    before = pixels.astype(np.int16)
+    after = output.astype(np.int16)
+    changed = np.any(np.abs(after - before) >= 1, axis=2)
+    difference = np.clip(np.abs(after - before) * 6, 0, 255).astype(np.uint8)
+
+    return {
+        "source": source,
+        "result": Image.fromarray(output, "RGB"),
+        "skin": skin,
+        "spots": spots,
+        "protected": protected,
+        "changed": changed,
+        "difference": Image.fromarray(difference, "RGB"),
+        "red_limit": red_limit,
+        "settings": settings,
+    }
+
+
+def _pipeline_panels(data):
+    """Build coloured evidence pictures from one completed pipeline run."""
+    original = data["source"]
+    return (
+        _mask_overlay(original, data["skin"], (255, 210, 80), 0.48),
+        _mask_overlay(original, data["spots"], (255, 35, 45), 0.78),
+        data["difference"],
+        data["result"],
+    )
+
+
+def _pipeline_report(data):
+    total = data["skin"].size
+    skin_count = int(data["skin"].sum())
+    protected_count = int(data["protected"].sum())
+    spot_count = int(data["spots"].sum())
+    changed_count = int(data["changed"].sum())
+    settings = data["settings"]
+    return (
+        "Skin region: %d/%d pixels. Detail protection: %d pixels. Red region: %d pixels. "
+        "OUTPUT changed %d pixels. Kernel %s ran %d time(s); smoothing %.0f%%; brightness %+.0f."
+        % (skin_count, total, protected_count, spot_count, changed_count,
+           settings["kernel_choice"], settings["passes"],
+           settings["skin_strength"] * 100, settings["brightness"])
+    )
+
+
+def describe_skin_pipeline_settings():
+    """Print the learner's current kernel and three visible effect controls."""
+    settings = _pipeline_settings()
+    kernel = settings["kernel"]
+    print("Kernel '%s':" % settings["kernel_choice"])
+    for row in kernel:
+        print("  " + "  ".join("%g" % value for value in row))
+    print("Weight total = %g; kernel passes = %d." % (float(kernel.sum()), settings["passes"]))
+    print("Skin smoothing: %.0f%% | Red-region smoothing: %.0f%% | Brightness: %+.0f" %
+          (settings["skin_strength"] * 100, settings["spot_strength"] * 100,
+           settings["brightness"]))
+
+
+def preview_pro_skin_pipeline():
+    """Run the capstone pipeline on a bundled portrait before a personal photo is used."""
+    original = _public_photo(PUBLIC_PHOTOS[0][0], (320, 240))
+    height, width = original.height, original.width
+    y, x = np.ogrid[:height, :width]
+    face = (((x - width * 0.50) / (width * 0.34)) ** 2
+            + ((y - height * 0.48) / (height * 0.50)) ** 2 <= 1)
+    data = _adaptive_skin_pipeline(original, face)
+    settings = data["settings"]
+    center_weight = float(settings["kernel"][1, 1] / settings["kernel"].sum())
+    print(_pipeline_report(data))
+    print("Normalised centre-pixel weight = %.3f." % center_weight)
+    print("DIFFERENCE ×6 brightens changed colours; dark areas were kept close to the input.")
+    skin_panel, spot_panel, difference, result = _pipeline_panels(data)
+    return _image_grid(
+        (original, skin_panel, spot_panel, data["difference"], data["result"]),
+        ("1 INPUT", "2 SKIN REGION", "3 RED REGION", "4 DIFFERENCE ×6", "5 OUTPUT"),
+        columns=3, tile_size=(200, 150), resample=Image.Resampling.LANCZOS,
+    )
+
+
+def _skin_snapshot(buffer, width, height, small_w, small_h, face_mask=None):
+    """Return four packed RGBA panels for the one-photo browser capstone."""
+    global _snapshot_status
+    raw = np.frombuffer(buffer.to_py(), dtype=np.uint8).reshape(height, width, 4)
+    image = Image.fromarray(np.ascontiguousarray(raw[..., :CHANNELS]), "RGB")
+    small = image.resize((small_w, small_h), Image.Resampling.LANCZOS)
+    mask_array = None
+    if face_mask is not None:
+        flat_mask = np.frombuffer(face_mask.to_py(), dtype=np.uint8)
+        if flat_mask.size == small_w * small_h:
+            mask_array = flat_mask.reshape(small_h, small_w)
+    data = _adaptive_skin_pipeline(small, mask_array)
+    _snapshot_status = _pipeline_report(data)
+    return b"".join(_to_rgba_bytes(panel) for panel in _pipeline_panels(data))
+
+
+def _skin_snapshot_report():
+    """Return the numbers produced by the most recent one-photo run."""
+    return _snapshot_status
+
+
 def preview_library_convolution():
     """Use the student's SciPy wrapper on all three colour channels and show before/after."""
     original = skin_sample_image()
@@ -1271,23 +1524,23 @@ def preview_library_convolution():
     center = (original.width // 2, original.height // 2)
     before = original.getpixel(center)
     after = filtered.getpixel(center)
-    print("SciPy dùng cùng một bảng trọng số cho ba bảng R, G, B; np.stack ghép ba kết quả thành ảnh RGB.")
-    print("Pixel giữa: trước %s -> sau %s. Hình bên phải cho thấy màu sau khi ghép ba kênh." %
+    print("SciPy applies one kernel to the R, G, and B arrays; np.stack combines the three results into RGB.")
+    print("Centre pixel: before %s -> after %s. The right panel shows the combined colour result." %
           (before, after))
-    return _image_grid((original, filtered), ("ẢNH RGB BAN ĐẦU", "ẢNH SAU KHI GHÉP"), columns=2)
+    return _image_grid((original, filtered), ("RGB INPUT", "COMBINED OUTPUT"), columns=2)
 
 
 def preview_skin_evidence():
     """Show coloured inputs and the student's 0/255 decisions together."""
     rule = _student_function("skin_evidence")
-    samples = (("DA (183,127,103)", SKIN_TONE),
-               ("ĐỎ (225,62,66)", PIMPLE_RED),
-               ("NỀN XANH (35,80,185)", SKIN_BACKGROUND))
+    samples = (("SAMPLE (183,127,103)", SKIN_TONE),
+               ("RED (225,62,66)", PIMPLE_RED),
+               ("BLUE BG (35,80,185)", SKIN_BACKGROUND))
     input_tiles = [Image.new("RGB", (80, 60), color) for _, color in samples]
     vote_tiles = [Image.new("RGB", (80, 60), (value, value, value))
                   for value in (rule(*color) for _, color in samples)]
-    labels = [label for label, _ in samples] + ["ĐÁNH DẤU = %d" % rule(*color) for _, color in samples]
-    print("Hàng trên là màu ban đầu. Hàng dưới là giá trị 0 hoặc 255 sau khi áp dụng cùng điều kiện RGB.")
+    labels = [label for label, _ in samples] + ["MASK = %d" % rule(*color) for _, color in samples]
+    print("The top row contains input colours. The bottom row shows the 0 or 255 decision from the same RGB rule.")
     return _image_grid(tuple(input_tiles + vote_tiles), tuple(labels), columns=3, tile_size=(120, 90))
 
 
@@ -1295,12 +1548,12 @@ def preview_skin_mask():
     """Show the student's skin mask alone and over the original colours."""
     original = skin_sample_image()
     mask = np.asarray(_student_function("detect_skin")(original))
-    print("skin_mask đánh dấu %d/%d pixel. Màu vàng chỉ đúng những vị trí có giá trị 255." %
+    print("skin_mask selects %d/%d pixels. Yellow marks the exact locations whose value is 255." %
           (int((mask > 0).sum()), mask.size))
     return _image_grid(
         (original, _mask_picture(mask, (245, 204, 166)),
          _mask_overlay(original, mask, (255, 210, 80))),
-        ("ẢNH RGB", "VÙNG DA 0/255", "VÙNG DA TRÊN ẢNH"),
+        ("RGB INPUT", "SKIN MASK 0/255", "SKIN OVERLAY"),
     )
 
 
@@ -1309,12 +1562,12 @@ def preview_pimple_mask():
     original = skin_sample_image()
     skin_mask = _student_function("detect_skin")(original)
     mask = np.asarray(_student_function("detect_pimples")(original, skin_mask))
-    print("pimple_mask đánh dấu %d/%d pixel. Màu đỏ cho biết các giá trị 255 nằm ở đâu trên ảnh." %
+    print("pimple_mask selects %d/%d pixels. Red marks the exact locations whose value is 255." %
           (int((mask > 0).sum()), mask.size))
     return _image_grid(
         (original, _mask_picture(mask, PIMPLE_RED),
          _mask_overlay(original, mask, (255, 35, 45), 0.7)),
-        ("ẢNH RGB", "VÙNG ĐỎ 0/255", "VÙNG ĐỎ TRÊN ẢNH"),
+        ("RGB INPUT", "RED MASK 0/255", "RED OVERLAY"),
     )
 
 
@@ -1326,13 +1579,13 @@ def preview_cleanup():
     after = np.asarray(cleaned, dtype=np.int16)
     difference = np.clip(np.abs(after - before) * 4, 0, 255).astype(np.uint8)
     sample_x, sample_y = original.width * 40 // 100, original.height * 58 // 100
-    print("Pixel ở vùng đỏ: trước %s -> sau %s." %
+    print("Pixel in the red region: before %s -> after %s." %
           (tuple(before[sample_y, sample_x]), tuple(after[sample_y, sample_x])))
-    print("Có %d/%d pixel đổi màu. Hình sai khác sáng ở nơi màu đã đổi; vùng tối được giữ nguyên." %
+    print("%d/%d pixels changed colour. The difference panel is bright where colours changed and dark where they stayed." %
           (int(np.any(before != after, axis=2).sum()), before.shape[0] * before.shape[1]))
     return _image_grid(
         (original, cleaned, _numpy_picture(difference)),
-        ("TRƯỚC", "SAU", "SAI KHÁC x4"),
+        ("BEFORE", "AFTER", "DIFFERENCE ×4"),
     )
 
 
@@ -1343,17 +1596,17 @@ def skin_demo(size=DEMO_SIZE):
     pimple_mask = _student_function("detect_pimples")(original, skin_mask)
     cleaned = _require_image(_student_function("remove_pimples")(original), "remove_pimples")
 
-    print("skin_mask đánh dấu %d pixel; pimple_mask đánh dấu %d pixel." %
+    print("skin_mask selects %d pixels; pimple_mask selects %d pixels." %
           (int((np.asarray(skin_mask) > 0).sum()), int((np.asarray(pimple_mask) > 0).sum())))
-    print("Mỗi vùng đánh dấu được phủ lên ảnh màu để em thấy chính xác pixel nào đã được chọn.")
-    print("Ảnh cuối chỉ đổi màu trong pimple_mask; các pixel còn lại giữ nguyên.")
+    print("Each mask is overlaid on the colour image so you can see the exact selected locations.")
+    print("The final image changes colour only inside pimple_mask; all other pixels remain unchanged.")
     return _image_grid(
         (original, _mask_picture(skin_mask, (245, 204, 166)),
          _mask_overlay(original, skin_mask, (255, 210, 80)),
          _mask_picture(pimple_mask, PIMPLE_RED),
          _mask_overlay(original, pimple_mask, (255, 35, 45), 0.7), cleaned),
-        ("1 ẢNH RGB", "2 VÙNG DA", "3 VÙNG DA TRÊN ẢNH",
-         "4 VÙNG ĐỎ", "5 VÙNG ĐỎ TRÊN ẢNH", "6 KẾT QUẢ"),
+        ("1 RGB INPUT", "2 SKIN MASK", "3 SKIN OVERLAY",
+         "4 RED MASK", "5 RED OVERLAY", "6 OUTPUT"),
     )
 
 
@@ -1482,6 +1735,21 @@ def _skin_test_image(size=(9, 9)):
     return image
 
 
+def _try_skin(name, test):
+    """Run one Skin Lab test and print an English learner-facing result."""
+    try:
+        problem = test()
+    except MagicMirrorError as error:
+        problem = str(error)
+    except Exception as error:
+        problem = "%s: %s" % (type(error).__name__, error)
+    if problem:
+        print("  FIX   %s -> %s" % (name, problem))
+        return False
+    print("   OK   %s" % name)
+    return True
+
+
 def _test_skin_convolution():
     layer = [[0 for _ in range(5)] for _ in range(5)]
     layer[2][2] = 9
@@ -1489,32 +1757,32 @@ def _test_skin_convolution():
     result = _student_function("convolve_layer")(layer, kernel, 9)
     values = np.asarray(result)
     if values.shape != (5, 5):
-        return "phải trả một bảng số NumPy mới có kích thước (5, 5)"
+        return "return a new NumPy array with shape (5, 5)"
     if values[2, 2] != 1:
-        return "ô giữa phải là 9 chia đều cho cửa sổ 3x3, tức 1"
+        return "the centre must be 9 divided across the 3x3 window, which is 1"
     if layer[2][2] != 9:
-        return "đã ghi đè lên input; hãy đọc layer và ghi sang result"
+        return "the input was overwritten; read from layer and write to a new result"
     return ""
 
 
 def _test_skin_evidence():
     rule = _student_function("skin_evidence")
     if rule(*SKIN_TONE) != COLOR_MAX or rule(92, 61, 49) != COLOR_MAX:
-        return "luật cần nhận cả mẫu da sáng và tối trong bài kiểm tra"
+        return "the rule must accept both supplied light and dark test colours"
     if rule(*SKIN_BACKGROUND) != COLOR_MIN:
-        return "nền xanh không được đánh dấu là da"
+        return "the blue background must not be marked as skin"
     return ""
 
 
 def _test_skin_mask():
     mask = np.asarray(_student_function("detect_skin")(_skin_test_image()))
     if mask.shape != (9, 9) or mask.dtype != np.uint8:
-        return "phải trả skin_mask có kích thước (9, 9) và kiểu số uint8"
+        return "return skin_mask with shape (9, 9) and dtype uint8"
     if mask[4, 4] != COLOR_MAX:
-        return "kết quả vùng 3x3 phải giữ pixel giữa là vùng da dù pixel đó có màu đỏ"
+        return "the 3x3 vote must keep the red centre inside the selected skin region"
     blue = Image.new("RGB", (9, 9), SKIN_BACKGROUND)
     if np.asarray(_student_function("detect_skin")(blue))[4, 4] != COLOR_MIN:
-        return "vùng nền xanh đang bị nhận nhầm là da"
+        return "a solid blue region is being selected as skin"
     return ""
 
 
@@ -1523,11 +1791,11 @@ def _test_pimple_mask():
     skin_mask = _student_function("detect_skin")(image)
     mask = np.asarray(_student_function("detect_pimples")(image, skin_mask))
     if mask.shape != (9, 9) or mask.dtype != np.uint8:
-        return "phải trả pimple_mask có kích thước (9, 9) và kiểu số uint8"
+        return "return pimple_mask with shape (9, 9) and dtype uint8"
     if mask[4, 4] != COLOR_MAX:
-        return "chưa tìm được chấm có độ đỏ cao hơn vùng da xung quanh"
+        return "the locally red centre was not selected"
     if mask[0, 0] != COLOR_MIN:
-        return "góc không có vùng đỏ phải nhận giá trị 0"
+        return "the corner has no red spot and must remain 0"
     return ""
 
 
@@ -1536,40 +1804,40 @@ def _test_remove_pimples():
     before = image.copy()
     result = _student_function("remove_pimples")(image)
     if not isinstance(result, Image.Image) or result.size != image.size:
-        return "phải trả về một ảnh PIL cùng kích thước"
+        return "return a PIL image with the same size"
     old = before.getpixel((4, 4))
     new = result.getpixel((4, 4))
     old_excess = old[0] - (old[1] + old[2]) / 2
     new_excess = new[0] - (new[1] + new[2]) / 2
     if new_excess >= old_excess:
-        return "độ đỏ ở tâm chưa giảm sau khi làm mềm"
+        return "the centre's excess redness did not decrease after smoothing"
     if result.getpixel((0, 0)) != SKIN_TONE:
-        return "pixel xa nốt đỏ phải được giữ nguyên"
+        return "a pixel far from the red spot must remain unchanged"
     if image.getpixel((4, 4)) != PIMPLE_RED:
-        return "không được sửa trực tiếp ảnh đầu vào"
+        return "do not edit the input image in place"
     return ""
 
 
 SKIN_TESTS = (
-    ("convolve_layer", "convolve_layer  (bảng trọng số)", _test_skin_convolution),
-    ("skin_evidence", "skin_evidence   (kiểm tra màu RGB)", _test_skin_evidence),
-    ("detect_skin", "detect_skin     (xét vùng 3x3)", _test_skin_mask),
-    ("detect_pimples", "detect_pimples  (đỏ hơn vùng 5x5)", _test_pimple_mask),
-    ("remove_pimples", "remove_pimples  (làm mềm có chọn lọc)", _test_remove_pimples),
+    ("convolve_layer", "convolve_layer  (apply a kernel)", _test_skin_convolution),
+    ("skin_evidence", "skin_evidence   (test RGB evidence)", _test_skin_evidence),
+    ("detect_skin", "detect_skin     (count a 3x3 area)", _test_skin_mask),
+    ("detect_pimples", "detect_pimples  (compare a 5x5 area)", _test_pimple_mask),
+    ("remove_pimples", "remove_pimples  (selective smoothing)", _test_remove_pimples),
 )
 
 
 def check_skin_code():
     """Grade only the five functions in the isolated Skin Lab notebook."""
-    print("=== TỰ CHẤM SKIN LAB ===")
+    print("=== SKIN LAB CHECK ===")
     passed = 0
     progress = getattr(js, "MagicMirrorUI", None)
     for task_id, name, test in SKIN_TESTS:
-        ok = _try(name, test)
+        ok = _try_skin(name, test)
         passed += int(ok)
         if progress is not None and hasattr(progress, "progress"):
             progress.progress(task_id, ok)
     print("-" * 54)
-    print("Kết quả: %d/%d phần đã đúng." % (passed, len(SKIN_TESTS)))
+    print("Result: %d/%d parts correct." % (passed, len(SKIN_TESTS)))
     if passed == len(SKIN_TESTS):
-        print("Tốt! Chạy magic_mirror.skin_demo(), rồi chụp một tấm bằng capture_skin_photo().")
+        print("Good. Run magic_mirror.skin_demo(), then test one still image with capture_skin_photo().")

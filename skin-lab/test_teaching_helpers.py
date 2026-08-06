@@ -8,6 +8,7 @@ from contextlib import ExitStack, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+import numpy as np
 from PIL import Image
 
 import skin_filters_solution
@@ -83,6 +84,42 @@ class TestTeachingHelpers(unittest.TestCase):
         self.assertEqual(live.size, magic_mirror.OUTPUT_SIZE)
         self.assertTrue(all(isinstance(preview, Image.Image) for preview in previews))
 
+    def test_capstone_pipeline_changes_skin_and_keeps_pixels_outside_face(self):
+        names = (
+            "convolve_layer", "skin_evidence", "detect_skin",
+            "detect_pimples", "remove_pimples",
+        )
+        with ExitStack() as stack:
+            main_module = sys.modules["__main__"]
+            for name in names:
+                stack.enter_context(patch.object(
+                    main_module, name, getattr(skin_filters_solution, name), create=True))
+            stack.enter_context(patch.object(main_module, "SOFTEN_KERNEL", (
+                (1, 1, 1), (1, 1, 1), (1, 1, 1),
+            ), create=True))
+            stack.enter_context(patch.object(main_module, "skin_smooth_strength", 0.55, create=True))
+            stack.enter_context(patch.object(main_module, "spot_smooth_strength", 0.90, create=True))
+            stack.enter_context(patch.object(main_module, "skin_brightness", 10, create=True))
+            stack.enter_context(patch.object(main_module, "skin_kernel_passes", 2, create=True))
+            stack.enter_context(patch.object(main_module, "redness_sensitivity", 1.6, create=True))
+            image = magic_mirror.skin_sample_image((80, 60))
+            face = [[False] * 80 for _ in range(60)]
+            for row in range(8, 53):
+                for column in range(18, 63):
+                    face[row][column] = True
+            data = magic_mirror._adaptive_skin_pipeline(image, face)
+            with redirect_stdout(io.StringIO()):
+                preview = magic_mirror.preview_pro_skin_pipeline()
+
+        self.assertGreater(int(data["skin"].sum()), 0)
+        self.assertGreater(int(data["changed"].sum()), image.width * image.height // 20)
+        before = np.asarray(image, dtype=np.float32)
+        after = np.asarray(data["result"], dtype=np.float32)
+        self.assertGreater(float(after[data["skin"]].mean()), float(before[data["skin"]].mean()) + 2)
+        self.assertEqual(data["result"].getpixel((0, 0)), image.getpixel((0, 0)))
+        self.assertIsInstance(preview, Image.Image)
+        self.assertGreater(preview.width, 600)
+
     def test_skin_explanation_helpers_return_visible_illustrations(self):
         helpers = (
             magic_mirror.show_skin_pipeline_overview,
@@ -101,6 +138,20 @@ class TestTeachingHelpers(unittest.TestCase):
             self.assertIsInstance(picture, Image.Image)
             self.assertGreaterEqual(picture.width, 300)
             self.assertGreaterEqual(picture.height, 150)
+
+    def test_three_channel_example_prints_exact_number_matrices_and_colours(self):
+        output = io.StringIO()
+        with redirect_stdout(output):
+            picture = magic_mirror.show_numpy_channels()
+        report = output.getvalue()
+        self.assertIn("pixels has shape (3, 3, 3)", report)
+        self.assertIn("R matrix = [[255, 0, 0]", report)
+        self.assertIn("G matrix = [[0, 255, 0]", report)
+        self.assertIn("B matrix = [[0, 0, 255]", report)
+        self.assertIn("R=183, G=127, B=103 -> RGB (183, 127, 103)", report)
+        self.assertIn("maximum difference = 0", report)
+        self.assertIsInstance(picture, Image.Image)
+        self.assertGreaterEqual(picture.width, 400)
 
     def test_number_substitutions_match_the_lesson(self):
         blurred = (8 * 10 + 90) / 9

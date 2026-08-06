@@ -231,6 +231,7 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
 .snapshot-results.hidden{display:none}
 .snapshot-results figure{min-width:0;margin:0;padding:8px;border:2px solid var(--mint-line);
   border-radius:var(--r-vua);background:var(--paper-raised)}
+.snapshot-results figure:last-child{grid-column:1/-1;width:min(100%,560px);justify-self:center}
 .snapshot-results canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;border-radius:var(--r-nho);
   background:var(--paper-warm);image-rendering:auto}
 .snapshot-results figcaption{padding:8px 4px 2px;color:var(--ink);font-size:12px;font-weight:800;line-height:1.4}

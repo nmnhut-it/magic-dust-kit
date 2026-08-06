@@ -1,4 +1,4 @@
-"""Bài giải Skin Lab: hiểu cơ chế bằng số nhỏ, xử lý ảnh thật bằng NumPy và SciPy."""
+"""Skin Lab answer key: small calculations, then full-image NumPy and SciPy."""
 
 # === TASK: shared ===
 import numpy as np
@@ -25,7 +25,7 @@ PIMPLE_RED_GAP = 24
 
 # === TASK: convolve_layer ===
 def convolve_layer(layer, kernel, divisor):
-    """Dùng bảng trọng số với SciPy và trả về một bảng số NumPy mới."""
+    """Apply a SciPy kernel and return a new NumPy array."""
     values = np.asarray(layer, dtype=np.float32)
     weights = np.asarray(kernel, dtype=np.float32)
     filtered = ndimage.convolve(values, weights, mode="nearest")
@@ -34,7 +34,7 @@ def convolve_layer(layer, kernel, divisor):
 
 # === TASK: skin_evidence ===
 def skin_evidence(red, green, blue):
-    """Áp dụng cùng một luật RGB cho một pixel hoặc cả ba kênh NumPy."""
+    """Apply one RGB rule to a pixel or to three complete NumPy channels."""
     red = np.asarray(red, dtype=np.int16)
     green = np.asarray(green, dtype=np.int16)
     blue = np.asarray(blue, dtype=np.int16)
@@ -53,7 +53,7 @@ def skin_evidence(red, green, blue):
 
 # === TASK: detect_skin ===
 def detect_skin(img):
-    """Tạo ảnh đánh dấu vùng da bằng cách đếm kết quả trong vùng 3x3."""
+    """Create a skin-region mask by counting decisions in each 3x3 area."""
     pixels = np.asarray(img.convert("RGB"), dtype=np.int16)
     raw_mask = skin_evidence(
         pixels[:, :, 0],
@@ -69,7 +69,7 @@ def detect_skin(img):
 
 # === TASK: detect_pimples ===
 def detect_pimples(img, skin_mask):
-    """Tìm điểm đỏ nổi bật trong vùng 5x5 rồi mở rộng vùng được chọn."""
+    """Find a locally red spot in a 5x5 area, then expand the selection."""
     pixels = np.asarray(img.convert("RGB"), dtype=np.float32)
     red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
     redness = np.maximum(0, red - (green + blue) / 2)
@@ -84,7 +84,7 @@ def detect_pimples(img, skin_mask):
 
 # === TASK: remove_pimples ===
 def remove_pimples(img):
-    """Làm mềm nơi pimple_mask bằng 255 và giữ nguyên mọi pixel còn lại."""
+    """Smooth where pimple_mask is 255 and keep every other pixel unchanged."""
     source = img.convert("RGB")
     pixels = np.asarray(source, dtype=np.float32)
     skin_mask = detect_skin(source)

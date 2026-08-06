@@ -113,7 +113,7 @@ async function notebookState(cdp) {
   return result.result.value;
 }
 
-async function waitForNotebook(cdp, mode, label, expectedCells = 58) {
+async function waitForNotebook(cdp, mode, label, expectedCells = 61) {
   const state = await poll(
     () => notebookState(cdp),
     (value) => value?.page === mode && (value.state === "ready" || value.state === "error"),
@@ -146,11 +146,11 @@ try {
   const mechanisms = await cdp.evaluate(`(async () => {
     const checks = [
       ["skin-mechanism-rgb", "(120, 0, 0)"],
-      ["skin-mechanism-rule", "0 — không chọn"],
-      ["skin-mechanism-neighbours", "255 — giữ vùng này"],
-      ["skin-mechanism-red-spot", "Có, vì"],
+      ["skin-mechanism-rule", "0 — do not select"],
+      ["skin-mechanism-neighbours", "255 — keep this region"],
+      ["skin-mechanism-red-spot", "Yes, because"],
       ["skin-mechanism-soften", "(170, 110, 95)"],
-      ["skin-mechanism-face", "Giữ màu ban đầu"],
+      ["skin-mechanism-face", "Keep the original colour"],
     ];
     for (const [id, answer] of checks) {
       const index = Nb.cells.findIndex((item) => item.id === id);
@@ -209,7 +209,7 @@ try {
   }
 
   await cdp.evaluate("location.reload()");
-  await waitForNotebook(cdp, "skin", "resumed practice route", 59);
+  await waitForNotebook(cdp, "skin", "resumed practice route", 62);
   const resumed = await poll(async () => {
     const result = await cdp.evaluate(`({
       source: Nb.cells.find((item) => item.id === "task-convolve-layer")?.source,
@@ -235,6 +235,7 @@ try {
       "skin-mechanism-soften", "skin-preview-cleanup", "skin-mechanism-face",
       "skin-check", "skin-demo", "numpy-filter-gallery", "numpy-kernel-gallery",
       "skin-public-gallery", "skin-public-test", "skin-face-mesh-map", "skin-face-mask-pipeline",
+      "skin-pro-pipeline-preview",
     ];
     for (const id of ids) {
       const index = Nb.cells.findIndex((item) => item.id === id);
@@ -257,7 +258,7 @@ try {
     Snapshot.captureButton.click();
     await waitFor(() => Snapshot.stream === null &&
       !Snapshot.results?.classList.contains("hidden") &&
-      !Snapshot.message?.textContent.startsWith("Đang"), 35_000, "one-photo processing");
+      !Snapshot.message?.textContent.startsWith("Face Mesh is"), 35_000, "one-photo processing");
     const photoEvidence = {
       message: Snapshot.message.textContent,
       streamStopped: Snapshot.stream === null,
@@ -288,19 +289,20 @@ try {
   const evidence = run.result.value;
   if (!Array.isArray(evidence.errors)) throw new Error(`Unexpected answer evidence: ${JSON.stringify(evidence)}`);
   if (evidence.errors.length) throw new Error(`Notebook errors: ${evidence.errors.join(" | ")}`);
-  if (!evidence.grader.includes("Kết quả: 5/5")) {
+  if (!evidence.grader.includes("Result: 5/5")) {
     throw new Error(`The browser grader did not reach 5/5: ${evidence.grader}`);
   }
-  if (evidence.images < 16 || evidence.mechanisms !== 6) {
-    throw new Error(`Expected at least 16 images and six mechanisms, got ${evidence.images} and ${evidence.mechanisms}.`);
+  if (evidence.images < 17 || evidence.mechanisms !== 6) {
+    throw new Error(`Expected at least 17 images and six mechanisms, got ${evidence.images} and ${evidence.mechanisms}.`);
   }
   if (!evidence.fitsMobile) throw new Error("Skin Lab overflows the 390 px mobile viewport.");
-  if (!evidence.controls.includes("Chụp một tấm") || !evidence.controls.includes("Chọn ảnh từ máy") ||
-      evidence.controls.includes("Quay video")) {
+  if (!evidence.controls.includes("Capture one photo") || !evidence.controls.includes("Choose an image file") ||
+      evidence.controls.includes("Record video")) {
     throw new Error(`Skin photo controls are wrong: ${evidence.controls}`);
   }
-  if (!evidence.photoEvidence.streamStopped || evidence.photoEvidence.resultCanvases !== 2 ||
-      evidence.photoEvidence.outputWidth !== 480) {
+  if (!evidence.photoEvidence.streamStopped || evidence.photoEvidence.resultCanvases !== 5 ||
+      evidence.photoEvidence.outputWidth !== 480 ||
+      !evidence.photoEvidence.message.includes("OUTPUT changed")) {
     throw new Error(`One-photo processing did not finish correctly: ${JSON.stringify(evidence.photoEvidence)}`);
   }
   if (!evidence.answerKey.includes(":skin-answers:v3") || !evidence.practiceSaveStillPresent) {
