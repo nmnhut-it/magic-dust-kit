@@ -207,7 +207,8 @@ const Kernel = {
 
   /** Chép magic_mirror.py vào hệ thống file ảo rồi mở sẵn display() cho notebook. */
   async install() {
-    const res = await fetch(CFG.pyodide.moduleSource, { cache: "no-store" });
+    const moduleUrl = `${CFG.pyodide.moduleSource}?v=${encodeURIComponent(PAGE.courseVersion)}`;
+    const res = await fetch(moduleUrl, { cache: "no-store" });
     if (!res.ok) throw new Error(CFG.pyodide.moduleSource + ": " + res.status);
     Kernel.py.FS.writeFile(CFG.pyodide.modulePath, new TextEncoder().encode(await res.text()));
     if (SKIN) {
@@ -1208,7 +1209,8 @@ const Nb = {
   },
 
   async load() {
-    const res = await fetch(Nb.file, { cache: "no-store" });
+    const notebookUrl = `${Nb.file}?v=${encodeURIComponent(PAGE.courseVersion)}`;
+    const res = await fetch(notebookUrl, { cache: "no-store" });
     if (!res.ok) throw new Error(res.status + " " + res.statusText);
     Nb.adopt(await res.json());
   },
