@@ -13,7 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HERE = pathlib.Path(__file__).resolve().parent
-COURSE_VERSION = "2026.08.07.1"
+COURSE_VERSION = "2026.08.07.2"
 PRACTICE_FILE = "Skin_Lab.ipynb"
 SOLUTION_FILE = "Skin_Lab_Answers.ipynb"
 TASK_ORDER = (
@@ -111,8 +111,16 @@ SETUP = """## Start here
 Run the next two cells. The first loads the visual tools. The second loads NumPy, SciPy, Pillow, and the constants used by
 the five functions. Do not edit these two cells yet.
 
-You do not need a personal photo for most of the lab. The 7 × 7 image, a drawn face, and three public-domain photographs
-are already included. The camera is used only once, in the final optional test.
+You do not need a personal photo for most of the lab. A 7 × 7 image, a drawn face, and four public-licence photographs are
+already included. The camera is used only once, in the final optional test.
+
+Two kinds of picture appear, on purpose:
+
+- **Real photographs** wherever you judge a result by eye — the filter and kernel galleries, the Face Mesh boundary, the
+  skin region, and the whole final pipeline. A blur or an edge filter means nothing on flat cartoon colour.
+- **The drawn face** wherever you must be able to count what happened. Its red spots are single bright pixels, so the
+  simple detector you are about to write provably fires on them and you can check the pixel counts by hand. On a real
+  photograph that same detector finds nothing — that is a real limit, and the lab shows you exactly where and why later.
 
 ### The four kinds of cells on this page
 
@@ -720,11 +728,22 @@ PHOTO = """## Run the pipeline once on a photograph
   once; NumPy and SciPy then run the pipeline once on that still image.
 - **OUTPUT:** five panels show the input, allowed skin region, stronger red region, magnified colour difference, and final
   result. The report states how many pixels were selected, protected, and changed, plus your kernel and settings.
-- **Hands-on comparison:** after the result appears, press the kernel buttons under it — `gentle 3×3`, `balanced 3×3`,
-  `strong 3×3`, `wide 5×5`, `widest 9×9`. Each press re-runs the whole pipeline on the **same** photograph, so the only
-  thing that changed is the kernel. Compare the reports and the difference panels, and write down the changed-pixel
-  count for each: how much farther does a 5 × 5 reach than a 3 × 3, and does `widest 9×9` change that number as much as
-  its 81 weights suggest it should?
+- **Hands-on comparison:** two button rows appear under the result, and every press re-runs the whole pipeline on the
+  **same** photograph, so exactly one thing changes each time.
+  - *Kernel* — `gentle 3×3`, `balanced 3×3`, `strong 3×3`, `wide 5×5`, `widest 9×9`: which neighbours are averaged, and
+    how far the average reaches.
+  - *Smoothing strength* — `25%`, `55%`, `85%`, `100%`: how much of that calculated colour actually replaces the
+    original. This writes `skin_smooth_strength` for you; `0%` would keep the input untouched and `100%` uses the whole
+    smooth colour.
+
+  Those two rows are the same split as `output = original × (1 - strength) + kernel_result × strength`: the kernel
+  decides the candidate colour, the strength decides how much of it is used. Write down the changed-pixel count for each
+  press. Does `widest 9×9` change that number as much as its 81 weights suggest it should — and does raising the
+  strength to `100%` make the difference between kernels easier or harder to see?
+- **The other settings** — the kernel weights themselves, `spot_smooth_strength`, `skin_brightness`,
+  `skin_kernel_passes`, and `redness_sensitivity` — stay in the settings cell above. Edit a number there, run that cell,
+  then press any button in these rows to re-run the same photograph with your new value. Running the settings cell also
+  puts the kernel and the strength back to the values written in it, so press the buttons again afterwards.
 
 The image stays only in this cell's visible output. It is not written to `localStorage`, and it disappears after a reload.
 Your code and progress remain. Processing uses 320 × 240 pixels and displays at 480 × 360 for a clear still-image result.

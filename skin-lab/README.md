@@ -22,12 +22,29 @@ Lesson structure (one continuous trail for young learners):
   and the capstone answers it (adaptive threshold, `wide` 5 × 5 kernel default,
   red areas pulled toward the surrounding skin colour, red skin excluded from
   edge protection).
+- **Which picture a cell shows is a decision, not an accident**, and
+  `test_teaching_helpers` asserts it per function. Cells judged by eye use
+  `demo_face_photo()` (the bundled portrait, `DEMO_PHOTO`): the filter and
+  kernel galleries, `preview_numpy_filter`, `preview_library_convolution`,
+  `preview_skin_mask`, `show_face_mesh_map`, `show_face_mask_pipeline` — a blur
+  or an edge kernel reads as nothing on flat cartoon colour. Cells where the
+  student's own detector must be seen firing keep `skin_sample_image()`:
+  `show_skin_sample`, `show_skin_pipeline_overview`, `preview_pimple_mask`,
+  `preview_cleanup`, `skin_demo`. That is not timidity — the taught 5 × 5 rule
+  selects **0** red pixels on the real acne photo at demo sizes, because the
+  window sits inside the blotch, so a real photo there would read as "my correct
+  code is broken" long before the lesson explains the limit.
 - After the one-photo capture, kernel buttons under the result re-run the
   pipeline on the same captured image (`Snapshot.renderPipeline` +
   `magic_mirror._set_snapshot_kernel`), so students compare `gentle/balanced/
   strong 3×3` against `wide 5×5` and `widest 9×9` hands-on without reopening the
   camera; a custom `kernel_options` entry typed in the settings cell wins over
-  the canonical weights. `magic_mirror.KERNEL_SHAPES` is the single list of
+  the canonical weights. A second row (`_set_snapshot_strength`, 25/55/85/100%)
+  writes `skin_smooth_strength`, so students can separate *which colour is
+  calculated* (kernel) from *how much of it is used* (strength) on one
+  photograph. Both rows are built by `Snapshot.rerunRow` and run through
+  `Snapshot.rerunWith`, so no row can forget to lock its buttons mid-run or to
+  highlight the active choice. `magic_mirror.KERNEL_SHAPES` is the single list of
   accepted sizes — `(3, 3)`, `(5, 5)`, `(9, 9)` — read by both the button
   handler and the capstone settings check. One 9 × 9 re-run of the whole
   pipeline takes about 0.5 s in the browser at 320 × 240, so the button stays a

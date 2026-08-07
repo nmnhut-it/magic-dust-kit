@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import io
 import math
@@ -269,6 +270,35 @@ class TestTeachingHelpers(unittest.TestCase):
         self.assertIn("Changed pixels: 1/24 | changed channel values: 1/72.", output.getvalue())
         self.assertIsInstance(picture, Image.Image)
 
+    def test_demo_photo_is_a_real_bundled_face_at_the_requested_size(self):
+        photo = magic_mirror.demo_face_photo((160, 120))
+        self.assertEqual(photo.size, (160, 120))
+        # Ảnh vẽ tay chỉ có vài màu phẳng; ảnh thật thì hàng nghìn — đây là cách
+        # rẻ nhất để test khẳng định "thật", không chỉ "có ảnh nào đó".
+        self.assertGreater(len(set(photo.convert("RGB").getdata())), 2000)
+        self.assertLess(len(set(magic_mirror.skin_sample_image().getdata())), 40)
+
+    def test_watch_cells_use_a_photograph_and_detector_cells_keep_the_drawn_plate(self):
+        """The split is deliberate: a photo where you judge by eye, the drawn plate
+        where the student's own 5 x 5 rule must be seen firing (it finds nothing on
+        a real blotch, which the lesson teaches later on its own terms)."""
+        tree = ast.parse((Path(__file__).parent / "assets" / "magic_mirror.py").read_text(encoding="utf-8"))
+        uses = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                called = {inner.func.id for inner in ast.walk(node)
+                          if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name)}
+                uses[node.name] = called
+        for name in ("show_face_mesh_map", "show_face_mask_pipeline", "numpy_filter_gallery",
+                     "numpy_kernel_gallery", "preview_numpy_filter", "preview_library_convolution",
+                     "preview_skin_mask"):
+            self.assertIn("demo_face_photo", uses[name], name)
+            self.assertNotIn("skin_sample_image", uses[name], name)
+        for name in ("show_skin_sample", "show_skin_pipeline_overview", "preview_pimple_mask",
+                     "preview_cleanup", "skin_demo"):
+            self.assertIn("skin_sample_image", uses[name], name)
+            self.assertNotIn("demo_face_photo", uses[name], name)
+
     def test_snapshot_kernel_buttons_switch_the_capstone_kernel(self):
         main_module = sys.modules["__main__"]
         custom_gentle = ((0, 1, 0), (1, 4, 1), (0, 1, 0))
@@ -297,6 +327,18 @@ class TestTeachingHelpers(unittest.TestCase):
             self.assertIn(weights.shape, magic_mirror.KERNEL_SHAPES, name)
             self.assertGreater(float(weights.sum()), 0, name)
             self.assertTrue((weights >= 0).all(), name)
+
+    def test_strength_buttons_write_the_notebook_smoothing_variable(self):
+        main_module = sys.modules["__main__"]
+        with patch.object(main_module, "skin_smooth_strength", 0.55, create=True):
+            for percent in magic_mirror.SNAPSHOT_STRENGTHS:
+                magic_mirror._set_snapshot_strength(percent)
+                self.assertAlmostEqual(main_module.skin_smooth_strength, percent / 100)
+                self.assertAlmostEqual(
+                    magic_mirror._pipeline_settings()["skin_strength"], percent / 100)
+        for wrong in (0, 60, "fast", None):
+            with self.assertRaises(magic_mirror.MagicMirrorError):
+                magic_mirror._set_snapshot_strength(wrong)
 
     def test_capstone_settings_accept_a_nine_by_nine_kernel_and_reject_other_shapes(self):
         main_module = sys.modules["__main__"]

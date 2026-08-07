@@ -1119,7 +1119,7 @@ def try_public_photo(index=0):
 
 def show_face_mesh_map():
     """Draw the face-oval landmark indices used by the browser's MediaPipe mask."""
-    image = ImageOps.fit(skin_sample_image(), (360, 270), method=Image.Resampling.NEAREST)
+    image = demo_face_photo((360, 270))
     draw = ImageDraw.Draw(image, "RGBA")
     points = {
         10: (180, 24), 338: (250, 40), 454: (293, 133), 152: (180, 248),
@@ -1138,7 +1138,7 @@ def show_face_mesh_map():
 
 def show_face_mask_pipeline():
     """Show why the final edit requires both a face polygon and the RGB skin decision."""
-    original = skin_sample_image((160, 120))
+    original = demo_face_photo((160, 120))
     width, height = original.size
     y, x = np.ogrid[:height, :width]
     face_mask = (((x - width / 2) / (width * .29)) ** 2
@@ -1332,7 +1332,7 @@ def _numpy_picture(array):
 
 def numpy_filter_gallery():
     """Show three beginner NumPy filters that operate on the whole RGB grid."""
-    original = skin_sample_image()
+    original = demo_face_photo((160, 120))
     pixels = np.asarray(original, dtype=np.int16)
     inverted = 255 - pixels
     brighter = np.clip(pixels + 35, 0, 255)
@@ -1347,7 +1347,7 @@ def numpy_filter_gallery():
 
 def numpy_kernel_gallery():
     """Apply three supplied kernels to one image."""
-    original = skin_sample_image((48, 36))
+    original = demo_face_photo((160, 120))
     pixels = np.asarray(original, dtype=np.int16)
     blur = ((1, 1, 1), (1, 1, 1), (1, 1, 1))
     sharpen = ((0, -1, 0), (-1, 5, -1), (0, -1, 0))
@@ -1363,7 +1363,7 @@ def numpy_kernel_gallery():
 
 def preview_numpy_filter(function):
     """Run a student's NumPy filter without allowing it to mutate the input."""
-    original = skin_sample_image()
+    original = demo_face_photo((160, 120))
     source = np.array(original, dtype=np.uint8, copy=True)
     before = source.copy()
     result = np.asarray(function(source))
@@ -1402,10 +1402,25 @@ def skin_sample_image(size=DEMO_SIZE):
     return image
 
 
+DEMO_PHOTO = "face-portrait-william-stitt.jpg"
+
+
+def demo_face_photo(size=DEMO_SIZE):
+    """A real bundled face for cells whose point is "look at what changed".
+
+    The drawn plate stays where a learner must count pixels or where their own
+    simple rule has to be seen working; a photograph goes everywhere the result
+    is judged by eye, because a filter or a landmark means nothing on flat
+    cartoon colour.
+    """
+    return _public_photo(DEMO_PHOTO, size)
+
+
 def show_skin_sample():
     """Show the fixed Skin Lab input before students write any detector."""
     print("The supplied image has a blue background, a drawn face, and three red points on the cheeks.")
-    print("Use it to learn the mechanism before testing one photograph at the end.")
+    print("Every value in it is easy to trace, which is why the first steps use it instead of a photograph.")
+    print("Real bundled photographs are used later, in the cells where you judge the result by eye.")
     return skin_sample_image().resize(OUTPUT_SIZE, Image.Resampling.NEAREST)
 
 
@@ -1475,6 +1490,27 @@ def _set_snapshot_kernel(name):
     __main__.kernel_choice = name
     __main__.SOFTEN_KERNEL = kernel
     return name
+
+
+SNAPSHOT_STRENGTHS = (25, 55, 85, 100)
+
+
+def _set_snapshot_strength(percent):
+    """The strength buttons under the captured photo call this before re-running.
+
+    The kernel decides which colour is calculated; skin_smooth_strength decides
+    how much of it is used. Writing the notebook variable keeps that one meaning
+    of "intensity" — the settings cell and the buttons cannot drift apart.
+    """
+    try:
+        value = int(percent)
+    except (TypeError, ValueError):
+        raise MagicMirrorError("The strength must be a whole percentage.")
+    if value not in SNAPSHOT_STRENGTHS:
+        raise MagicMirrorError("Unknown strength '%s'. Choose %s." % (
+            percent, ", ".join("%d%%" % option for option in SNAPSHOT_STRENGTHS)))
+    __main__.skin_smooth_strength = value / 100
+    return value
 
 
 def _pipeline_number(name, default, minimum, maximum):
@@ -1702,7 +1738,7 @@ def _skin_snapshot_report():
 
 def preview_library_convolution():
     """Use the student's SciPy wrapper on all three colour channels and show before/after."""
-    original = skin_sample_image()
+    original = demo_face_photo((160, 120))
     pixels = np.asarray(original, dtype=np.float32)
     function = _student_function("convolve_layer")
     channels = [function(pixels[:, :, channel], SKIN_SOFTEN_KERNEL, 16) for channel in range(3)]
@@ -1733,7 +1769,7 @@ def preview_skin_evidence():
 
 def preview_skin_mask():
     """Show the student's skin mask alone and over the original colours."""
-    original = skin_sample_image()
+    original = demo_face_photo((160, 120))
     mask = np.asarray(_student_function("detect_skin")(original))
     print("skin_mask selects %d/%d pixels. Yellow marks the exact locations whose value is 255." %
           (int((mask > 0).sum()), mask.size))

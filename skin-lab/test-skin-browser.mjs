@@ -337,27 +337,29 @@ try {
       resultCanvases: Snapshot.results.querySelectorAll("canvas").length,
       outputWidth: Snapshot.outputCanvas.width,
     };
-    const kernelButton = [...document.querySelectorAll(".snapshot-kernels button")]
-      .find((button) => button.dataset.kernel === "gentle");
-    if (!kernelButton) throw new Error("Missing kernel buttons under the captured photo");
-    kernelButton.click();
-    await waitFor(() => Snapshot.message?.textContent.includes("Kernel gentle"),
-      40_000, "same-photo kernel switch");
-    const gentleMessage = Snapshot.message.textContent;
-    const widestButton = [...document.querySelectorAll(".snapshot-kernels button")]
-      .find((button) => button.dataset.kernel === "widest");
-    if (!widestButton) throw new Error("Missing the widest 9×9 kernel button");
-    const widestStarted = Date.now();
-    widestButton.click();
-    await waitFor(() => Snapshot.message?.textContent.includes("Kernel widest"),
-      40_000, "9 × 9 kernel switch");
+    // Mỗi lần bấm là một lần render lại; luôn tìm nút NGAY trước khi bấm, đừng
+    // giữ tham chiếu cũ — nút giữ từ vòng trước có thể đã bị thay.
+    const pressRerun = async (rowClass, choice, expected, label) => {
+      const button = [...document.querySelectorAll("." + rowClass + " button")]
+        .find((item) => item.dataset.choice === choice);
+      if (!button) throw new Error("Missing the " + choice + " button in ." + rowClass);
+      const started = Date.now();
+      button.click();
+      await waitFor(() => Snapshot.message?.textContent.includes(expected), 40_000, label);
+      return { message: Snapshot.message.textContent, seconds: (Date.now() - started) / 1000 };
+    };
+    const gentle = await pressRerun("snapshot-kernels", "gentle", "Kernel gentle", "same-photo kernel switch");
+    const widest = await pressRerun("snapshot-kernels", "widest", "Kernel widest", "9 × 9 kernel switch");
+    const fullStrength = await pressRerun("snapshot-strengths", "100", "smoothing 100%", "smoothing-strength switch");
     const kernelEvidence = {
-      message: Snapshot.message.textContent,
-      gentleMessage,
-      widestSeconds: (Date.now() - widestStarted) / 1000,
-      labels: [...document.querySelectorAll(".snapshot-kernels button")].map((button) => button.textContent),
+      message: widest.message,
+      gentleMessage: gentle.message,
+      strengthMessage: fullStrength.message,
+      widestSeconds: widest.seconds,
+      labels: [...document.querySelectorAll(".snapshot-rerun button")].map((button) => button.textContent),
       streamStillStopped: Snapshot.stream === null,
-      barVisible: !document.querySelector(".snapshot-kernels").classList.contains("hidden"),
+      barVisible: [...document.querySelectorAll(".snapshot-rerun")]
+        .every((row) => !row.classList.contains("hidden")),
     };
     const output = (id) => Nb.cells.find((item) => item.id === id).outEl;
     const controlHost = document.createElement("div");
@@ -402,7 +404,9 @@ try {
   }
   if (!evidence.kernelEvidence.gentleMessage.includes("Kernel gentle ran") ||
       !evidence.kernelEvidence.message.includes("Kernel widest ran") ||
+      !evidence.kernelEvidence.strengthMessage.includes("smoothing 100%") ||
       !evidence.kernelEvidence.labels.includes("widest 9×9") ||
+      !evidence.kernelEvidence.labels.includes("85%") ||
       !evidence.kernelEvidence.streamStillStopped || !evidence.kernelEvidence.barVisible) {
     throw new Error(`Same-photo kernel switching failed: ${JSON.stringify(evidence.kernelEvidence)}`);
   }

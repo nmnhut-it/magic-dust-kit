@@ -29,12 +29,12 @@ class TestSkinNotebook(unittest.TestCase):
         practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
         answer_page = (ROOT / "dap-an.html").read_text(encoding="utf-8")
         self.assertIn('notebook: "Skin_Lab.ipynb"', practice_page)
-        self.assertIn("assets/notebook.js?v=2026.08.07.1", practice_page)
-        self.assertIn("assets/skin-mechanisms.js?v=2026.08.07.1", practice_page)
+        self.assertIn("assets/notebook.js?v=2026.08.07.2", practice_page)
+        self.assertIn("assets/skin-mechanisms.js?v=2026.08.07.2", practice_page)
         self.assertIn('href="dap-an.html"', practice_page)
         self.assertIn('href="../index.html"', practice_page)
         self.assertIn('notebook: "Skin_Lab_Answers.ipynb"', answer_page)
-        self.assertIn("assets/notebook.js?v=2026.08.07.1", answer_page)
+        self.assertIn("assets/notebook.js?v=2026.08.07.2", answer_page)
         self.assertIn('href="./"', answer_page)
         self.assertIn('href="../index.html"', answer_page)
 
@@ -310,11 +310,12 @@ class TestSkinNotebook(unittest.TestCase):
             self.assertIn(phrase, lesson)
         self.assertIn("@mediapipe/face_mesh", runtime)
         self.assertIn("Capture one photo", lesson)
-        self.assertIn("press the kernel buttons under it", lesson)
+        self.assertIn("two button rows appear under the result", lesson)
         self.assertIn("Capture one photo", runtime)
         self.assertIn("Choose an image file", runtime)
         self.assertIn("Try another kernel on the same photo:", runtime)
-        self.assertIn('Kernel.callBridge("_set_snapshot_kernel", [name])', runtime)
+        self.assertIn('"_set_snapshot_kernel", "The kernel could not be changed: "', runtime)
+        self.assertIn("Kernel.callBridge(bridge, [value]);", runtime)
         self.assertIn("Snapshot.renderPipeline()", runtime)
         self.assertIn("Snapshot.stopStream();", runtime)
         self.assertIn("faceMaskBytes(landmarks", runtime)
@@ -355,6 +356,23 @@ class TestSkinNotebook(unittest.TestCase):
             self.assertIn(phrase, lesson)
         self.assertIn('["widest", "widest 9×9"]', runtime)
         self.assertIn("KERNEL_SHAPES = ((3, 3), (5, 5), (9, 9))", helpers)
+
+    def test_students_can_set_the_smoothing_strength_from_the_photo_buttons(self):
+        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
+        self.assertIn("Change the smoothing strength on the same photo:", runtime)
+        self.assertIn('"_set_snapshot_strength"', runtime)
+        self.assertIn("[[25, \"25%\"], [55, \"55%\"], [85, \"85%\"], [100, \"100%\"]]", runtime)
+        self.assertIn("SNAPSHOT_STRENGTHS = (25, 55, 85, 100)", helpers)
+        self.assertIn("__main__.skin_smooth_strength = value / 100", helpers)
+        for phrase in (
+            "*Smoothing strength* — `25%`, `55%`, `85%`, `100%`",
+            "This writes `skin_smooth_strength` for you",
+            "output = original × (1 - strength) + kernel_result × strength",
+            "stay in the settings cell above",
+        ):
+            self.assertIn(phrase, lesson)
 
     def test_convolution_transfer_check_is_unsolved_only_in_practice(self):
         practice = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-convolution-transfer")

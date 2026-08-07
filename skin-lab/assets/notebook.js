@@ -981,35 +981,16 @@ const Snapshot = {
     message.className = "snapshot-message";
     message.textContent = "Requesting camera access…";
 
-    // Nút đổi kernel dưới tấm ảnh đã chụp: chạy lại pipeline trên ĐÚNG ảnh đó,
-    // không mở lại camera — để học sinh tự tay so 3×3 với 5×5.
-    const kernels = document.createElement("div");
-    kernels.className = "snapshot-bar snapshot-kernels hidden";
-    kernels.appendChild(Object.assign(document.createElement("span"),
-      { textContent: "Try another kernel on the same photo:" }));
-    [["gentle", "gentle 3×3"], ["balanced", "balanced 3×3"],
-      ["strong", "strong 3×3"], ["wide", "wide 5×5"],
-      ["widest", "widest 9×9"]].forEach(([name, label]) => {
-      const pick = document.createElement("button");
-      pick.type = "button"; pick.className = "btn";
-      pick.dataset.kernel = name; pick.textContent = label;
-      pick.onclick = async () => {
-        if (Snapshot.busy || !Snapshot.lastCanvas) return;
-        Snapshot.busy = true; pick.disabled = true;
-        try {
-          Kernel.callBridge("_set_snapshot_kernel", [name]);
-          [...kernels.querySelectorAll("button")].forEach((other) =>
-            other.classList.toggle("primary", other === pick));
-          await Snapshot.renderPipeline();
-        } catch (error) {
-          Snapshot.message.textContent = "The kernel could not be changed: "
-            + String(error?.message || error).split("\n").pop();
-        } finally {
-          Snapshot.busy = false; pick.disabled = false;
-        }
-      };
-      kernels.appendChild(pick);
-    });
+    // Hai hàng nút dưới tấm ảnh đã chụp: chạy lại pipeline trên ĐÚNG ảnh đó,
+    // không mở lại camera — để học sinh đổi MỘT thứ mỗi lần, hoặc lưới kernel
+    // (bao xa) hoặc độ mạnh pha trộn (dùng bao nhiêu màu vừa tính).
+    const kernels = Snapshot.rerunRow("snapshot-kernels", "Try another kernel on the same photo:",
+      [["gentle", "gentle 3×3"], ["balanced", "balanced 3×3"], ["strong", "strong 3×3"],
+        ["wide", "wide 5×5"], ["widest", "widest 9×9"]],
+      "_set_snapshot_kernel", "The kernel could not be changed: ");
+    const strengths = Snapshot.rerunRow("snapshot-strengths", "Change the smoothing strength on the same photo:",
+      [[25, "25%"], [55, "55%"], [85, "85%"], [100, "100%"]],
+      "_set_snapshot_strength", "The strength could not be changed: ");
 
     const results = document.createElement("div");
     results.className = "snapshot-results hidden";
@@ -1027,14 +1008,46 @@ const Snapshot = {
     const differenceCanvas = makeResult("4 · Changed colours, magnified ×6");
     const outputCanvas = makeResult("5 · OUTPUT: red correction, smoothing, and brightness");
 
-    wrap.append(intro, live, bar, message, kernels, results);
+    wrap.append(intro, live, bar, message, kernels, strengths, results);
     host.appendChild(wrap);
     Object.assign(Snapshot, {
-      wrap, video, captureButton: capture, message, results, kernelBar: kernels,
+      wrap, video, captureButton: capture, message, results,
+      rerunBars: [kernels, strengths],
       inputCanvas, skinCanvas, spotCanvas, differenceCanvas, outputCanvas,
       lastCanvas: null, lastLandmarks: [], busy: false,
     });
     return wrap;
+  },
+
+  /** Một hàng nút "đổi một thứ rồi chạy lại": mọi hàng dùng chung mã này để
+   *  không có hàng nào quên khoá nút khi đang chạy hay quên tô nút đang chọn. */
+  rerunRow(className, prompt, choices, bridge, failure) {
+    const row = document.createElement("div");
+    row.className = `snapshot-bar snapshot-rerun ${className} hidden`;
+    row.appendChild(Object.assign(document.createElement("span"), { textContent: prompt }));
+    choices.forEach(([value, label]) => {
+      const pick = document.createElement("button");
+      pick.type = "button"; pick.className = "btn";
+      pick.dataset.choice = String(value); pick.textContent = label;
+      pick.onclick = () => Snapshot.rerunWith(bridge, value, pick, row, failure);
+      row.appendChild(pick);
+    });
+    return row;
+  },
+
+  async rerunWith(bridge, value, pick, row, failure) {
+    if (Snapshot.busy || !Snapshot.lastCanvas) return;
+    Snapshot.busy = true; pick.disabled = true;
+    try {
+      Kernel.callBridge(bridge, [value]);
+      [...row.querySelectorAll("button")].forEach((other) =>
+        other.classList.toggle("primary", other === pick));
+      await Snapshot.renderPipeline();
+    } catch (error) {
+      Snapshot.message.textContent = failure + String(error?.message || error).split("\n").pop();
+    } finally {
+      Snapshot.busy = false; pick.disabled = false;
+    }
   },
 
   async openCamera() {
@@ -1209,7 +1222,7 @@ const Snapshot = {
         target.getContext("2d").putImageData(
           new ImageData(new Uint8ClampedArray(frame), CFG.capture.w, CFG.capture.h), 0, 0);
       });
-      Snapshot.kernelBar?.classList.remove("hidden");
+      (Snapshot.rerunBars || []).forEach((row) => row.classList.remove("hidden"));
       const report = Kernel.callBridge("_skin_snapshot_report", []);
       Snapshot.message.textContent = (landmarks.length
         ? "Face Mesh limited changes to the face region. "
