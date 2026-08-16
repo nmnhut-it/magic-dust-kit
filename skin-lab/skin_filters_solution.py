@@ -19,6 +19,7 @@ SOFTEN_KERNEL = (
 )
 
 MASK_OFF, MASK_ON = 0, 255
+MIN_SHARE = 0.001
 SKIN_NEIGHBOURS_NEEDED = 5
 PIMPLE_RED_GAP = 24
 
@@ -227,26 +228,32 @@ def choose_smooth_area(skin_mask, face_mask, feature_mask):
 
 
 # === TASK: smooth_skin ===
-def smooth_skin(img, area_mask, strength):
-    """Soften the skin inside area_mask and leave everything else exactly as it is.
+def smooth_skin(img, area_mask, strength, radius):
+    """Even out the skin inside area_mask: average the COLOUR wide, keep the LIGHT.
 
-    heal_spots takes the redness out; this takes the roughness out. Together they
-    are what "smooth skin" means. The blur comes from the student's own
-    convolve_layer, so task 2 finally does real work on a real photograph.
+    A 3x3 blur only softens grain; blotches are twenty pixels across, so the
+    colour has to be averaged over a wide area to even out. Averaging the light
+    as well would flatten the nose and jaw, so the brightness is kept from a
+    small blur - the same "keep the local light" idea heal_spots uses.
     """
-    source = img.convert("RGB")
-    pixels = np.asarray(source, dtype=np.float32)
-    weights = np.asarray(SOFTEN_KERNEL, dtype=np.float32)
+    picture = img.convert("RGB")
+    pixels = np.asarray(picture, dtype=np.float32)
+    allowed = (np.asarray(area_mask) == MASK_ON).astype(np.float32)
 
-    allowed = np.asarray(area_mask) == MASK_ON
-    layers = []
-    for channel in range(3):
-        original = pixels[:, :, channel]
-        blurred = convolve_layer(original, weights, weights.sum())
-        # The same mix as calm_redness: strength decides how much blur is used,
-        # so the result can stop well short of plastic.
-        mixed = original * (1 - strength) + blurred * strength
-        layers.append(np.where(allowed, mixed, original))
+    def wide_average(layer):
+        """Average counting ONLY allowed pixels, so background and lips never bleed in."""
+        total = ndimage.uniform_filter(layer * allowed, size=radius, mode="nearest")
+        count = ndimage.uniform_filter(allowed, size=radius, mode="nearest")
+        return np.where(count > MIN_SHARE, total / np.maximum(count, MIN_SHARE), layer)
 
-    output = np.clip(np.rint(np.stack(layers, axis=2)), 0, 255).astype(np.uint8)
-    return Image.fromarray(output, "RGB")
+    soft = np.stack([wide_average(pixels[:, :, channel]) for channel in range(3)], axis=2)
+    # The light comes from the student's own convolve_layer: a small blur keeps
+    # shading and structure while the colour underneath is evened out.
+    light = convolve_layer(pixels.mean(axis=2), SOFTEN_KERNEL, sum(sum(row) for row in SOFTEN_KERNEL))
+    soft_light = soft.mean(axis=2)
+    scale = np.where(soft_light > MIN_SHARE, light / np.maximum(soft_light, MIN_SHARE), 1.0)
+
+    toned = soft * scale[:, :, None]
+    mixed = pixels * (1 - strength) + toned * strength
+    output = np.where(allowed[:, :, None] > 0, mixed, pixels)
+    return Image.fromarray(np.clip(np.rint(output), 0, 255).astype(np.uint8), "RGB")

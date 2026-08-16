@@ -31,6 +31,7 @@ SOFTEN_KERNEL = (
 )
 
 MASK_OFF, MASK_ON = 0, 255
+MIN_SHARE = 0.001
 SKIN_NEIGHBOURS_NEEDED = 5
 PIMPLE_RED_GAP = 24
 
@@ -297,33 +298,39 @@ def choose_smooth_area(skin_mask, face_mask, feature_mask):
 
 
 # === TASK: smooth_skin ===
-def smooth_skin(img, area_mask, strength):
-    """Soften the skin inside area_mask and leave everything else exactly as it is.
+def smooth_skin(img, area_mask, strength, radius):
+    """Even out the skin inside area_mask: average the COLOUR wide, keep the LIGHT.
 
-    WHAT IT DOES: the texture step. heal_spots takes the redness out; this takes
-    the roughness out, and together they are what "smooth skin" actually means.
-    HOW IT WORKS: blur the whole picture once with the 1-2-1 kernel you already
-    wrote convolve_layer for, then keep the blurred version only where area_mask
-    allows it. strength decides how much of the blur is used, so the result can
-    stay short of plastic.
+    WHAT IT DOES: the step that finally makes the skin look even.
+    HOW IT WORKS: a 3x3 blur only softens grain, and a blotch is twenty pixels
+    across, so the colour is averaged over a WIDE area instead. Averaging the
+    light too would flatten the nose and jaw into a mask, so the brightness is
+    kept from a small blur - the same "keep the local light" idea as heal_spots.
     """
-    source = img.convert("RGB")
-    pixels = np.asarray(source, dtype=np.float32)
-    weights = np.asarray(SOFTEN_KERNEL, dtype=np.float32)
+    picture = img.convert("RGB")
+    pixels = np.asarray(picture, dtype=np.float32)
+    allowed = (np.asarray(area_mask) == MASK_ON).astype(np.float32)
 
-    # TASK 10 - fill the three ___ blanks, top to bottom.
-    # Blank 1: smooth one colour layer with YOUR convolve_layer. The divisor is
-    #          weights.sum(), because the nine weights add up to 16.
-    # Blank 2: mix the blurred layer with the original, exactly like calm_redness:
-    #          original * (1 - strength) + blurred * strength.
-    # Blank 3: np.where keeps the mixed value only where the mask says MASK_ON.
-    allowed = np.asarray(area_mask) == MASK_ON
-    layers = []
-    for channel in range(3):
-        original = pixels[:, :, channel]
-        blurred = convolve_layer(___, weights, weights.sum())
-        mixed = ___
-        layers.append(np.where(___, mixed, original))
+    # GIVEN - a masked average: it counts ONLY allowed pixels, so the dark
+    # background and the lips never bleed into the cheek. Dividing the blurred
+    # picture by the blurred mask is what makes that work.
+    def wide_average(layer):
+        total = ndimage.uniform_filter(layer * allowed, size=radius, mode="nearest")
+        count = ndimage.uniform_filter(allowed, size=radius, mode="nearest")
+        return np.where(count > MIN_SHARE, total / np.maximum(count, MIN_SHARE), layer)
 
-    output = np.clip(np.rint(np.stack(layers, axis=2)), 0, 255).astype(np.uint8)
-    return Image.fromarray(output, "RGB")
+    # TASK 10 - fill the four ___ blanks, top to bottom.
+    # Blank 1: the colour layer to average wide - one channel at a time.
+    # Blank 2: the light. Use YOUR convolve_layer on the brightness with the
+    #          small SOFTEN_KERNEL, so shading and structure survive.
+    # Blank 3: put the kept light back on top of the evened colour.
+    # Blank 4: how far the pixel moves - the same mixing formula as always.
+    soft = np.stack([wide_average(___) for channel in range(3)], axis=2)
+    light = ___
+    soft_light = soft.mean(axis=2)
+    scale = np.where(soft_light > MIN_SHARE, ___ / np.maximum(soft_light, MIN_SHARE), 1.0)
+
+    toned = soft * scale[:, :, None]
+    mixed = pixels * (1 - strength) + toned * ___
+    output = np.where(allowed[:, :, None] > 0, mixed, pixels)
+    return Image.fromarray(np.clip(np.rint(output), 0, 255).astype(np.uint8), "RGB")

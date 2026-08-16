@@ -1056,21 +1056,23 @@ cell and read which of the four rules failed.
 
 TASK_SMOOTH = """### Coding task 10 of 10 — complete `smooth_skin`
 
-The last function in the lab, and it reuses the first tool you built.
+The last function in the lab, and the one that makes the skin actually look even.
 
-- **Given:** the loop over the three colour channels, the `SOFTEN_KERNEL`, and the clipping back into `0..255`.
-- **INPUT:** `img`, the `area_mask` you just built, and `strength` from `0.0` to `1.0`.
-- **PROCESS:** fill the three `___` blanks, top to bottom:
-  1. `convolve_layer(___, weights, weights.sum())` — the layer to blur. **Your own task-2 function**, finally running
-     on a real photograph. The divisor is `weights.sum()` because the nine weights add up to 16.
-  2. `mixed = ___` — the calm_redness mix once more: `original * (1 - strength) + blurred * strength`.
-  3. `np.where(___, mixed, original)` — keep the mixed value only where the area mask allows it.
-- **OUTPUT:** a new PIL image. Inside the area the skin must be visibly softer; outside it every pixel must be
-  **identical** to the input.
+- **Given:** `wide_average`, a masked average that counts **only** allowed pixels. Dividing the blurred picture by the
+  blurred mask is what stops the dark background and the lips bleeding into the cheek.
+- **INPUT:** `img`, your `area_mask`, `strength` `0.0`–`1.0`, and `radius` — how wide the colour is averaged.
+- **PROCESS:** fill the four `___` blanks, top to bottom:
+  1. `wide_average(___)` — one colour channel at a time: `pixels[:, :, channel]`.
+  2. `light = ___` — **your own `convolve_layer`** on the brightness `pixels.mean(axis=2)` with `SOFTEN_KERNEL`
+     and divisor `16`. A *small* blur here on purpose.
+  3. `___ / np.maximum(soft_light, MIN_SHARE)` — the kept light, going back on top of the evened colour.
+  4. `+ toned * ___` — how far the pixel moves. The mixing formula you have used since task 7.
+- **OUTPUT:** a new PIL image, visibly even inside the area and **identical** outside it.
 
-`strength` is why this stops short of a beauty filter. At `1.0` you get the full blur and skin starts to look like
-plastic; the lab defaults to `0.7`, which is smoother than the original while pores and texture still read as skin.
-Try both and decide which one you would actually publish.
+Why two different widths? A 3 × 3 blur only softens grain, and a blotch is twenty pixels across — the colour has to be
+averaged over a wide area to even out. But averaging the *light* that wide would flatten the nose and jaw into a
+mask, so the brightness comes from the small blur instead. Same idea as `heal_spots`: take the colour from far away,
+take the light from nearby.
 """
 
 SMOOTH_RUN = """## Write the whole program yourself
@@ -1217,7 +1219,8 @@ HEAL_RUN_A = HEAL_RUN_Q.replace(
 SMOOTH_RUN_Q = '''photo = magic_mirror.heal_photo()      # the same acne cheek, 160 x 120
 
 HEAL_RADIUS, HEAL_SPAN = 13, 12        # the settings you defended two cells ago
-STRENGTHS = (0.4, 0.7, 1.0)            # the three versions you are going to compare
+STRENGTHS = (0.5, 0.85, 1.0)           # the three versions you are going to compare
+SMOOTH_RADIUS = 21                     # how wide the colour is averaged
 
 
 def roughness(image):
@@ -1234,9 +1237,12 @@ def roughness(image):
 #       a. heal `passes` times, each pass on the result of the last, with
 #          heal_spots(picture, HEAL_RADIUS, HEAL_SPAN)   <- the loop from the last cell
 #       b. skin = detect_skin(picture)                   <- your task 3
-#       c. area = choose_smooth_area(skin, None, None)   <- your task 9; None because
-#          the bundled photo has no Face Mesh landmarks. Your captured photo does.
-#       d. return smooth_skin(healed, area, strength)    <- your task 10
+#       c. face, features = magic_mirror.photo_face_masks()
+#          area = choose_smooth_area(skin, None, features)  <- your task 9.
+#          None for the oval on purpose: Face Mesh fitted it to this tight crop
+#          and it misses the left cheek. Its lip and eye rings are still good,
+#          and those are the ones you must NOT smooth.
+#       d. return smooth_skin(healed, area, strength, SMOOTH_RADIUS)  <- your task 10
 #
 # 2. def report(label, before, after):
 #       print the label, then redness before -> after, then roughness before -> after.
@@ -1261,8 +1267,9 @@ def polish(picture, passes, strength):
     for _ in range(passes):
         healed = heal_spots(healed, HEAL_RADIUS, HEAL_SPAN)
     skin = detect_skin(picture)
-    area = choose_smooth_area(skin, None, None)
-    return smooth_skin(healed, area, strength)
+    face, features = magic_mirror.photo_face_masks()
+    area = choose_smooth_area(skin, None, features)
+    return smooth_skin(healed, area, strength, SMOOTH_RADIUS)
 
 
 def report(label, before, after):
@@ -1275,11 +1282,11 @@ def report(label, before, after):
 versions = {}
 for strength in STRENGTHS:
     versions[strength] = polish(photo, 2, strength)
-    report("strength %.1f" % strength, photo, versions[strength])
+    report("strength %.2f" % strength, photo, versions[strength])
 
-# 0.4 still shows texture, 1.0 is plainly plastic around the nose and jaw.
-# 0.7 is the one that still reads as skin, so that is the one worth publishing.
-magic_mirror.show_before_after(photo, versions[0.7])
+# 0.5 still shows blotches, 1.0 is plainly plastic around the nose and jaw.
+# 0.85 evens the tone and still reads as skin, so that is the one to publish.
+magic_mirror.show_before_after(photo, versions[0.85])
 '''
 
 PHOTO = """## Run your healer on one photograph of your own

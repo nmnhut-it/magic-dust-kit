@@ -208,7 +208,7 @@ class TestSkinNotebook(unittest.TestCase):
             "detect_skin": "two", "detect_pimples": "two", "remove_pimples": "two",
             "average_skin_color": "three", "calm_redness": "three",
             "heal_spots": "five", "choose_smooth_area": "three",
-            "smooth_skin": "three",
+            "smooth_skin": "four",
         }
         teaching_order = (
             "skin_evidence", "convolve_layer", "detect_skin",

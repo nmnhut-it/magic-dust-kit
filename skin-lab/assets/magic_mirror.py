@@ -42,6 +42,7 @@ their original language and behaviour.
 """
 import base64
 import io
+import json
 import math
 from pathlib import Path
 
@@ -1473,7 +1474,8 @@ _snapshot_status = ""
 SNAPSHOT_RADIUS_CHOICES = (7, 13, 25)
 SNAPSHOT_PASS_CHOICES = (1, 2, 3)
 SNAPSHOT_SPAN = 12
-SNAPSHOT_SMOOTH_STRENGTH = 0.7
+SNAPSHOT_SMOOTH_STRENGTH = 0.85
+SNAPSHOT_SMOOTH_RADIUS = 21
 _snapshot_radius = SNAPSHOT_RADIUS_CHOICES[1]
 _snapshot_passes = SNAPSHOT_PASS_CHOICES[1]
 
@@ -1515,7 +1517,8 @@ def _smooth_with_student_code(picture, source, face_mask, feature_mask):
             return picture
     skin_mask = _student_function("detect_skin")(source)
     area = _student_function("choose_smooth_area")(skin_mask, face_mask, feature_mask)
-    smoothed = _student_function("smooth_skin")(picture, area, SNAPSHOT_SMOOTH_STRENGTH)
+    smoothed = _student_function("smooth_skin")(
+        picture, area, SNAPSHOT_SMOOTH_STRENGTH, SNAPSHOT_SMOOTH_RADIUS)
     return _require_image(smoothed, "smooth_skin")
 
 
@@ -1666,6 +1669,66 @@ def preview_my_pipeline():
 
 HEAL_SIZE = (160, 120)
 HEAL_PHOTO = "face-acne-cheek.jpg"
+
+# Cùng các vòng landmark mà notebook.js dùng (FACE_RINGS). Trình duyệt dựng mặt
+# nạ khi CHỤP ảnh; với ảnh bundled thì landmark đã đọc sẵn một lần bằng
+# tools/face-landmarks.mjs, nên bài học vẫn có môi và mắt để chừa ra.
+FACE_RINGS = {
+    "oval": (10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365,
+             379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93,
+             234, 127, 162, 21, 54, 103, 67, 109),
+    "lips": (61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269,
+             267, 0, 37, 39, 40, 185),
+    "left_eye": (33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159,
+                 160, 161, 246),
+    "right_eye": (362, 382, 381, 380, 374, 373, 390, 249, 263, 466, 388, 387,
+                  386, 385, 384, 398),
+}
+FEATURE_RINGS = ("lips", "left_eye", "right_eye")
+LANDMARK_FILE = PUBLIC_PHOTO_DIR / "landmarks.json"
+_landmark_cache = None
+
+
+def _landmarks(file_name):
+    """Precomputed Face Mesh points for a bundled photo, or None if it has no face."""
+    global _landmark_cache
+    if _landmark_cache is None:
+        _landmark_cache = (json.loads(LANDMARK_FILE.read_text(encoding="utf-8"))
+                           if LANDMARK_FILE.exists() else {})
+    entry = _landmark_cache.get(file_name)
+    return entry["points"] if entry else None
+
+
+def _ring_mask(points, rings, size):
+    """Fill the named landmark rings into one 0/255 mask, or None if nothing drew."""
+    width, height = size
+    picture = Image.new("L", size, MASK_OFF)
+    pen = ImageDraw.Draw(picture)
+    drew = False
+    for ring in rings:
+        polygon = [(points[i][0] * width, points[i][1] * height)
+                   for i in FACE_RINGS[ring] if i < len(points)]
+        if len(polygon) >= 3:
+            pen.polygon(polygon, fill=MASK_ON)
+            drew = True
+    return np.asarray(picture, dtype=np.uint8) if drew else None
+
+
+def photo_face_masks(size=HEAL_SIZE, file_name=HEAL_PHOTO):
+    """Face Mesh regions for a bundled photo: (face_mask, feature_mask).
+
+    Face Mesh is an outside service, exactly as it is for a captured photo - the
+    browser draws these rings in JavaScript. What to DO with the two masks is
+    choose_smooth_area, which is the student's own task.
+
+    OUTPUT: two 0/255 arrays shaped (height, width), or (None, None) when the
+    photo has no detected face, which choose_smooth_area already handles.
+    """
+    points = _landmarks(file_name)
+    if not points:
+        return (None, None)
+    return (_ring_mask(points, ("oval",), size),
+            _ring_mask(points, FEATURE_RINGS, size))
 HEAL_VIEW = (320, 240)
 DIFFERENCE_GAIN = 4
 
@@ -1969,6 +2032,7 @@ def _test_calm_redness():
 
 SMOOTH_TEST_SIZE = (16, 16)
 SMOOTH_TEST_STRENGTH = 1.0
+SMOOTH_TEST_RADIUS = 5
 
 
 def _test_choose_smooth_area():
@@ -1999,21 +2063,24 @@ def _test_choose_smooth_area():
 
 
 def _test_smooth_skin():
-    """The allowed area must soften; everything else must be untouched."""
+    """The allowed area must even out; everything else must be untouched."""
     image = Image.new("RGB", SMOOTH_TEST_SIZE, SKIN_TONE)
     image.putpixel((4, 4), (255, 255, 255))    # inside the allowed area
     image.putpixel((12, 12), (255, 255, 255))  # outside it
     area = np.zeros(SMOOTH_TEST_SIZE, dtype=np.uint8)
     area[:8, :8] = MASK_ON
-    result = _student_function("smooth_skin")(image, area, SMOOTH_TEST_STRENGTH)
+    result = _student_function("smooth_skin")(
+        image, area, SMOOTH_TEST_STRENGTH, SMOOTH_TEST_RADIUS)
     result = _require_image(result, "smooth_skin")
 
     if result.getpixel((4, 4)) == (255, 255, 255):
-        return "the white pixel inside area_mask must be softened by the 1-2-1 kernel"
+        return "the odd pixel inside area_mask must be evened out by the wide average"
     if result.getpixel((12, 12)) != (255, 255, 255):
         return "a pixel outside area_mask must keep its original colour exactly"
-    if result.getpixel((5, 4)) == SKIN_TONE:
-        return "the neighbours of the white pixel must pick up some of its brightness"
+    corner = result.getpixel((0, 0))
+    if max(abs(corner[i] - SKIN_TONE[i]) for i in range(3)) > 40:
+        return ("plain skin inside the area drifted to %s; the masked average must "
+                "divide by the blurred mask, not by the whole window" % (corner,))
     return ""
 
 

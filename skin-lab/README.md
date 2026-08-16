@@ -28,7 +28,7 @@ Lesson structure (one continuous trail for young learners):
 - **Every task cell is a runnable scaffold — no blank pages.** All ten tasks
   are fill-in-the-blank over a skeleton that already contains the loops, the
   `.copy()`, the clamping and the explanatory comments; the `___` blanks are the
-  ideas, never the plumbing. Blank counts: 3, 3, 2, 2, 2, 3, 3, 5, 3, 3. Tasks 7–8 used
+  ideas, never the plumbing. Blank counts: 3, 3, 2, 2, 2, 3, 3, 5, 3, 4. Tasks 7–8 used
   to be blank-body `raise NotImplementedError` cells written from a plan; they
   were converted to scaffolds so a student who stalls at task 7 still reaches the
   capstone. Task 7 hands them the red channel already written and asks for green
