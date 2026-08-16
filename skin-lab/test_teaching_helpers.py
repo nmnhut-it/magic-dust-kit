@@ -1,4 +1,5 @@
 import ast
+import json
 import importlib.util
 import io
 import math
@@ -73,17 +74,21 @@ class TestTeachingHelpers(unittest.TestCase):
                 board = magic_mirror.skin_demo()
                 live = magic_mirror.process_skin(
                     magic_mirror.skin_sample_image(), magic_mirror.DEMO_SIZE)
+                # The viewer cells are the student's own code now; what stays here is
+                # the pure-display primitive they call.
                 previews = (
-                    magic_mirror.preview_library_convolution(),
-                    magic_mirror.preview_skin_evidence(),
-                    magic_mirror.preview_skin_mask(),
-                    magic_mirror.preview_pimple_mask(),
-                    magic_mirror.preview_cleanup(),
+                    magic_mirror.show_images(
+                        (magic_mirror.skin_sample_image(),), ("ONE",), columns=1),
+                    magic_mirror.show_images(
+                        (magic_mirror.skin_sample_image(),) * 3, ("A", "B", "C")),
                 )
 
         self.assertEqual(board.size, (496, 292))
         self.assertEqual(live.size, magic_mirror.OUTPUT_SIZE)
         self.assertTrue(all(isinstance(preview, Image.Image) for preview in previews))
+        for bad in (((), ()), ((magic_mirror.skin_sample_image(),), ("A", "B"))):
+            with self.assertRaises(magic_mirror.MagicMirrorError):
+                magic_mirror.show_images(*bad)
 
     def test_capstone_runs_the_students_healer_and_keeps_pixels_outside_the_face(self):
         """The one-photo capstone must be the student's heal_spots, repeated."""
@@ -280,14 +285,23 @@ class TestTeachingHelpers(unittest.TestCase):
                           if isinstance(inner, ast.Call) and isinstance(inner.func, ast.Name)}
                 uses[node.name] = called
         for name in ("show_face_mesh_map", "show_face_mask_pipeline", "numpy_filter_gallery",
-                     "numpy_kernel_gallery", "preview_numpy_filter", "preview_library_convolution",
-                     "preview_skin_mask"):
+                     "numpy_kernel_gallery", "preview_numpy_filter"):
             self.assertIn("demo_face_photo", uses[name], name)
             self.assertNotIn("skin_sample_image", uses[name], name)
-        for name in ("show_skin_sample", "show_skin_pipeline_overview", "preview_pimple_mask",
-                     "preview_cleanup", "skin_demo"):
+        for name in ("show_skin_sample", "show_skin_pipeline_overview", "skin_demo"):
             self.assertIn("skin_sample_image", uses[name], name)
             self.assertNotIn("demo_face_photo", uses[name], name)
+
+        # The viewer cells moved into the notebook, so the same split is asserted there.
+        cells = {cell["id"]: "".join(cell["source"])
+                 for cell in json.loads((Path(__file__).parent / "Skin_Lab.ipynb")
+                                        .read_text(encoding="utf-8"))["cells"]}
+        for cell_id in ("skin-see-convolution", "skin-see-mask"):
+            self.assertIn("demo_face_photo", cells[cell_id], cell_id)
+            self.assertNotIn("skin_sample_image", cells[cell_id], cell_id)
+        for cell_id in ("skin-see-pimples", "skin-see-cleanup", "skin-see-target", "skin-see-calm"):
+            self.assertIn("skin_sample_image", cells[cell_id], cell_id)
+            self.assertNotIn("demo_face_photo", cells[cell_id], cell_id)
 
     def test_photo_buttons_set_the_comparison_width_and_the_pass_count(self):
         for radius in magic_mirror.SNAPSHOT_RADIUS_CHOICES:

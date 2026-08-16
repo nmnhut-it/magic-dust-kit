@@ -225,7 +225,7 @@ try {
       return Nb.cells[index].outEl.innerText;
     };
     await runById("task-skin-evidence");
-    const preview = await runById("skin-preview-evidence");
+    const preview = await runById("skin-see-evidence");
     const grader = await runById("skin-check");
     const note = document.querySelector('[data-cell-id="skin-task-evidence-note"] .md');
     return { preview, grader, nestedBlankSteps: note ? note.querySelectorAll("ul ol li").length : -1 };
@@ -312,12 +312,12 @@ try {
       "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
       "skin-convolution-math", "skin-mechanism-kernel-filter", "skin-rgb-convolution",
       "skin-mechanism-convolution-scan", "skin-convolution-transfer",
-      "skin-preview-convolution", "skin-preview-evidence",
-      "skin-preview-mask", "skin-mechanism-red-spot", "skin-preview-pimples",
-      "skin-mechanism-soften", "skin-preview-cleanup", "skin-mechanism-face",
+      "skin-see-convolution", "skin-see-evidence",
+      "skin-see-mask", "skin-mechanism-red-spot", "skin-see-pimples",
+      "skin-mechanism-soften", "skin-see-cleanup", "skin-mechanism-face",
       "skin-check", "skin-demo", "numpy-filter-gallery", "numpy-kernel-gallery",
       "skin-public-gallery", "skin-public-test", "skin-face-mesh-map", "skin-face-mask-pipeline",
-      "skin-preview-average", "skin-preview-calm", "skin-build-pipeline", "skin-heal-run",
+      "skin-see-target", "skin-see-calm", "skin-build-pipeline", "skin-heal-run",
       // Hai task cuối chạy SAU ô chấm giữa trang, để ô đó vẫn đúng là
       // "still to come" — rồi ô chấm cuối mới đủ 10/10.
       "task-choose-smooth-area", "task-smooth-skin", "skin-smooth-run", "skin-check-all",

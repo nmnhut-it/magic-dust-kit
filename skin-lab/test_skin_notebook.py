@@ -113,8 +113,8 @@ class TestSkinNotebook(unittest.TestCase):
             "numpy-change-one-number", "skin-mechanism-kernel-filter",
             "skin-rgb-convolution", "skin-mechanism-convolution-scan",
             "skin-convolution-transfer",
-            "skin-preview-convolution", "skin-preview-evidence", "skin-preview-mask",
-            "skin-preview-pimples", "skin-preview-cleanup", "skin-demo",
+            "skin-see-convolution", "skin-see-evidence", "skin-see-mask",
+            "skin-see-pimples", "skin-see-cleanup", "skin-demo",
             "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
             "skin-mechanism-red-spot", "skin-mechanism-soften", "skin-mechanism-face",
         ):
@@ -342,7 +342,10 @@ class TestSkinNotebook(unittest.TestCase):
             if "student-work" in cell.get("metadata", {}).get("tags", [])
         }
         self.assertEqual(tagged, {"skin-convolution-transfer", "skin-build-pipeline",
-                                  "skin-heal-run", "skin-smooth-run"})
+                                  "skin-heal-run", "skin-smooth-run",
+                                  "skin-see-evidence", "skin-see-convolution", "skin-see-mask",
+                                  "skin-see-pimples", "skin-see-cleanup",
+                                  "skin-see-target", "skin-see-calm"})
 
     def test_route_has_no_training_dependency_or_diagnostic_claim(self):
         code = (ROOT / "skin_filters_solution.py").read_text(encoding="utf-8").lower()
@@ -357,7 +360,7 @@ class TestSkinNotebook(unittest.TestCase):
         answer_ids = [cell["id"] for cell in self.answers["cells"]]
         self.assertEqual(practice_ids, answer_ids)
         self.assertEqual(len(practice_ids), len(set(practice_ids)))
-        self.assertEqual(len(practice_ids), 90)
+        self.assertEqual(len(practice_ids), 97)
         for notebook in (self.practice, self.answers):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)

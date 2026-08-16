@@ -1308,6 +1308,29 @@ def show_soften_math():
     ), width=310)
 
 
+def show_images(pictures, labels, columns=3):
+    """Display only: lay labelled pictures on a grid. No filtering, no decisions.
+
+    This is the drawing tool the student's own viewer cells call. It never looks
+    at a pixel and never runs a rule - what to show, and what to call it, is
+    entirely the caller's choice.
+
+    INPUT : pictures (a sequence of PIL images), labels (one string each),
+            columns (how many tiles per row).
+    OUTPUT: one combined PIL image, ready to be the value of a notebook cell.
+    """
+    pictures, labels = tuple(pictures), tuple(labels)
+    if not pictures:
+        raise MagicMirrorError("show_images needs at least one picture.")
+    if len(pictures) != len(labels):
+        raise MagicMirrorError(
+            "show_images needs one label per picture: %d pictures but %d labels."
+            % (len(pictures), len(labels)))
+    for picture in pictures:
+        _require_image(picture, "show_images")
+    return _image_grid(pictures, labels, columns=columns, tile_size=(120, 90))
+
+
 def show_numpy_mask(mask):
     """Render a two-dimensional NumPy 0/255 mask."""
     array = np.asarray(mask)
@@ -1602,82 +1625,6 @@ def _skin_snapshot_report():
 
 
 
-def preview_library_convolution():
-    """Use the student's SciPy wrapper on all three colour channels and show before/after."""
-    original = demo_face_photo((160, 120))
-    pixels = np.asarray(original, dtype=np.float32)
-    function = _student_function("convolve_layer")
-    channels = [function(pixels[:, :, channel], SKIN_SOFTEN_KERNEL, 16) for channel in range(3)]
-    combined = np.stack(channels, axis=2)
-    filtered = _numpy_picture(combined)
-    center = (original.width // 2, original.height // 2)
-    before = original.getpixel(center)
-    after = filtered.getpixel(center)
-    print("SciPy applies one kernel to the R, G, and B arrays; np.stack combines the three results into RGB.")
-    print("Centre pixel: before %s -> after %s. The right panel shows the combined colour result." %
-          (before, after))
-    return _image_grid((original, filtered), ("RGB INPUT", "COMBINED OUTPUT"), columns=2)
-
-
-def preview_skin_evidence():
-    """Show coloured inputs and the student's 0/255 decisions together."""
-    rule = _student_function("skin_evidence")
-    samples = (("SAMPLE (183,127,103)", SKIN_TONE),
-               ("RED (225,62,66)", PIMPLE_RED),
-               ("BLUE BG (35,80,185)", SKIN_BACKGROUND))
-    input_tiles = [Image.new("RGB", (80, 60), color) for _, color in samples]
-    vote_tiles = [Image.new("RGB", (80, 60), (value, value, value))
-                  for value in (rule(*color) for _, color in samples)]
-    labels = [label for label, _ in samples] + ["MASK = %d" % rule(*color) for _, color in samples]
-    print("The top row contains input colours. The bottom row shows the 0 or 255 decision from the same RGB rule.")
-    return _image_grid(tuple(input_tiles + vote_tiles), tuple(labels), columns=3, tile_size=(120, 90))
-
-
-def preview_skin_mask():
-    """Show the student's skin mask alone and over the original colours."""
-    original = demo_face_photo((160, 120))
-    mask = np.asarray(_student_function("detect_skin")(original))
-    print("skin_mask selects %d/%d pixels. Yellow marks the exact locations whose value is 255." %
-          (int((mask > 0).sum()), mask.size))
-    return _image_grid(
-        (original, _mask_picture(mask, (245, 204, 166)),
-         _mask_overlay(original, mask, (255, 210, 80))),
-        ("RGB INPUT", "SKIN MASK 0/255", "SKIN OVERLAY"),
-    )
-
-
-def preview_pimple_mask():
-    """Show the student's red-spot mask alone and over the original colours."""
-    original = skin_sample_image()
-    skin_mask = _student_function("detect_skin")(original)
-    mask = np.asarray(_student_function("detect_pimples")(original, skin_mask))
-    print("pimple_mask selects %d/%d pixels. Red marks the exact locations whose value is 255." %
-          (int((mask > 0).sum()), mask.size))
-    return _image_grid(
-        (original, _mask_picture(mask, PIMPLE_RED),
-         _mask_overlay(original, mask, (255, 35, 45), 0.7)),
-        ("RGB INPUT", "RED MASK 0/255", "RED OVERLAY"),
-    )
-
-
-def preview_cleanup():
-    """Show before, selective result, and a magnified colour difference."""
-    original = skin_sample_image()
-    cleaned = _require_image(_student_function("remove_pimples")(original), "remove_pimples")
-    before = np.asarray(original, dtype=np.int16)
-    after = np.asarray(cleaned, dtype=np.int16)
-    difference = np.clip(np.abs(after - before) * 4, 0, 255).astype(np.uint8)
-    sample_x, sample_y = original.width * 40 // 100, original.height * 58 // 100
-    print("Pixel in the red region: before %s -> after %s." %
-          (tuple(before[sample_y, sample_x]), tuple(after[sample_y, sample_x])))
-    print("%d/%d pixels changed colour. The difference panel is bright where colours changed and dark where they stayed." %
-          (int(np.any(before != after, axis=2).sum()), before.shape[0] * before.shape[1]))
-    return _image_grid(
-        (original, cleaned, _numpy_picture(difference)),
-        ("BEFORE", "AFTER", "DIFFERENCE ×4"),
-    )
-
-
 CALM_DEMO_STRENGTH = 0.8
 SWATCH_SIZE = (160, 120)
 
@@ -1690,47 +1637,6 @@ def _excess_redness(pixel):
 def _red_spot_point(image):
     """The location of the first drawn red spot, used for before/after printouts."""
     return (image.width * 40 // 100, image.height * 58 // 100)
-
-
-def preview_average_skin_color():
-    """Show the target colour the student's average produced, next to its source region."""
-    original = skin_sample_image()
-    skin_mask = _student_function("detect_skin")(original)
-    color = tuple(_student_function("average_skin_color")(original, skin_mask))
-    if len(color) != CHANNELS:
-        raise MagicMirrorError("average_skin_color() must return three numbers (r, g, b).")
-    print("The selected skin region averages to %s. That single colour is the target for the red spots." % (color,))
-    print("Averaging hides the spots because they are a few pixels among thousands of ordinary skin pixels.")
-    return _image_grid(
-        (original, _mask_overlay(original, skin_mask, (255, 210, 80)),
-         Image.new("RGB", SWATCH_SIZE, color)),
-        ("RGB INPUT", "AVERAGED REGION", "TARGET COLOUR"),
-    )
-
-
-def preview_calm_redness():
-    """Run the student's colour blend on the drawn face and measure the redness it removed."""
-    original = skin_sample_image()
-    skin_mask = _student_function("detect_skin")(original)
-    spot_mask = _student_function("detect_pimples")(original, skin_mask)
-    color = tuple(_student_function("average_skin_color")(original, skin_mask))
-    calmed = _require_image(
-        _student_function("calm_redness")(original, spot_mask, color, CALM_DEMO_STRENGTH),
-        "calm_redness")
-
-    point = _red_spot_point(original)
-    before, after = original.getpixel(point), calmed.getpixel(point)
-    difference = np.clip(
-        np.abs(np.asarray(calmed, dtype=np.int16) - np.asarray(original, dtype=np.int16)) * 4,
-        0, 255).astype(np.uint8)
-    print("Target colour %s, strength %.2f." % (color, CALM_DEMO_STRENGTH))
-    print("Spot pixel: %s -> %s. Excess redness %.1f -> %.1f." %
-          (before, after, _excess_redness(before), _excess_redness(after)))
-    print("Smoothing averages the neighbours; this step replaces the colour itself, so the redness has nowhere to hide.")
-    return _image_grid(
-        (original, calmed, _numpy_picture(difference)),
-        ("BEFORE", "AFTER COLOUR BLEND", "DIFFERENCE ×4"),
-    )
 
 
 def preview_my_pipeline():

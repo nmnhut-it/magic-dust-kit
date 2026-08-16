@@ -403,6 +403,257 @@ Do not copy a number from the table. Use the mechanism to predict four new outpu
 Fill the four blanks, then run the cell. A complete explanation must connect each number to what appears in the output map.
 """
 
+SEE_EVIDENCE = """### See your own rule work — and write the seeing yourself
+
+You just wrote a rule. Now write the code that **shows** it, because looking at your own output is half of
+image processing and it should not be something a library does for you behind your back.
+
+The only helper is `magic_mirror.show_images(pictures, labels)`, and it does exactly one thing: put pictures on a
+grid with captions under them. It never looks at a pixel and never runs your rule. Deciding *what* to show — and what
+to call it — is the whole job, and it is yours.
+
+- **Given:** three sample colours, the empty lists, and the `show_images` call.
+- **PROCESS:** fill the four `___` blanks, top to bottom:
+  1. `Image.new("RGB", TILE, ___)` — the sample colour itself, so the top row is what went in.
+  2. 3. 4. `skin_evidence(___, ___, ___)` — your rule needs the three channels separately, and `colour` is the
+     tuple `(red, green, blue)`. `colour[0]` is the red one.
+- **OUTPUT:** two rows. The top row is the three input colours. The bottom row is your rule's answer for each.
+
+Watch what the bottom row actually is. Your rule returns `0` or `255`, and a grey tile of `(v, v, v)` is exactly how a
+mask *looks*: `255` is white, `0` is black. That is the same white-and-black picture every later mask cell shows —
+you are not looking at a diagram of the answer, you are looking at the answer.
+
+Then change something and run it again. Add a colour of your own to `SAMPLES` — a green one, your own skin, a
+wall — and predict the answer before you press ▶. A rule you cannot predict is a rule you do not understand yet.
+"""
+
+SEE_EVIDENCE_Q = '''TILE = (80, 60)
+SAMPLES = (
+    ("SKIN (183,127,103)", (183, 127, 103)),
+    ("RED SPOT (225,62,66)", (225, 62, 66)),
+    ("BLUE BG (35,80,185)", (35, 80, 185)),
+)
+
+
+def show_my_evidence(samples):
+    """Top row: the colours. Bottom row: what my skin_evidence says about each."""
+    pictures, labels = [], []
+    for name, colour in samples:
+        pictures.append(Image.new("RGB", TILE, ___))
+        labels.append(name)
+    for name, colour in samples:
+        answer = skin_evidence(___, ___, ___)
+        # A mask value IS a grey level: 255 draws white, 0 draws black.
+        pictures.append(Image.new("RGB", TILE, (answer, answer, answer)))
+        labels.append("MASK = %d" % answer)
+    return magic_mirror.show_images(pictures, labels, columns=3)
+
+
+show_my_evidence(SAMPLES)
+'''
+
+SEE_EVIDENCE_A = SEE_EVIDENCE_Q.replace(
+    'Image.new("RGB", TILE, ___)', 'Image.new("RGB", TILE, colour)'
+).replace(
+    "skin_evidence(___, ___, ___)", "skin_evidence(colour[0], colour[1], colour[2])"
+)
+
+SEE_CONVOLUTION = """### See your kernel run on a real photograph — your code again
+
+`convolve_layer` handles **one** layer of numbers. A photograph has three. Joining them back into a picture is the
+step that turns a maths function into an image filter, and it is worth writing once yourself.
+
+- **Given:** the photo, `SOFTEN_KERNEL`, and the line that turns the finished numbers back into a picture.
+- **PROCESS:** fill the three `___` blanks — the kernel and divisor your own function needs, then the axis
+  `np.stack` joins on. R, G and B are the **third** axis of an image array, and NumPy counts from `0`.
+- **OUTPUT:** the photo before and after, side by side.
+
+The nine weights add up to `16`, which is why the divisor is `16`: divide by the total and the picture keeps its
+brightness. Try `1` instead and watch it turn white.
+"""
+
+SEE_CONVOLUTION_Q = '''photo = magic_mirror.demo_face_photo((160, 120))
+
+
+def show_my_convolution(picture, kernel, divisor):
+    """Run my convolve_layer on R, G and B, then put the three answers back together."""
+    pixels = np.asarray(picture, dtype=np.float32)
+    channels = [convolve_layer(pixels[:, :, c], ___, ___) for c in range(3)]
+    combined = np.stack(channels, axis=___)
+    filtered = Image.fromarray(np.clip(np.rint(combined), 0, 255).astype(np.uint8), "RGB")
+    return magic_mirror.show_images((picture, filtered), ("RGB INPUT", "COMBINED OUTPUT"), columns=2)
+
+
+show_my_convolution(photo, SOFTEN_KERNEL, 16)
+'''
+
+SEE_CONVOLUTION_A = SEE_CONVOLUTION_Q.replace(
+    "convolve_layer(pixels[:, :, c], ___, ___)", "convolve_layer(pixels[:, :, c], kernel, divisor)"
+).replace("np.stack(channels, axis=___)", "np.stack(channels, axis=2)")
+
+SEE_MASK = """### Draw your own mask — and write the drawing tool you will reuse
+
+A mask is a grid of `0` and `255`. To *see* it you must turn those numbers into colours, and that is a function you
+write once and then use for every mask in the rest of the lesson.
+
+- **Given:** the photo and the call.
+- **PROCESS:** fill the three `___` blanks:
+  1. `== ___` — which value counts as selected.
+  2. `np.where(selected, ___, 0)` — the colour to paint there. Black stays where the mask is `0`.
+  3. `detect_skin(___)` — the picture to run your detector on.
+- **OUTPUT:** the photo, then your mask painted in one colour.
+
+`mask[:, :, None]` is the line worth understanding: a mask has one number per pixel and a colour needs three, so
+`None` adds the missing third axis and NumPy repeats the decision across R, G and B.
+"""
+
+SEE_MASK_Q = '''photo = magic_mirror.demo_face_photo((160, 120))
+
+
+def mask_picture(mask, colour):
+    """Turn a 0/255 mask into a picture: colour where selected, black everywhere else.
+
+    Written once here, reused by every later viewer cell.
+    """
+    selected = np.asarray(mask)[:, :, None] == ___
+    painted = np.where(selected, ___, 0)
+    return Image.fromarray(painted.astype(np.uint8), "RGB")
+
+
+def show_my_mask(picture, mask, colour, title):
+    """The photo next to the mask my own detector produced."""
+    print(title, "selects", int((np.asarray(mask) > 0).sum()), "of", np.asarray(mask).size, "pixels.")
+    return magic_mirror.show_images(
+        (picture, mask_picture(mask, colour)), ("RGB INPUT", title), columns=2)
+
+
+show_my_mask(photo, detect_skin(___), (255, 210, 80), "SKIN MASK")
+'''
+
+SEE_MASK_A = SEE_MASK_Q.replace(
+    "[:, :, None] == ___", "[:, :, None] == MASK_ON"
+).replace(
+    "np.where(selected, ___, 0)", "np.where(selected, np.asarray(colour, dtype=np.uint8), 0)"
+).replace("detect_skin(___)", "detect_skin(photo)")
+
+SEE_PIMPLES = """### Draw the red-spot mask — now reuse what you already wrote
+
+You do not write a new viewer for this. `mask_picture` and `show_my_mask` already exist, and a second mask is just a
+second argument. That is what reusable code buys you.
+
+- **PROCESS:** fill the two `___` blanks — the two things `detect_pimples` needs, in the right order.
+- **OUTPUT:** the drawn face next to your red-spot mask.
+
+Use the drawn face here, not the photograph: your 5 × 5 rule finds **nothing** on the real acne photo, for a reason
+the lesson reaches much later. Watching your correct code select nothing would read as a bug.
+"""
+
+SEE_PIMPLES_Q = '''face = magic_mirror.skin_sample_image()
+
+skin = detect_skin(face)
+spots = detect_pimples(___, ___)
+show_my_mask(face, spots, (255, 35, 45), "RED MASK")
+'''
+
+SEE_PIMPLES_A = SEE_PIMPLES_Q.replace("detect_pimples(___, ___)", "detect_pimples(face, skin)")
+
+SEE_CLEANUP = """### See what changed — and write the second tool you will reuse
+
+"It looks a bit different" is not evidence. A difference picture is: subtract the two images, take the size of the
+change, and multiply so small changes become visible.
+
+- **PROCESS:** fill the three `___` blanks:
+  1. `np.abs(second - ___)` — subtract the original.
+  2. `* ___` — the gain, so a change of 3 is not invisible. Use `gain`.
+  3. `remove_pimples(___)` — the picture to clean.
+- **OUTPUT:** before, after, and the magnified difference.
+
+Bright means changed, dark means untouched. A correct selective filter gives an almost black picture with a few
+bright specks — if yours is bright everywhere, it changed pixels it should have left alone.
+"""
+
+SEE_CLEANUP_Q = '''def difference_picture(before, after, gain=4):
+    """Where did the picture change, and by how much? Reused by the next viewer too."""
+    first = np.asarray(before, dtype=np.int16)
+    second = np.asarray(after, dtype=np.int16)
+    change = np.abs(second - ___) * ___
+    return Image.fromarray(np.clip(change, 0, 255).astype(np.uint8), "RGB")
+
+
+def show_my_change(before, after, labels=("BEFORE", "AFTER", "DIFFERENCE x4")):
+    """Three panels: before, after, and where they differ."""
+    changed = int(np.any(np.asarray(before) != np.asarray(after), axis=2).sum())
+    print(changed, "pixels changed colour.")
+    return magic_mirror.show_images(
+        (before, after, difference_picture(before, after)), labels, columns=3)
+
+
+face = magic_mirror.skin_sample_image()
+show_my_change(face, remove_pimples(___))
+'''
+
+SEE_CLEANUP_A = SEE_CLEANUP_Q.replace(
+    "np.abs(second - ___) * ___", "np.abs(second - first) * gain"
+).replace("remove_pimples(___)", "remove_pimples(face)")
+
+SEE_TARGET = """### See the one colour your average produced
+
+`average_skin_color` returns three numbers. Three numbers are hard to judge and a colour is easy, so paint it.
+
+- **PROCESS:** fill the two `___` blanks — the mask your average should count over, and the colour to fill the
+  swatch with.
+- **OUTPUT:** the face, the region that was averaged, and the single target colour beside it.
+
+Check it by eye: the swatch should look like the skin in the picture. If it comes out grey or greenish, your average
+is counting pixels the mask never selected.
+"""
+
+SEE_TARGET_Q = '''face = magic_mirror.skin_sample_image()
+
+skin = detect_skin(face)
+target = average_skin_color(face, ___)
+print("The selected region averages to", target, "- the target the red spots get pulled toward.")
+magic_mirror.show_images(
+    (face, mask_picture(skin, (255, 210, 80)), Image.new("RGB", (160, 120), ___)),
+    ("RGB INPUT", "AVERAGED REGION", "TARGET COLOUR"), columns=3)
+'''
+
+SEE_TARGET_A = SEE_TARGET_Q.replace(
+    "average_skin_color(face, ___)", "average_skin_color(face, skin)"
+).replace('Image.new("RGB", (160, 120), ___)', 'Image.new("RGB", (160, 120), target)')
+
+SEE_CALM = """### See the colour blend work — reusing both of your tools
+
+Nothing new to write here beyond the call itself: `show_my_change` and `difference_picture` are already yours.
+
+- **PROCESS:** fill the two `___` blanks — the mask that says *which* pixels to recolour, and how far to move them.
+- **OUTPUT:** before, after, and the difference, plus what one spot pixel became.
+
+Compare this difference panel with the smoothing one above. Smoothing changed a ring of pixels around each spot;
+this changes the spot itself, because it replaces the colour instead of averaging the neighbours.
+"""
+
+SEE_CALM_Q = '''face = magic_mirror.skin_sample_image()
+
+skin = detect_skin(face)
+spots = detect_pimples(face, skin)
+target = average_skin_color(face, skin)
+calmed = calm_redness(face, ___, target, ___)
+
+# Sample the reddest pixel THE MASK SELECTED. Not the middle (it may be plain
+# skin) and not the reddest overall - that is the middle of a blotch, which a
+# 5 x 5 rule never selects, so a correct answer would print "no change".
+values = np.asarray(face, dtype=np.float32)
+redness = values[:, :, 0] - (values[:, :, 1] + values[:, :, 2]) / 2
+marked = np.where(np.asarray(spots) == MASK_ON, redness, -1e9)
+y, x = np.unravel_index(np.argmax(marked), marked.shape)
+print("Marked pixel", face.getpixel((x, y)), "->", calmed.getpixel((x, y)))
+show_my_change(face, calmed, ("BEFORE", "AFTER COLOUR BLEND", "DIFFERENCE x4"))
+'''
+
+SEE_CALM_A = SEE_CALM_Q.replace(
+    "calm_redness(face, ___, target, ___)", "calm_redness(face, spots, target, 0.8)")
+
 TASK_CONVOLVE = """### Coding task 2 of 10 — complete `convolve_layer`
 
 You just traced multiply → add → divide by hand. This function makes SciPy repeat it at every pixel.
@@ -530,7 +781,7 @@ The last function ties everything together: calculate a smooth colour everywhere
 
 COLOR_GAP = """## Blur cannot fix colour — so change the colour
 
-Run `preview_cleanup` again and look at the red spot. It is softer, and it is still red. That is not a mistake in your
+Run your `show_my_change` cell again and look at the red spot. It is softer, and it is still red. That is not a mistake in your
 code; it is what averaging does. The kernel replaces a pixel with a mix of its neighbours, and when the neighbourhood is
 red, the mix stays red. A real blotch is many pixels wide, so most of its window is more blotch.
 
@@ -1191,7 +1442,10 @@ def build_skin_cells(solution):
         markdown_cell("skin-task-evidence-note", TASK_EVIDENCE),
         code_cell("task-skin-evidence", blocks["skin_evidence"],
                   ("autoload", "task:skin_evidence")),
-        code_cell("skin-preview-evidence", "magic_mirror.preview_skin_evidence()"),
+        markdown_cell("skin-see-evidence-note", SEE_EVIDENCE),
+        code_cell("skin-see-evidence",
+                  SEE_EVIDENCE_A if solution else SEE_EVIDENCE_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-votes", VOTES),
         code_cell("skin-mechanism-neighbours", 'magic_mirror.show_mechanism("neighbours")',
                   ("concept:neighbours",)),
@@ -1210,34 +1464,47 @@ def build_skin_cells(solution):
         markdown_cell("skin-task-convolve-note", TASK_CONVOLVE),
         code_cell("task-convolve-layer", blocks["convolve_layer"],
                   ("autoload", "task:convolve_layer")),
-        code_cell("skin-preview-convolution", "magic_mirror.preview_library_convolution()"),
+        markdown_cell("skin-see-convolution-note", SEE_CONVOLUTION),
+        code_cell("skin-see-convolution",
+                  SEE_CONVOLUTION_A if solution else SEE_CONVOLUTION_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-task-detect-note", TASK_SKIN),
         code_cell("task-detect-skin", blocks["detect_skin"],
                   ("autoload", "task:detect_skin")),
-        code_cell("skin-preview-mask", "magic_mirror.preview_skin_mask()"),
+        markdown_cell("skin-see-mask-note", SEE_MASK),
+        code_cell("skin-see-mask", SEE_MASK_A if solution else SEE_MASK_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-red-gap", RED_GAP),
         code_cell("skin-mechanism-red-spot", 'magic_mirror.show_mechanism("red_spot")',
                   ("concept:red_spot",)),
         markdown_cell("skin-task-pimple-note", TASK_PIMPLE),
         code_cell("task-detect-pimples", blocks["detect_pimples"],
                   ("autoload", "task:detect_pimples")),
-        code_cell("skin-preview-pimples", "magic_mirror.preview_pimple_mask()"),
+        markdown_cell("skin-see-pimples-note", SEE_PIMPLES),
+        code_cell("skin-see-pimples", SEE_PIMPLES_A if solution else SEE_PIMPLES_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-soften", SOFTEN),
         code_cell("skin-mechanism-soften", 'magic_mirror.show_mechanism("soften")',
                   ("concept:soften",)),
         markdown_cell("skin-task-remove-note", TASK_REMOVE),
         code_cell("task-remove-pimples", blocks["remove_pimples"],
                   ("autoload", "task:remove_pimples")),
-        code_cell("skin-preview-cleanup", "magic_mirror.preview_cleanup()"),
+        markdown_cell("skin-see-cleanup-note", SEE_CLEANUP),
+        code_cell("skin-see-cleanup", SEE_CLEANUP_A if solution else SEE_CLEANUP_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-color-gap", COLOR_GAP),
         markdown_cell("skin-task-average-note", TASK_AVERAGE),
         code_cell("task-average-skin-color", blocks["average_skin_color"],
                   ("autoload", "task:average_skin_color")),
-        code_cell("skin-preview-average", "magic_mirror.preview_average_skin_color()"),
+        markdown_cell("skin-see-target-note", SEE_TARGET),
+        code_cell("skin-see-target", SEE_TARGET_A if solution else SEE_TARGET_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-task-calm-note", TASK_CALM),
         code_cell("task-calm-redness", blocks["calm_redness"],
                   ("autoload", "task:calm_redness")),
-        code_cell("skin-preview-calm", "magic_mirror.preview_calm_redness()"),
+        markdown_cell("skin-see-calm-note", SEE_CALM),
+        code_cell("skin-see-calm", SEE_CALM_A if solution else SEE_CALM_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-check-note", CHECK),
         code_cell("skin-check", "magic_mirror.check_skin_code()"),
         markdown_cell("skin-demo-note", DEMO),

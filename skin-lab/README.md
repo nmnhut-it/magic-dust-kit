@@ -44,15 +44,31 @@ Lesson structure (one continuous trail for young learners):
   pipeline hits — averaging inside a red blotch produces more red — and the two
   new tasks answer it: `average_skin_color` reduces the skin region to one target
   colour, `calm_redness` mixes the marked pixels toward it with
-  `original × (1 - strength) + target × strength`. `preview_calm_redness` and
-  `preview_my_pipeline` print excess redness `R - (G + B) / 2` before and after,
-  so the effect is a number, not an impression.
+  `original × (1 - strength) + target × strength`. The student's own
+  `skin-see-calm` cell and `preview_my_pipeline` report what changed before and
+  after, so the effect is a number, not an impression.
 - **These two functions loop on purpose.** Every earlier filter is vectorized
   because the capstone runs it on 320 × 240 pixels in the browser; the two colour
   tasks run only on the small teaching images, so they use a plain
   `for y / for x` loop with `getpixel`/`putpixel` — the code a student can read
   and trace. `test_teaching_helpers` enforces the split: the five whole-image
   filters must stay vectorized, the colour tasks may loop.
+- **The student writes the seeing, not just the rule.** Every `preview_*` helper
+  that ran a student function and displayed the result has been deleted from
+  `magic_mirror.py`. Seven `skin-see-*` `student-work` cells replace them, and
+  the only thing the library still supplies is `show_images(pictures, labels,
+  columns)` — it lays labelled pictures on a grid, never reads a pixel and never
+  runs a rule. Looking at your own output is half of image processing, so it is
+  not something a helper should do behind the student's back.
+  The seven cells are deliberately DRY: `skin-see-mask` has them write
+  `mask_picture` and `skin-see-cleanup` has them write `difference_picture`,
+  and `skin-see-pimples`, `skin-see-target` and `skin-see-calm` then reuse
+  those, which is the point their notes make out loud. `skin-see-evidence`
+  carries the idea the old black box hid — a mask value *is* a grey level, so
+  `255` draws white and `0` draws black.
+  `skin-see-calm` samples the reddest pixel **the mask selected**: the middle of
+  a blotch is the reddest pixel overall and a 5 × 5 rule never selects it, so
+  sampling that would print "no change" for a correct answer.
 - A survival kit up front: cell-type legend, error first-aid table, and a
   glossary cell (`skin-glossary`).
 - Four bundled photos (`assets/photos/`): the default index `0` is a real acne
@@ -64,12 +80,12 @@ Lesson structure (one continuous trail for young learners):
 - **Which picture a cell shows is a decision, not an accident**, and
   `test_teaching_helpers` asserts it per function. Cells judged by eye use
   `demo_face_photo()` (the bundled portrait, `DEMO_PHOTO`): the filter and
-  kernel galleries, `preview_numpy_filter`, `preview_library_convolution`,
-  `preview_skin_mask`, `show_face_mesh_map`, `show_face_mask_pipeline` — a blur
+  kernel galleries, `preview_numpy_filter`, `show_face_mesh_map`, `show_face_mask_pipeline`,
+  and the `skin-see-convolution` / `skin-see-mask` cells — a blur
   or an edge kernel reads as nothing on flat cartoon colour. Cells where the
   student's own detector must be seen firing keep `skin_sample_image()`:
-  `show_skin_sample`, `show_skin_pipeline_overview`, `preview_pimple_mask`,
-  `preview_cleanup`, `skin_demo`. That is not timidity — the taught 5 × 5 rule
+  `show_skin_sample`, `show_skin_pipeline_overview`, `skin_demo`, and the
+  `skin-see-pimples` / `skin-see-cleanup` / `skin-see-target` / `skin-see-calm` cells. That is not timidity — the taught 5 × 5 rule
   selects **0** red pixels on the real acne photo at demo sizes, because the
   window sits inside the blotch, so a real photo there would read as "my correct
   code is broken" long before the lesson explains the limit.
@@ -159,7 +175,7 @@ node test-skin-browser.mjs
 
 Autosave stores code, progress, mechanism state, and the current cell in this
 browser. Only cells holding student work restore from the save — the ten
-`task:*` cells, the four `student-work` cells (transfer answers, the assembled
+`task:*` cells, the eleven `student-work` cells (transfer answers, the assembled
 pipeline, the healing run, and the write-it-yourself smoothing program), and student-added `user-*` cells. Markdown and observation code
 always load fresh from the deployed notebook: a save written by an older
 release once restored a different `numpy-array` cell under the same id and
