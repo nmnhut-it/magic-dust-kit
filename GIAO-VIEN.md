@@ -220,9 +220,11 @@ thật, trang chết trắng vì mã cũ gặp dữ liệu mới.
 
 Nó đóng luôn con số đó vào `courseVersion` và mọi `assets/...?v=` của hai trang
 Skin Lab. Trước đây hai chỗ này phải sửa tay nên đứng yên ở `2026.08.07.2` suốt
-nhiều bản dựng: `notebook.js?v=` không đổi thì máy học sinh vẫn nạp JavaScript
-đời cũ. `python -m unittest test_skin_notebook.py` báo đỏ nếu một bản dựng quên
-chạy bước này.
+nhiều bản dựng, tức bản lưu trong máy học sinh ghi một số đời không bao giờ lệch
+với trang — không còn dấu hiệu nào để biết bản lưu đã cũ. (Riêng chuyện tải nhầm
+file cũ thì `_headers` đã chặn sẵn bằng `no-store` cho `/skin-lab/*`.)
+`python -m unittest test_skin_notebook.py` báo đỏ nếu một bản dựng quên chạy
+bước này.
 
 ## Chấm tự động
 

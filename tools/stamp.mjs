@@ -3,9 +3,9 @@
 // đang giữ bản cũ — trang tự nạp lại.
 //
 // Đóng luôn con số đó vào courseVersion + ?v= của hai trang Skin Lab. Trước đây
-// courseVersion phải sửa tay nên nó đứng yên ở 2026.08.07.2 suốt nhiều bản dựng:
-// notebook.js?v=... không đổi thì máy học sinh vẫn chạy JS cũ, và bản lưu cũ
-// không có dấu hiệu nào để nhận ra là đã lỗi thời.
+// courseVersion phải sửa tay nên nó đứng yên ở 2026.08.07.2 suốt nhiều bản dựng,
+// tức bản lưu trong máy học sinh ghi một số đời không bao giờ lệch với trang.
+// Còn ?v= chỉ là lớp chắn phụ: _headers đã gửi no-store cho /skin-lab/*.
 //
 //     node tools/stamp.mjs        chạy trước mỗi lần deploy
 import { readFileSync, writeFileSync } from 'node:fs';

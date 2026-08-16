@@ -1,2 +1,2 @@
 // Máy sinh ra, đừng sửa tay — xem tools/stamp.mjs
-export const BUILD = '20260816120210';
+export const BUILD = '20260816120754';

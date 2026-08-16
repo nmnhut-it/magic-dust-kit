@@ -213,9 +213,11 @@ enforce that, and both exist because they were broken:
 
 `tools/stamp.mjs` writes the build stamp into `courseVersion` and every
 `assets/*.js|css?v=` in both Skin Lab pages. Hand-edited, `courseVersion` sat at
-`2026.08.07.2` across many deploys, so `notebook.js?v=` never changed and browsers
-kept running old JavaScript. `test_skin_notebook` fails if a page carries a
-version other than `build.txt`.
+`2026.08.07.2` across many deploys — so the save recorded a version that could
+never disagree with the page, and nothing in the record marked it as old. The
+`?v=` query is belt-and-braces only: `_headers` already sends `no-store` for
+`/skin-lab/*`, so no browser was serving stale JavaScript. `test_skin_notebook`
+fails if a page carries a version other than `build.txt`.
 
 Unfilled `___` blanks are translated for learners in both error paths: a cell
 run appends "Replace every ___ with your answer …" (`notebook.js
