@@ -74,6 +74,11 @@ const T = {
   holdHint: "Hold all 5 fingers open to flip the image",
   holdDone: "Flipped!",
   sparkHint: "Raise your thumb and little finger to create particles",
+  starterBtn: "↺ This task changed — get the new version",
+  starterSure: "Sure? This replaces the code in this cell",
+  lessonUpdated: (n) => `<strong>The lesson was updated.</strong> ${n} task${n === 1 ? "" : "s"} now ` +
+    `ask${n === 1 ? "s" : ""} for something different. Your own code was kept — press ` +
+    `<em>↺ This task changed</em> inside a highlighted cell to take the new version of that one cell.`,
 };
 
 const PAGE = Object.assign(
@@ -82,6 +87,12 @@ const PAGE = Object.assign(
 );
 const SIMPLE = PAGE.mode.startsWith("simple");   // bản đơn giản: giữ tay để lật + bụi phép
 const SKIN = PAGE.mode.startsWith("skin");       // route riêng: tích chập + bộ lọc da, không training
+// Trang đáp án KHÔNG nạp lại mã đã lưu: ở đó không có bài của ai để giữ, mà bản
+// lưu cũ thì đè đáp án cũ lên notebook mới. Đúng lỗi thầy gặp: bản lưu giữ
+// smooth_skin(img, area_mask, strength) đời trước, ô chấm mới gọi thêm radius
+// và báo "TypeError: takes 3 positional arguments but 4 were given" — 9/10 trên
+// một trang mà máy mở lần đầu vẫn chấm 10/10.
+const RESTORES_WORK = PAGE.mode !== "skin-answers";
 
 // Các vòng landmark của MediaPipe Face Mesh (refineLandmarks: true, 478 điểm).
 // `oval` là đường viền khuôn mặt — vùng ĐƯỢC phép sửa.
@@ -1295,7 +1306,7 @@ window.MagicMirrorUI = {
 /* --------------------------------- notebook --------------------------------- */
 const Nb = {
   cells: [], file: PAGE.notebook, counter: 0, currentOutput: null,
-  saved: null, saveTimer: null, storageAvailable: true,
+  saved: null, saveTimer: null, storageAvailable: true, changedTasks: [],
 
   storageKey() { return `magic-dust-kit:skin-lab:${PAGE.mode}:v${CFG.storageSchema}`; },
 
@@ -1303,7 +1314,7 @@ const Nb = {
     return {
       schema: CFG.storageSchema,
       courseVersion: PAGE.courseVersion,
-      cells: {}, passed: [], widgets: {}, concepts: [], lastCellId: null, updatedAt: null,
+      cells: {}, starters: {}, passed: [], widgets: {}, concepts: [], lastCellId: null, updatedAt: null,
     };
   },
 
@@ -1335,6 +1346,7 @@ const Nb = {
       id: c.id || c.metadata?.stable_id || `cell-${idx}`,
       type: c.cell_type === "markdown" ? "markdown" : "code",
       source: joinSource(c.source),
+      starter: joinSource(c.source),   // đề gốc, giữ lại để có nút ↺ trả về
       tags: (c.metadata && c.metadata.tags) || [],
       editing: false, count: null,
     }));
@@ -1344,13 +1356,20 @@ const Nb = {
         if (rawSaved[index] !== undefined) Nb.saved.cells[cell.id] = rawSaved[index];
       });
     }
+    // Bài học đổi thì đề của ô task đổi theo. So đề ĐÃ LƯU với đề hiện tại để biết
+    // ô nào đổi: giữ nguyên bài các em viết, nhưng nói ra ô nào có đề mới. Im lặng
+    // thì mã cũ gọi hàm theo tham số cũ và ô chấm báo sai một hàm viết đúng.
+    const savedStarters = Nb.saved.starters || {};
+    Nb.changedTasks = !RESTORES_WORK ? [] : Nb.cells
+      .filter((cell) => holdsWork(cell) && savedStarters[cell.id] !== undefined
+        && savedStarters[cell.id] !== cell.starter)
+      .map((cell) => cell.id);
     Nb.cells.forEach((cell) => {
-      // Chỉ ô chứa BÀI LÀM của học sinh mới giữ bản đã lưu: năm ô task, các ô gắn
+      // Chỉ ô chứa BÀI LÀM của học sinh mới giữ bản đã lưu: mười ô task, các ô gắn
       // thẻ student-work và ô các em tự thêm. Ô quan sát + chữ giảng luôn nạp bản
       // mới — bản lưu từ phiên bản cũ từng đè lên ô quan sát mới và làm vỡ bài
       // (numpy-array đời .6/.7 tạo ma trận khác hẳn ô đổi-một-số đời .9 cần).
-      const holdsStudentWork = cell.tags.some((tag) => tag.startsWith("task:") || tag === "student-work");
-      if (cell.type !== "code" || !holdsStudentWork) return;
+      if (!RESTORES_WORK || !holdsWork(cell)) return;
       if (Object.prototype.hasOwnProperty.call(Nb.saved.cells, cell.id)) {
         cell.source = typeof Nb.saved.cells[cell.id] === "string"
           ? Nb.saved.cells[cell.id]
@@ -1383,12 +1402,20 @@ const Nb = {
 
   persist() {
     if (!Nb.saved) Nb.saved = Nb.emptySaved();
-    Nb.saved.cells = Object.fromEntries(Nb.cells.map((cell) => [cell.id, {
+    // Trang đáp án không nạp lại mã thì cũng đừng lưu mã: lưu chỉ để lại một bản
+    // sao đáp án đời cũ trong máy — đúng thứ vừa làm hỏng bài. Ô do người dùng
+    // tự thêm vẫn giữ, vì file notebook không có sẵn để dựng lại.
+    const keepsSource = (cell) => RESTORES_WORK || cell.id.startsWith("user-");
+    Nb.saved.cells = Object.fromEntries(Nb.cells.filter(keepsSource).map((cell) => [cell.id, {
       source: cell.source,
       type: cell.type,
       tags: cell.tags,
       user: cell.id.startsWith("user-"),
     }]));
+    // Lưu kèm ĐỀ GỐC của các ô task: lần mở sau so với đề mới là biết bài học đã đổi.
+    Nb.saved.starters = !RESTORES_WORK ? {} : Object.fromEntries(Nb.cells
+      .filter((cell) => holdsWork(cell) && cell.starter !== undefined)
+      .map((cell) => [cell.id, cell.starter]));
     Nb.saved.updatedAt = new Date().toISOString();
     try {
       localStorage.setItem(Nb.storageKey(), JSON.stringify(Nb.saved));
@@ -1483,6 +1510,7 @@ const Nb = {
     if (taskTag && new Set(Nb.saved?.passed || []).has(taskTag.slice(5))) el.classList.add("done");
     const conceptTag = cell.tags.find((tag) => tag.startsWith("concept:"));
     if (conceptTag && new Set(Nb.saved?.concepts || []).has(conceptTag.slice(8))) el.classList.add("done");
+    if ((Nb.changedTasks || []).includes(cell.id)) el.classList.add("changed");
     el.onmousedown = () => Nb.focusCell(idx, false);
 
     const gutter = document.createElement("div");
@@ -1509,6 +1537,7 @@ const Nb = {
         tag.className = "cell-tag"; tag.textContent = T.skipCell;
         body.appendChild(tag);
       }
+      if ((Nb.changedTasks || []).includes(cell.id)) body.appendChild(Nb.starterButton(cell));
       body.appendChild(Nb.editor(cell, idx));
     }
     const out = document.createElement("div");
@@ -1519,6 +1548,26 @@ const Nb = {
     el.append(gutter, body);
     cell.el = el;
     return el;
+  },
+
+  /** Trả ĐÚNG ô này về đề mới. Hỏi lại ngay trên nút, không mở hộp thoại: hộp
+   *  thoại chặn mọi sự kiện của trang và không kiểm thử tự động được. */
+  starterButton(cell) {
+    const button = document.createElement("button");
+    button.className = "starter-btn";
+    button.textContent = T.starterBtn;
+    let armed = false;
+    button.onclick = (event) => {
+      event.stopPropagation();
+      if (!armed) { armed = true; button.textContent = T.starterSure; button.classList.add("armed"); return; }
+      cell.source = cell.starter;
+      Nb.changedTasks = Nb.changedTasks.filter((id) => id !== cell.id);
+      Nb.persist();
+      Nb.render();
+      App.banner(Nb.changedTasks.length ? T.lessonUpdated(Nb.changedTasks.length) : App.pageNotice,
+        Nb.changedTasks.length > 0);
+    };
+    return button;
   },
 
   editor(cell, idx) {
@@ -1672,6 +1721,11 @@ const Nb = {
 };
 
 function joinSource(src) { return Array.isArray(src) ? src.join("") : String(src || ""); }
+/** Ô chứa BÀI LÀM của học sinh: mười ô task và các ô gắn thẻ student-work. */
+function holdsWork(cell) {
+  return cell.type === "code"
+    && cell.tags.some((tag) => tag.startsWith("task:") || tag === "student-work");
+}
 function splitSource(text) {
   const lines = text.split("\n");
   return lines.map((l, i) => (i === lines.length - 1 ? l : l + "\n"));
@@ -1692,7 +1746,9 @@ const App = {
     try {
       await Nb.load();
       const isFileUrl = location.protocol === "file:";
-      App.banner(isFileUrl ? T.fileHint : App.pageNotice, isFileUrl);
+      const changed = Nb.changedTasks.length;
+      App.banner(isFileUrl ? T.fileHint : (changed ? T.lessonUpdated(changed) : App.pageNotice),
+        isFileUrl || changed > 0);
       if (!isFileUrl) Nb.showResume();
     } catch (err) {
       document.getElementById("notebook").textContent = "";

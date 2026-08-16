@@ -218,6 +218,12 @@ mạng. Nó ghi cùng một con số vào `build.txt` và `src/build.js`; trang 
 bước này thì máy học sinh có thể chạy mã cũ nửa ngày mà không ai biết — đã gặp
 thật, trang chết trắng vì mã cũ gặp dữ liệu mới.
 
+Nó đóng luôn con số đó vào `courseVersion` và mọi `assets/...?v=` của hai trang
+Skin Lab. Trước đây hai chỗ này phải sửa tay nên đứng yên ở `2026.08.07.2` suốt
+nhiều bản dựng: `notebook.js?v=` không đổi thì máy học sinh vẫn nạp JavaScript
+đời cũ. `python -m unittest test_skin_notebook.py` báo đỏ nếu một bản dựng quên
+chạy bước này.
+
 ## Chấm tự động
 
 `python cham.py` chấm cả hai file, không cần trình duyệt lẫn camera: nó dựng

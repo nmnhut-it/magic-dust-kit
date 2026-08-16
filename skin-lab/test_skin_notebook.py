@@ -40,14 +40,21 @@ class TestSkinNotebook(unittest.TestCase):
         practice_page = (ROOT / "index.html").read_text(encoding="utf-8")
         answer_page = (ROOT / "dap-an.html").read_text(encoding="utf-8")
         self.assertIn('notebook: "Skin_Lab.ipynb"', practice_page)
-        self.assertIn("assets/notebook.js?v=2026.08.07.2", practice_page)
-        self.assertIn("assets/skin-mechanisms.js?v=2026.08.07.2", practice_page)
         self.assertIn('href="dap-an.html"', practice_page)
         self.assertIn('href="../index.html"', practice_page)
         self.assertIn('notebook: "Skin_Lab_Answers.ipynb"', answer_page)
-        self.assertIn("assets/notebook.js?v=2026.08.07.2", answer_page)
         self.assertIn('href="./"', answer_page)
         self.assertIn('href="../index.html"', answer_page)
+
+    def test_every_page_asset_carries_the_current_build_stamp(self):
+        """A frozen ?v= left old notebook.js in the browser after a deploy, and a frozen
+        courseVersion gave a stale save no way to announce itself. tools/stamp.mjs writes
+        the one stamp into both pages; this fails if a deploy skipped it."""
+        stamp = (ROOT.parent / "build.txt").read_text(encoding="utf-8").strip()
+        for name in ("index.html", "dap-an.html"):
+            page = (ROOT / name).read_text(encoding="utf-8")
+            versions = set(re.findall(r'\?v=([^"]+)', page)) | set(re.findall(r'courseVersion: "([^"]+)"', page))
+            self.assertEqual(versions, {stamp}, f"{name} carries versions {sorted(versions)}, not {stamp}")
 
     def test_each_task_is_a_stable_autoload_cell_with_the_matching_function(self):
         for notebook, code_path in (
@@ -331,9 +338,24 @@ class TestSkinNotebook(unittest.TestCase):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         self.assertIn("Replace every ___ with your answer", runtime)
         self.assertIn('tag.startsWith("task:") || tag === "student-work"', runtime)
-        self.assertIn('if (cell.type !== "code" || !holdsStudentWork) return;', runtime)
+        self.assertIn("if (!RESTORES_WORK || !holdsWork(cell)) return;", runtime)
         helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
         self.assertIn("still contains ___ blanks", helpers)
+
+    def test_a_saved_answer_never_overrides_the_published_answers(self):
+        """The answer route is the published answer, so it restores nothing: a browser that
+        held smooth_skin(img, area_mask, strength) from an earlier release scored 9/10 on a
+        page a fresh browser scored 10/10. The practice route keeps the student's own code
+        instead, and compares the saved starter with the current one to say which task moved."""
+        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
+        self.assertIn('const RESTORES_WORK = PAGE.mode !== "skin-answers";', runtime)
+        self.assertIn("Nb.changedTasks = !RESTORES_WORK ? [] : Nb.cells", runtime)
+        self.assertIn("savedStarters[cell.id] !== cell.starter", runtime)
+        self.assertIn("Nb.saved.starters = !RESTORES_WORK ? {} : Object.fromEntries(Nb.cells", runtime)
+        self.assertIn("starterButton(cell)", runtime)
+        # Hộp thoại chặn cả trang; nút phải tự hỏi lại bằng chính chữ trên nút.
+        self.assertIn("starterSure", runtime)
+        self.assertNotIn("window.confirm(T.starter", runtime)
 
     def test_student_work_cells_are_the_only_restored_code_cells(self):
         tagged = {
@@ -375,8 +397,8 @@ class TestSkinNotebook(unittest.TestCase):
     def test_runtime_saves_by_stable_id_and_never_persists_captured_images(self):
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         self.assertIn("magic-dust-kit:skin-lab:", runtime)
-        self.assertIn("cells: {}, passed: [], widgets: {}, concepts: []", runtime)
-        self.assertIn("Object.fromEntries(Nb.cells.map", runtime)
+        self.assertIn("cells: {}, starters: {}, passed: [], widgets: {}, concepts: []", runtime)
+        self.assertIn("Object.fromEntries(Nb.cells.filter(keepsSource).map", runtime)
         self.assertIn('user: cell.id.startsWith("user-")', runtime)
         self.assertIn("Ô do học sinh tự thêm", runtime)
         self.assertIn('tags.includes("autoload")', runtime)

@@ -173,6 +173,14 @@ node test-skin-mechanisms.mjs
 node test-skin-browser.mjs
 ```
 
+`test-skin-browser.mjs` runs **every** code cell of the answer notebook in page
+order — it used to walk a hand-written list of ids, which quietly skipped cells
+added later and reported a green run for a page that was broken. It also opens
+both routes a second time with a save seeded from an older release, because a
+fresh browser profile passes the very failure a returning one hits. Set
+`SKIN_BASE=https://magic-dust-project.nmnhut.dev` to run the whole check against
+the deployed site instead of a local server.
+
 Autosave stores code, progress, mechanism state, and the current cell in this
 browser. Only cells holding student work restore from the save — the ten
 `task:*` cells, the eleven `student-work` cells (transfer answers, the assembled
@@ -182,6 +190,32 @@ release once restored a different `numpy-array` cell under the same id and
 crashed the newer change-one-number demo. A captured or uploaded image is not
 written to `localStorage`. Students can download the notebook to move their
 code to another device.
+
+**A save written before a lesson update must not break the lesson.** Two rules
+enforce that, and both exist because they were broken:
+
+- **The answer route restores nothing** (`RESTORES_WORK` in `notebook.js`, false
+  when `PAGE.mode === "skin-answers"`), and stores no cell source either apart
+  from cells the reader added. There is no work to preserve on that page — it is
+  the published answer — so restoring only let an older copy of it override the
+  new one. It did: a browser holding `smooth_skin(img, area_mask, strength)` from
+  before task 10 gained its `radius` argument scored **9/10** with
+  `TypeError: smooth_skin() takes 3 positional arguments but 4 were given`, on a
+  page a first-time browser scored 10/10. Writing the save also clears the old
+  code out, so one visit repairs the browser.
+- **The practice route keeps the student's code and says which task moved.** The
+  save carries `starters` — the notebook's own text for each work cell — so the
+  next load compares saved starter with current starter. Any task whose wording
+  changed gets a `.changed` highlight and a `↺ This task changed` button that
+  replaces *that one cell*; a banner counts them. Deleting their work would be
+  worse than the bug. The button asks again on itself rather than through
+  `window.confirm`, because a modal dialog blocks the page and cannot be tested.
+
+`tools/stamp.mjs` writes the build stamp into `courseVersion` and every
+`assets/*.js|css?v=` in both Skin Lab pages. Hand-edited, `courseVersion` sat at
+`2026.08.07.2` across many deploys, so `notebook.js?v=` never changed and browsers
+kept running old JavaScript. `test_skin_notebook` fails if a page carries a
+version other than `build.txt`.
 
 Unfilled `___` blanks are translated for learners in both error paths: a cell
 run appends "Replace every ___ with your answer …" (`notebook.js

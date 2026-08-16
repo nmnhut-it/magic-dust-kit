@@ -119,6 +119,14 @@ const NOTEBOOK_CELLS = JSON.parse(
   readFileSync(resolve(ROOT, "Skin_Lab.ipynb"), "utf8"),
 ).cells.length;
 
+/** Mã gốc của một ô trong file notebook đã dựng — dùng để dựng bản lưu "đời trước". */
+function notebookSource(file, id) {
+  const cells = JSON.parse(readFileSync(resolve(ROOT, file), "utf8")).cells;
+  const cell = cells.find((item) => (item.id || item.metadata?.stable_id) === id);
+  if (!cell) throw new Error(`${file} has no cell ${id}`);
+  return Array.isArray(cell.source) ? cell.source.join("") : String(cell.source);
+}
+
 async function waitForNotebook(cdp, mode, label, expectedCells = NOTEBOOK_CELLS) {
   const state = await poll(
     () => notebookState(cdp),
@@ -303,29 +311,20 @@ try {
   await waitForNotebook(cdp, "skin-answers", "answer route");
   console.log("Browser check: answer notebook and Pyodide are ready.");
   const run = await cdp.evaluate(`(async () => {
-    const ids = [
-      // skin-library-setup định nghĩa np, MASK_ON, SOFTEN_KERNEL… Chạy tường minh
-      // để lỗi của nó hiện trong evidence.errors thay vì im lặng.
-      "skin-setup", "skin-library-setup",
-      "skin-overview", "skin-pixel-channels", "numpy-array", "numpy-channels",
-      "numpy-change-one-number",
-      "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
-      "skin-convolution-math", "skin-mechanism-kernel-filter", "skin-rgb-convolution",
-      "skin-mechanism-convolution-scan", "skin-convolution-transfer",
-      "skin-see-convolution", "skin-see-evidence",
-      "skin-see-mask", "skin-mechanism-red-spot", "skin-see-pimples",
-      "skin-mechanism-soften", "skin-see-cleanup", "skin-mechanism-face",
-      "skin-check", "skin-demo", "numpy-filter-gallery", "numpy-kernel-gallery",
-      "skin-public-gallery", "skin-public-test", "skin-face-mesh-map", "skin-face-mask-pipeline",
-      "skin-see-target", "skin-see-calm", "skin-build-pipeline", "skin-heal-run",
-      // Hai task cuối chạy SAU ô chấm giữa trang, để ô đó vẫn đúng là
-      // "still to come" — rồi ô chấm cuối mới đủ 10/10.
-      "task-choose-smooth-area", "task-smooth-skin", "skin-smooth-run", "skin-check-all",
-    ];
+    // MỌI ô code, theo đúng thứ tự trên trang — không giữ danh sách id chép tay.
+    // Danh sách chép tay từng bỏ sót ô mới thêm và báo xanh cho một trang hỏng;
+    // thứ tự trên trang cũng chính là thứ tự học sinh bấm, nên ô chấm giữa trang
+    // vẫn chạy trước hai task cuối và vẫn phải đọc "still to come".
+    const ids = Nb.cells
+      .filter((cell) => cell.type === "code" && cell.id !== "skin-photo")
+      .map((cell) => cell.id);
+    // Lời ra của một ô bị xoá mỗi lần trang vẽ lại, nên đọc ngay sau khi chạy.
+    const texts = {};
     for (const id of ids) {
       const index = Nb.cells.findIndex((item) => item.id === id);
       if (index < 0) throw new Error("Missing cell " + id);
       await Nb.runCell(index);
+      texts[id] = Nb.cells[index].outEl.innerText;
     }
     const photoIndex = Nb.cells.findIndex((item) => item.id === "skin-photo");
     if (photoIndex < 0) throw new Error("Missing cell skin-photo");
@@ -382,10 +381,11 @@ try {
     Snapshot.stop();
     controlHost.remove();
     return {
-      grader: output("skin-check").innerText,
-      graderAll: output("skin-check-all").innerText,
-      healRun: output("skin-heal-run").innerText,
-      smoothRun: output("skin-smooth-run").innerText,
+      cellsRun: ids.length,
+      grader: texts["skin-check"],
+      graderAll: texts["skin-check-all"],
+      healRun: texts["skin-heal-run"],
+      smoothRun: texts["skin-smooth-run"],
       images: ids.filter((id) => output(id).querySelector("img")).length,
       errors: ids.flatMap((id) => [...output(id).querySelectorAll(".err")].map((item) => item.innerText)),
       answerKey: Nb.storageKey(),
@@ -446,6 +446,97 @@ try {
   if (!evidence.answerKey.includes(":skin-answers:v3") || !evidence.practiceSaveStillPresent) {
     throw new Error("Practice and answer routes do not use separate localStorage records.");
   }
+
+  // --- Máy đã từng mở bài này ---------------------------------------------
+  // Máy mới thì trang nào cũng xanh; hỏng là hỏng ở máy đã có bản lưu đời trước.
+  // Đúng lỗi đã gặp: bản lưu giữ smooth_skin ba tham số, notebook mới gọi bốn,
+  // trang đáp án tụt xuống 9/10 với "TypeError: takes 3 positional arguments".
+  const staleSmooth = notebookSource("Skin_Lab_Answers.ipynb", "task-smooth-skin")
+    .replace("def smooth_skin(img, area_mask, strength, radius):", "def smooth_skin(img, area_mask, strength):");
+  const staleAnswerSave = {
+    schema: 3, courseVersion: "an-older-release", updatedAt: "2026-08-15T00:00:00.000Z",
+    passed: [], widgets: {}, concepts: [], lastCellId: null, starters: {},
+    cells: { "task-smooth-skin": { source: staleSmooth, type: "code", tags: ["task:smooth_skin"], user: false } },
+  };
+  await cdp.evaluate(
+    `localStorage.setItem("magic-dust-kit:skin-lab:skin-answers:v3", ${JSON.stringify(JSON.stringify(staleAnswerSave))});`
+    + `location.reload();`,
+  );
+  await sleep(1_000);
+  await waitForNotebook(cdp, "skin-answers", "answer route with an older save");
+  const stale = await cdp.evaluate(`(async () => {
+    // Đọc TRƯỚC khi chạy: trang đáp án dọn mã cũ khỏi bản lưu ngay lần ghi đầu,
+    // đọc sau thì phép thử xanh vì rỗng chứ không phải vì đúng.
+    const seeded = (localStorage.getItem("magic-dust-kit:skin-lab:skin-answers:v3") || "")
+      .includes("def smooth_skin(img, area_mask, strength):");
+    const ids = Nb.cells.filter((cell) => cell.type === "code" && cell.id !== "skin-photo").map((cell) => cell.id);
+    let graderAll = "";
+    for (const id of ids) {
+      const index = Nb.cells.findIndex((item) => item.id === id);
+      await Nb.runCell(index);
+      if (id === "skin-check-all") graderAll = Nb.cells[index].outEl.innerText;
+    }
+    return { graderAll, seeded, smoothSource: Nb.cells.find((cell) => cell.id === "task-smooth-skin").source,
+      // Ghi đè xong thì mã đáp án đời cũ phải biến khỏi máy, không nằm lại chờ dịp.
+      cleared: !(localStorage.getItem("magic-dust-kit:skin-lab:skin-answers:v3") || "")
+        .includes("def smooth_skin(img, area_mask, strength):") };
+  })()`);
+  if (stale.exceptionDetails) throw new Error(`Stale-save run failed: ${JSON.stringify(stale.exceptionDetails)}`);
+  if (!stale.result.value.seeded) throw new Error("The older answer save never reached the page.");
+  if (stale.result.value.smoothSource.includes("strength):")) {
+    throw new Error("The answer page restored saved code over the published answers.");
+  }
+  if (!stale.result.value.graderAll.includes("Result: 10/10")) {
+    throw new Error(`A browser with an older save scores ${stale.result.value.graderAll}`);
+  }
+  if (!stale.result.value.cleared) throw new Error("The answer route kept old answer code in this browser.");
+  console.log("Browser check: an older saved answer no longer overrides the published answers.");
+
+  // Trang luyện tập thì NGƯỢC LẠI — bài các em viết phải còn nguyên. Chỉ nói ra
+  // ô nào có đề mới, và cho lấy đề mới của đúng ô đó.
+  const myCode = "# bai cua em, viet tu hom qua\ndef smooth_skin(img, area_mask, strength):\n    return img\n";
+  const stalePracticeSave = {
+    schema: 3, courseVersion: "an-older-release", updatedAt: "2026-08-15T00:00:00.000Z",
+    passed: [], widgets: {}, concepts: [], lastCellId: null,
+    cells: { "task-smooth-skin": { source: myCode, type: "code", tags: ["task:smooth_skin"], user: false } },
+    starters: { "task-smooth-skin": "# de bai doi rat nhieu so voi ban nay\n" },
+  };
+  await cdp.evaluate(`location.href = ${JSON.stringify(PRACTICE_URL)}`);
+  await poll(() => notebookState(cdp), (value) => value?.page === "skin", 60_000, "practice route again");
+  await cdp.evaluate(
+    `localStorage.setItem("magic-dust-kit:skin-lab:skin:v3", ${JSON.stringify(JSON.stringify(stalePracticeSave))});`
+    + `location.reload();`,
+  );
+  await sleep(1_000);
+  const updated = await poll(async () => {
+    const result = await cdp.evaluate(`({
+      banner: document.getElementById("banner")?.textContent || "",
+      changed: document.querySelectorAll(".cell.changed").length,
+      button: document.querySelector(".cell.changed .starter-btn")?.textContent || "",
+      source: Nb.cells?.find((cell) => cell.id === "task-smooth-skin")?.source || "",
+    })`);
+    return result.result.value;
+  }, (value) => value?.source, 60_000, "practice route with an older save");
+  if (!updated.source.includes("bai cua em") || updated.changed !== 1
+      || !updated.banner.includes("lesson was updated") || !updated.button.includes("This task changed")) {
+    throw new Error(`An updated task must keep the student's code and say so: ${JSON.stringify(updated)}`);
+  }
+  const took = await cdp.evaluate(`(async () => {
+    const button = document.querySelector(".cell.changed .starter-btn");
+    button.click();                                   // lần một: hỏi lại
+    const asked = button.textContent;
+    document.querySelector(".cell.changed .starter-btn").click();   // lần hai: đổi thật
+    return { asked, banner: document.getElementById("banner")?.textContent || "",
+      changed: document.querySelectorAll(".cell.changed").length,
+      source: Nb.cells.find((cell) => cell.id === "task-smooth-skin").source };
+  })()`);
+  const retaken = took.result.value;
+  if (!retaken.asked.includes("Sure?") || retaken.changed !== 0
+      || retaken.source.includes("bai cua em")
+      || retaken.source !== notebookSource("Skin_Lab.ipynb", "task-smooth-skin")) {
+    throw new Error(`Taking the new version of one task failed: ${JSON.stringify(retaken)}`);
+  }
+  console.log("Browser check: an updated task keeps the student's code and offers the new version.");
 
   await cdp.evaluate(`location.href = ${JSON.stringify(MAIN_URL)}`);
   const original = await poll(async () => {

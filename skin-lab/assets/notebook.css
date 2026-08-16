@@ -79,6 +79,11 @@ main{max-width:1000px;margin:0 auto;padding:24px 20px 120px}
 .cell.active{border-color:var(--mint-line);background:var(--paper-raised)}
 .cell.done{border-color:var(--success-ink);background:color-mix(in srgb,var(--mint-soft) 60%,var(--paper-raised))}
 .cell.done .run-btn{opacity:1;border-color:var(--success-ink);color:var(--success-ink)}
+.cell.changed{border-color:var(--honey-line);background:var(--honey-soft)}
+.starter-btn{display:block;margin:0 6px 6px;font-size:12px;font-weight:800;cursor:pointer;
+  color:var(--honey-ink);background:var(--honey);border:2px solid var(--honey-line);
+  border-radius:var(--r-lon);padding:5px 10px}
+.starter-btn.armed{background:var(--honey-ink);color:var(--paper-raised);border-color:var(--honey-ink)}
 .gutter{padding:14px 8px 14px 0;display:flex;flex-direction:column;align-items:flex-end;gap:7px}
 .prompt{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--ink-muted);user-select:none;white-space:nowrap}
 .cell.running .prompt{color:var(--honey-ink)}
