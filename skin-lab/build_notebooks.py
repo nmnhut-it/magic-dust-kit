@@ -23,6 +23,9 @@ TASK_ORDER = (
     "detect_skin",
     "detect_pimples",
     "remove_pimples",
+    "average_skin_color",
+    "calm_redness",
+    "heal_spots",
 )
 
 
@@ -70,7 +73,7 @@ def read_task_blocks(file_name):
 # notebooks are built from the same constants so they always speak in one voice.
 TITLE = """# Skin Lab — How does code change a photograph?
 
-You will build an image-processing pipeline from five small functions. Start with a **7 × 7 pixel image**, where every
+You will build an image-processing pipeline from eight small functions, then wire them together yourself. Start with a **7 × 7 pixel image**, where every
 pixel is just three numbers. Then use **NumPy**, **SciPy**, and **Pillow** to run the same calculations across a full image.
 At the end, **MediaPipe Face Mesh** adds a face boundary so the program changes pixels only where it is allowed.
 
@@ -82,22 +85,26 @@ By the end of the lab, you will be able to:
 - turn a colour rule into a black-and-white mask;
 - use a 3 × 3 kernel to count or blend neighbouring pixels;
 - find a red spot by comparing it with its local area;
-- combine masks to smooth texture, soften red areas, and adjust brightness on one photograph.
+- average a selected region into one colour and blend red spots toward it;
+- combine masks to smooth texture, soften red areas, and adjust brightness on one photograph;
+- assemble those steps into a pipeline of your own and defend its order;
+- write the healer that clears a real photograph, and explain with numbers why it works where the simple rule failed.
 
 ### How you will know the pipeline works
 
 Every observation cell gives you **numbers, an image or overlay, and a short explanation**. The numbers show the calculation.
 The image shows which pixels were selected. The explanation connects those two pieces of evidence.
 
-### Five checkpoints — stop after any one of them
+### Six checkpoints — stop after any one of them
 
 1. **RGB:** I can point to one matrix position and read its R, G, and B values.
 2. **Masks:** I can explain why a rule writes `0` or `255` at that position.
 3. **Convolution:** I can trace a 3 × 3 window through multiply → add → divide → one output value.
 4. **Selective change:** I can explain why a mask changes some pixels and keeps others.
-5. **Portrait pipeline:** I can use a difference panel and pixel count to defend one setting.
+5. **Colour:** I can explain why averaging a red blotch keeps it red, and what replacing the colour does instead.
+6. **Portrait pipeline:** I can use a difference panel and pixel count to defend one setting of my own healer.
 
-The page saves after every edit. You are not expected to finish all five checkpoints in one sitting.
+The page saves after every edit. You are not expected to finish all six checkpoints in one sitting.
 
 This is a lesson about image-processing algorithms. It is **not a diagnostic tool and it does not rate anyone's skin**.
 Lighting, cameras, backgrounds, and different skin tones can all make a hand-written colour rule fail.
@@ -109,7 +116,7 @@ stored in `localStorage`. Use **Download notebook** if you want to move your wor
 SETUP = """## Start here
 
 Run the next two cells. The first loads the visual tools. The second loads NumPy, SciPy, Pillow, and the constants used by
-the five functions. Do not edit these two cells yet.
+the first five functions. Do not edit these two cells yet.
 
 You do not need a personal photo for most of the lab. A 7 × 7 image, a drawn face, and four public-licence photographs are
 already included. The camera is used only once, in the final optional test.
@@ -128,7 +135,8 @@ Two kinds of picture appear, on purpose:
 2. **Interactive panels** — click buttons and sliders, then answer the panel's new-case question. A correct answer unlocks
    the matching Python code.
 3. **Coding tasks** — code with `___` blanks. Replace every `___`, then press ▶. A task cell only teaches Python your
-   function — it prints nothing itself. The proof appears when you run the check cell below it.
+   function — it prints nothing itself. The proof appears when you run the check cell below it. Every one of the eight
+   is a working skeleton: the loops, the comments and the plumbing are already there, and the blanks are the ideas.
 4. **Check cells** — they run your function and print OK or FIX with a reason.
 
 For each coding task, read all four lines before editing:
@@ -159,6 +167,7 @@ Whenever a sentence stops making sense, come back to this table.
 |---|---|---|
 | pixel | one dot of the picture, stored as three numbers | `(225, 62, 66)` |
 | channel | one of the three number layers: R, G, or B | `pixels[:, :, 0]` is every red value |
+| `:` | "every" — it keeps a whole direction instead of picking one | `pixels[2, :, 0]` = every red value in row 2 |
 | mask | a map of decisions: `255` = selected, `0` = not selected | `skin_mask` |
 | threshold | the line a number must cross to count as a yes | `count >= 5` |
 | kernel | a small grid of instructions moved across the image | the 3 × 3 blur grid of nine `1`s |
@@ -207,6 +216,27 @@ The panel selected a pixel by row and column. NumPy starts counting both at **0*
 - `pixels[:, :, 0]` reads the red value at every row and column;
 - `pixels[:, :, 1]` reads every green value;
 - `pixels[:, :, 2]` reads every blue value.
+
+### What the `:` means
+
+Inside the brackets the order never changes: `[row, column, channel]`. A number in a slot picks **one**. A colon in a
+slot picks **all of them** — read `:` out loud as "every".
+
+| Written | Read it as | What you get back |
+|---|---|---|
+| `pixels[2, 2]` | row `2`, column `2`, every channel | one pixel: 3 numbers |
+| `pixels[2, 2, 0]` | row `2`, column `2`, channel `0` | one number: the red value `225` |
+| `pixels[2, :, 0]` | row `2`, **every** column, channel `0` | one row of red values: 5 numbers |
+| `pixels[:, :, 0]` | **every** row, **every** column, channel `0` | the whole red matrix: 25 numbers |
+
+That last line is why the lab almost never needs a loop. `pixels[:, :, 0] - 10` subtracts `10` from all 25 red values in
+one step, and `pixels[:, :, 0] - (pixels[:, :, 1] + pixels[:, :, 2]) / 2` calculates the redness of all 25 pixels at
+once. You write the calculation once and NumPy applies it everywhere.
+
+Two shapes to keep apart, because the error messages mention them:
+
+- `pixels[:, :, 0]` has shape `(5, 5)` — a flat number matrix, one value per position, exactly like a mask;
+- `pixels` has shape `(5, 5, 3)` — three of those matrices stacked, one per channel.
 
 For this example, `pixels.shape` is `(5, 5, 3)`: 5 rows, 5 columns, and 3 channels. The last `3` does **not** mean another
 row. It means every position stores three channel values. Separating the channels produces three ordinary 5 × 5 number
@@ -277,7 +307,7 @@ This is a deliberately simple RGB rule for learning the mechanism. It will not i
 of lighting. Later, public photographs will help you find its limits.
 """
 
-TASK_EVIDENCE = """### Coding task 1 of 5 — complete `skin_evidence`
+TASK_EVIDENCE = """### Coding task 1 of 10 — complete `skin_evidence`
 
 Mechanism 2 showed the rule on one pixel. Now write the same rule as code.
 
@@ -373,7 +403,7 @@ Do not copy a number from the table. Use the mechanism to predict four new outpu
 Fill the four blanks, then run the cell. A complete explanation must connect each number to what appears in the output map.
 """
 
-TASK_CONVOLVE = """### Coding task 2 of 5 — complete `convolve_layer`
+TASK_CONVOLVE = """### Coding task 2 of 10 — complete `convolve_layer`
 
 You just traced multiply → add → divide by hand. This function makes SciPy repeat it at every pixel.
 
@@ -387,7 +417,7 @@ You just traced multiply → add → divide by hand. This function makes SciPy r
   the nine window values add to `9`, and `9 / 9 = 1`. The original input must still contain its centre value `9`.
 """
 
-TASK_SKIN = """### Coding task 3 of 5 — complete `detect_skin`
+TASK_SKIN = """### Coding task 3 of 10 — complete `detect_skin`
 
 This function joins your first two: `skin_evidence` decides pixel by pixel, and `convolve_layer` counts the decisions.
 
@@ -439,7 +469,7 @@ Finally, `maximum_filter` expands one selected pixel into a 3 × 3 area. That le
 instead of changing only one isolated dot.
 """
 
-TASK_PIMPLE = """### Coding task 4 of 5 — complete `detect_pimples`
+TASK_PIMPLE = """### Coding task 4 of 10 — complete `detect_pimples`
 
 Mechanism 4 compared one pixel with its 5 × 5 area. This function runs that comparison everywhere.
 
@@ -483,7 +513,7 @@ The calculated colour is `(194, 111, 94)`. Then `np.where` makes a separate deci
 The program may calculate a smoothed version of the whole image, but the mask controls where that version is visible.
 """
 
-TASK_REMOVE = """### Coding task 5 of 5 — complete `remove_pimples`
+TASK_REMOVE = """### Coding task 5 of 10 — complete `remove_pimples`
 
 The last function ties everything together: calculate a smooth colour everywhere, then use it only where the mask says yes.
 
@@ -498,18 +528,125 @@ The last function ties everything together: calculate a smooth colour everywhere
   must stay unchanged, and the function must not edit the input image in place.
 """
 
-CHECK = """## Check all five functions
+COLOR_GAP = """## Blur cannot fix colour — so change the colour
 
-Run the grader. Each line names a function and explains any failing result. The final line must read:
+Run `preview_cleanup` again and look at the red spot. It is softer, and it is still red. That is not a mistake in your
+code; it is what averaging does. The kernel replaces a pixel with a mix of its neighbours, and when the neighbourhood is
+red, the mix stays red. A real blotch is many pixels wide, so most of its window is more blotch.
+
+To take the redness out, the program needs a colour that is **not** in the blotch. The surrounding skin already supplies
+one: average every pixel the skin mask selected and you get a single target colour.
 
 ```text
-Result: 5/5 parts correct.
+average_skin_color = (sum of R over the region, sum of G, sum of B) / number of selected pixels
+```
+
+Averaging thousands of skin pixels together with a few dozen spot pixels barely moves the result, which is exactly why
+the average is a fair description of "this person's skin colour in this light".
+
+Then mix each marked pixel toward that target. The mixing formula is the one the capstone already used for smoothing —
+only the second colour changes:
+
+```text
+mixed = original × (1 - strength) + target × strength
+```
+
+With the spot at `(225, 62, 66)`, the target at `(183, 127, 103)`, and `strength = 0.5`:
+
+```text
+new_red   = 225 × 0.5 + 183 × 0.5 = 204
+new_green =  62 × 0.5 + 127 × 0.5 = 94.5 → 94
+new_blue  =  66 × 0.5 + 103 × 0.5 = 84.5 → 84
+```
+
+Excess redness `R - (G + B) / 2` falls from `161.0` to `115.0`. Raise the strength to `1.00` and the spot becomes the
+target colour exactly — flat, obvious, and usually too much. That trade-off is yours to set in the next three cells.
+"""
+
+TASK_AVERAGE = """### Coding task 6 of 10 — complete `average_skin_color`
+
+No kernels here — this is the average you already know: add the numbers up, then divide by how many you added.
+The loop visits every pixel, `skin_mask[y][x]` says whether to count it, and `picture.getpixel((x, y))` reads its
+three numbers.
+
+- **Given:** the loop, the four running totals, and the empty-mask case, already written for you.
+- **INPUT:** one RGB image and the matching skin mask.
+- **PROCESS:** fill the three `___` blanks, top to bottom:
+  1. Inside `if skin_mask[y][x] != ___` — the value a selected pixel has: `MASK_ON`.
+  2. `total_green = ___` — add this pixel's green to the total, like the line above it.
+  3. Inside `round(___)` — the blue total divided by `counted`.
+- **OUTPUT:** a tuple of three whole numbers. On a plain skin patch it must stay close to `(183, 127, 103)`, and an
+  empty mask must return `(0, 0, 0)` rather than an error.
+"""
+
+TASK_CALM = """### Coding task 7 of 10 — complete `calm_redness`
+
+This is the function that does what smoothing cannot: it replaces the colour instead of averaging it.
+
+- **Given:** the whole skeleton — the `.copy()`, `keep = 1 - strength`, the loop, and the **red channel already
+  written**. Read that one line first; the other two channels have exactly the same shape.
+- **INPUT:** `img`, `spot_mask` (`0` or `255` per pixel), `skin_color` as `(r, g, b)`, and `strength` from `0.0` to `1.0`.
+- **PROCESS:** fill the three `___` blanks, top to bottom:
+  1. Inside `if spot_mask[y][x] != ___` — the value a marked pixel has: `MASK_ON`.
+  2. `round(green * keep + ___ * strength)` — the target green, the matching entry in `skin_color`.
+  3. `round(___ * keep + skin_color[2] * strength)` — the pixel's own blue, the number being moved.
+- **OUTPUT:** a new PIL image of the same size. The marked pixel must land on the mixed colour, a pixel outside the mask
+  must be identical to the input, and the input image must not change.
+
+The one line to understand is `old * keep + target * strength`. Because `keep` and `strength` add up to `1`, the answer
+always lands between the two colours — at `0.0` the pixel stays where it is, at `1.0` it arrives at the target. Working
+on `img.convert("RGB").copy()` is what keeps the original safe — the rule the NumPy filter cell taught with
+`pixels.copy()`.
+"""
+
+BUILD_PIPELINE = """## Build your own pipeline
+
+Everything so far ran in the order the lesson chose. This cell is yours: the stages are finished functions, and you
+decide how they are wired.
+
+- **Given:** `detect_skin`, `detect_pimples`, `average_skin_color`, `calm_redness`, and `remove_pimples`.
+- **INPUT:** the drawn face, so every change is countable.
+- **PROCESS:** fill the four `___` blanks so the function runs colour replacement first and smoothing second. Then
+  experiment — this cell is meant to be edited:
+  - change `calm_strength` between `0.0` and `1.0`;
+  - swap the two stages and see whether smoothing before recolouring gives a different result;
+  - delete the smoothing stage and judge whether the recoloured patch looks pasted on;
+  - pass `skin_mask` instead of `spot_mask` and explain the damage before you undo it.
+- **OUTPUT:** the changed-pixel count and the excess redness at the spot, before and after. Report the setting that gave
+  the lowest excess redness **without** an obviously flat patch, and say how the two numbers disagreed.
+
+Order matters because each stage reads the image the stage before it wrote. Recolour first and the smoothing blends your
+new colour into its neighbours; smooth first and you are averaging red into a slightly wider area before replacing it.
+"""
+
+CHECK_ALL = """### Check all ten, now that the last ones exist
+
+This is the same grader cell as before. Every function is written now, so the final line must read
+`Result: 10/10 parts correct.` — and every line that said `still to come` is gone.
+"""
+
+CHECK = """## Check the functions you have written so far
+
+Run the grader. Each line names a function and explains any failing result.
+
+Tasks 8, 9 and 10 are further down the page — the healer and the two smoothing functions are the last things you
+write. The grader marks them `still to come` and leaves them out of the score, so at this point in the lesson a full
+pass reads:
+
+```text
+Result: 7/7 parts correct.
+```
+
+The same grader cell appears once more after the last task. When every function is written, its final line must read:
+
+```text
+Result: 10/10 parts correct.
 ```
 
 The page saves your code, grader progress, and every interactive panel, so you can continue later on this computer.
 """
 
-DEMO = """## Connect the five functions into one visible pipeline
+DEMO = """## Connect the first five functions into one visible pipeline
 
 Run the next cell. The six labelled images follow the actual data path:
 
@@ -547,7 +684,7 @@ The starter function adds `40` to the blue channel and uses `np.clip` to keep ev
 Run it once. Then change the channel index or the added amount and state which visible change your new numbers caused.
 """
 
-PUBLIC_IMAGES = """## Test your five functions on real photographs
+PUBLIC_IMAGES = """## Test your functions on real photographs
 
 Four public images are bundled with the lesson, so the page does not hotlink personal data: a cheek with real acne from a
 dermatology teaching collection by [Dr. Gandikota Raghurama Rao](https://commons.wikimedia.org/wiki/File:0601_Acne_Vulgaris.jpg)
@@ -601,149 +738,317 @@ output    = np.where(allowed[..., None], cleaned, original)
 
 `allowed[..., None]` applies the same allowed/not-allowed decision to all three RGB values. Face Mesh supplies a location
 boundary. It does not diagnose skin and it does not find red spots by itself.
-"""
 
-PRO_PIPELINE = """## Capstone — build a visible, adjustable portrait pipeline
+### The rings you are about to use
 
-Your five functions are the foundation. The final program repeats ideas you already used:
+The 478 landmarks are not one shape but many closed rings, and the lab uses four of them. The browser builds each ring
+by joining its points in order and filling the inside:
 
-1. Face Mesh draws a face boundary. Pixels outside it are kept.
-2. Colour rules make a skin-region mask. They use RGB plus a second way of separating lightness from colour.
-3. An edge filter finds strong changes around eyes, lips, hair, and the face outline. Those details are protected —
-   but locally red skin does not count as protected detail, otherwise the pipeline would protect the very blotches
-   it should soften.
-4. The kernel you choose smooths the selected region. Locally red areas are additionally pulled toward the
-   surrounding skin colour with a stronger blend.
-5. A small brightness value is added only where both the face and skin masks allow it.
+| Ring | Landmarks joined | What it is for |
+|---|---|---|
+| `oval` | `10, 338, … 234, 127, … 109` (36 points) | the outside of the face — the only place you may edit |
+| `lips` | `61, 146, … 40, 185` (20 points) | must be **left alone** |
+| `leftEye`, `rightEye` | 16 points each | must be **left alone** |
 
-Under the hood, the second colour system is called Y/Cb/Cr, and the SciPy edge operation is called `sobel`. You do not need
-to memorise those names. You do need to trace the same pattern: **numbers → mask or filtered values → selected output**.
+That last column is the whole idea of the next task. The face oval **contains** the lips and the eyes, so "inside the
+face" is not the same as "safe to smooth". Blur someone's lips and eyelashes and they stop looking like a person —
+that plastic, wax-model look you have seen in edited photos is very often exactly this mistake.
 
-Follow two pixels through those five steps:
-
-- A pixel on the **cheek**: inside the face, passes the skin rules, far from any edge — its colour moves toward the kernel
-  result and gains a little brightness.
-- A pixel on the **edge of the lips**: inside the face, but the edge filter marks it as protected detail — it keeps its
-  original colour, which is why the mouth stays sharp.
-
-### How far does a kernel reach?
-
-One pass of a 3 × 3 kernel mixes each pixel only with neighbours **one step away**. A 5 × 5 kernel reaches two steps, and
-a 9 × 9 kernel reaches four. Run any of them `n` times and information travels about `n` × that reach. A red blotch on a
-real photograph can be ten steps wide, so:
-
-- more `skin_kernel_passes`, or a wider kernel (`wide` 5 × 5, `widest` 9 × 9), increase how far the smoothing reaches;
-- reach costs arithmetic: a 9 × 9 window averages 81 pixels for every output value instead of 9, so the same cell does
-  about nine times the multiplying and adding a 3 × 3 does;
-- reach is not the whole story. With `skin_smooth_strength` at `0.55` and detail protection switched on, the measured
-  difference between 5 × 5 and 9 × 9 on one 320 × 240 photograph is small. Raise the strength and the pass count if you
-  want that difference to become obvious, and judge it by the changed-pixel count rather than by first impression;
-- reach alone still cannot fix colour — averaging inside a red blotch only produces more red. That is why the red
-  region is also pulled toward the surrounding skin colour, not merely blurred.
-
-For one channel, suppose the original value is `200`, the kernel result is `188`, and `skin_smooth_strength = 0.55`:
+So the region you actually want is three decisions combined:
 
 ```text
-mixed = 200 × (1 - 0.55) + 188 × 0.55
-      = 200 × 0.45 + 188 × 0.55
-      = 193.4 → 193
-bright = 193 + 10 = 203
+smoothable = skin_mask & face_mask & ~feature_mask
 ```
 
-The kernel decides the candidate smooth colour. `skin_smooth_strength` decides how much of that colour to use.
-`skin_brightness` adds a controlled offset after blending.
-
-### Capstone task — choose and defend your settings
-
-- **Given:** five kernels — `gentle`, `balanced`, `strong` (3 × 3), `wide` (5 × 5) and `widest` (9 × 9) — and safe ranges
-  for all settings.
-- **INPUT:** the next cell uses the bundled acne photograph, where the effect is easy to see; the final cell accepts one
-  captured or uploaded photograph.
-- **PROCESS:** change `kernel_choice`, then test one or more strengths, brightness, pass count, or the weights inside the
-  chosen kernel.
-- **OUTPUT:** the report must name the kernel, weight total, strengths, and changed-pixel count. The five-panel figure must
-  show input, skin region, red region, magnified difference, and final output.
-
-Change one setting at a time. Use the difference panel and changed-pixel count—not just “it looks better”—to explain the
-effect of your change.
+`~` means NOT. You have already used `&` in `skin_evidence` and `detect_skin`; this is the same mask algebra, and it is
+the entire content of task 9.
 """
 
-PIPELINE_SETTINGS_CODE = """# Choose "gentle", "balanced", "strong", "wide", or "widest".
-# "wide" reaches two steps per pass, so its smoothing is clearly visible.
-# "widest" reaches four steps and averages 81 pixels per output value.
-kernel_choice = "wide"
+SMOOTH_GAP = """## The redness is gone. The skin is still rough.
 
-# You may also edit the weights of any kernel.
-kernel_options = {
-    "gentle": (
-        (1, 2, 1),
-        (2, 4, 2),
-        (1, 2, 1),
-    ),
-    "balanced": (
-        (1, 1, 1),
-        (1, 1, 1),
-        (1, 1, 1),
-    ),
-    "strong": (
-        (1, 1, 1),
-        (1, 0, 1),
-        (1, 1, 1),
-    ),
-    "wide": (
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-    ),
-    "widest": (
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-    ),
-}
+Look at your healed photograph again, and be honest about it. The angry red is gone — your numbers proved that. But the
+skin is not *smooth*. Every bump, pore and patch of uneven texture is exactly where it was.
 
-SOFTEN_KERNEL = kernel_options[kernel_choice]
-skin_smooth_strength = 0.55   # 0.00 keeps the input; 1.00 uses the full smooth colour
-spot_smooth_strength = 0.90   # red areas receive a stronger blend
-skin_brightness = 5           # add -25 to 25 inside the selected skin region
-skin_kernel_passes = 2        # run the kernel 1 to 4 times
-redness_sensitivity = 1.6     # lower selects more red areas; higher selects fewer
+That is not a bug in your code. `heal_spots` only ever changes **colour**: it slides a pixel toward the skin colour
+around it. A bump that is the same colour as its neighbours is invisible to it, no matter how many passes you run.
 
-magic_mirror.describe_skin_pipeline_settings()
+```text
+heal_spots  -> changes WHAT COLOUR a pixel is   -> removes redness
+smooth_skin -> changes HOW MUCH pixels DIFFER   -> removes roughness
+```
+
+Roughness is a different measurement. Take any two pixels side by side and subtract them: on smooth skin that
+difference is small everywhere, and on rough skin it is large. Averaging neighbours is precisely the tool that makes
+neighbouring pixels more alike — which is why the thing that could not remove redness is the perfect thing for this.
+
+You wrote that tool in task 2 and it has been waiting ever since. `convolve_layer` with the 1-2-1 kernel is the whole
+engine of the last task; all that is left is deciding **where** it is allowed to run, and how much of it to use.
 """
 
-PHOTO = """## Run the pipeline once on a photograph
+TASK_AREA = """### Coding task 9 of 10 — complete `choose_smooth_area`
 
-- **Given:** your five functions, your current capstone settings, and MediaPipe's face-boundary landmark list.
+Three masks in, one mask out. No loops, no kernels — this is mask algebra, and it is four lines long.
+
+- **Given:** the three masks already converted to `True`/`False` above the blanks, including the sensible fallbacks for
+  when Face Mesh finds no face (`face_mask` missing means the whole picture is allowed; `feature_mask` missing means
+  nothing needs protecting). Those two lines matter, because the bundled photograph has no Face Mesh landmarks at all.
+- **INPUT:** `skin_mask` from your `detect_skin`, and `face_mask` + `feature_mask` from Face Mesh.
+- **PROCESS:** fill the three `___` blanks in `allowed = ___ & ___ & ___`:
+  1. `is_skin` — it has to be skin.
+  2. `inside_face` — and inside the face oval.
+  3. `~is_feature` — and **not** a lip or an eye. Note the `~`.
+- **OUTPUT:** one `0`/`255` mask. Ordinary cheek must be `255`; a lip, an eye, or anything outside the face must be `0`.
+
+If you forget the `~`, you will smooth **only** the lips and eyes — the exact opposite of what you want. Run the check
+cell and read which of the four rules failed.
+"""
+
+TASK_SMOOTH = """### Coding task 10 of 10 — complete `smooth_skin`
+
+The last function in the lab, and it reuses the first tool you built.
+
+- **Given:** the loop over the three colour channels, the `SOFTEN_KERNEL`, and the clipping back into `0..255`.
+- **INPUT:** `img`, the `area_mask` you just built, and `strength` from `0.0` to `1.0`.
+- **PROCESS:** fill the three `___` blanks, top to bottom:
+  1. `convolve_layer(___, weights, weights.sum())` — the layer to blur. **Your own task-2 function**, finally running
+     on a real photograph. The divisor is `weights.sum()` because the nine weights add up to 16.
+  2. `mixed = ___` — the calm_redness mix once more: `original * (1 - strength) + blurred * strength`.
+  3. `np.where(___, mixed, original)` — keep the mixed value only where the area mask allows it.
+- **OUTPUT:** a new PIL image. Inside the area the skin must be visibly softer; outside it every pixel must be
+  **identical** to the input.
+
+`strength` is why this stops short of a beauty filter. At `1.0` you get the full blur and skin starts to look like
+plastic; the lab defaults to `0.7`, which is smoother than the original while pores and texture still read as skin.
+Try both and decide which one you would actually publish.
+"""
+
+SMOOTH_RUN = """## Write the whole program yourself
+
+Ten functions ago you were filling in one number at a time. This cell has **no blanks**: it gives you a plan in
+comments and you write the program under it. That is the real skill — not any single line, but holding four of your own
+functions in your head at once and wiring them into something that works.
+
+```text
+detect_skin  ->  heal_spots  ->  choose_smooth_area  ->  smooth_skin
+   where          colour             where again           texture
+```
+
+- **Given:** `roughness`, because a new measurement is not the lesson here, and the two settings you already defended.
+- **PROCESS:** write two functions and a loop.
+  1. `polish(picture, passes, strength)` — the four stages above, in order, returning the finished image.
+  2. `report(label, before, after)` — one printed line: redness before → after, roughness before → after.
+  3. Run `polish` once for each value in `STRENGTHS`, report each, and show the one you would publish.
+- **OUTPUT:** three reported lines, and before/after/difference panels for your chosen version.
+
+If you get stuck, every piece exists somewhere above: the healing loop is in the last run cell, and each stage is a
+function you wrote and the grader already checked. Nothing here is new code — it is *your* code, assembled.
+
+Then judge it with your eyes as well as the numbers, because they disagree on purpose. `1.0` always wins on roughness
+and always looks the most fake. Look at the nose and the jawline at each strength before you choose.
+
+**Say this plainly in your write-up.** Smoothing removes evidence. Real skin has pores and texture, and a picture with
+those averaged away is not a more accurate picture of a person — it is a less accurate one. You built a filter, not a
+cure, and the honest version of this tool is the one that stops early.
+"""
+
+HEAL_GAP = """## Why the photograph still has spots — and what is missing
+
+Your pipeline works, and the acne cheek is still covered in red marks. Three things are holding it back, and each one has
+a fix you can write.
+
+**1. The comparison area is far too small.** `detect_pimples` asks "is this pixel redder than its 5 × 5 neighbours?" A
+real blotch is ten or more pixels across, so the 5 × 5 window sits *inside* it: the neighbours are just as red, the
+difference is near zero, and only the thin rim of the blotch is ever selected.
+
+```text
+5 × 5 window inside a wide blotch:  centre 96 red, neighbours 94 red  -> difference 2   -> not selected
+25 × 25 window on the same pixel:   centre 96 red, neighbours 68 red  -> difference 28  -> selected
+```
+
+The fix is one number: make the comparison area **wider than the thing you want to find**.
+
+**2. A mask says only yes or no.** Every pixel is either fully changed or untouched, so the treated area ends at a hard
+line you can see. Real work uses an *amount*: how strongly this pixel is a spot, from `0.0` to `1.0`.
+
+```text
+share = excess / span, cut into 0.0 .. 1.0
+excess  4 with span 12 -> share 0.33   (barely red, barely changed)
+excess 12 with span 12 -> share 1.00   (clearly a spot, fully replaced)
+```
+
+**3. A spot is not only redder, it is also brighter or darker.** Replacing the colour alone leaves the bump's shading
+behind, so you still see it. Take the brightness from the *surrounding* skin instead of from the spot, and the bump
+flattens with its colour — while the cheek keeps its own light and shadow, because that brightness is measured locally,
+not set to one flat value.
+
+```text
+target = average skin colour × (brightness of the surrounding skin / brightness of the average skin colour)
+```
+
+Put together, that is one function — the one that finally clears the photograph.
+"""
+
+TASK_HEAL = """### Coding task 8 of 10 — complete `heal_spots`
+
+This is the capstone, and it is code, not settings. It is also the shortest thing you will write all lesson: the loop is
+the one from task 7, and the five blanks are exactly the three ideas above, one piece at a time.
+
+- **Given:** the whole skeleton, plus `wide_redness` and `wide_brightness` from `ndimage.uniform_filter` (the tool
+  `detect_pimples` already used, only wider), `skin_mask` and `skin_color` from your own two functions, and the
+  `min`/`max`/`round` clamping already written.
+- **INPUT:** `img`, `radius` (how wide the comparison area is) and `span` (how much extra redness counts as a whole spot).
+- **PROCESS:** fill the five `___` blanks, top to bottom:
+  1. `excess = redness[y][x] - ___` — the **wide** average, not the pixel itself. This is idea 1, and getting it wrong
+     is what leaves the middle of a blotch untouched.
+  2. `share = min(1.0, max(0.0, ___ / span))` — the extra redness you just measured. Idea 2.
+  3. `scale = ___ / skin_brightness` — the brightness of the surrounding skin. Idea 3.
+  4. `target = skin_color[channel] * ___` — what turns the average colour into the locally-lit target.
+  5. `... + target * ___` — how far this pixel moves: the soft amount, not a yes/no.
+- **OUTPUT:** a new PIL image. In the grader's test picture the middle of the wide blotch must lose at least `20` of its
+  excess redness while plain skin in the corner stays exactly as it was.
+
+Nothing here is new. The blend in blanks 4 and 5 is `calm_redness` with `share` in place of `strength`, and the loop is
+the one from `average_skin_color`.
+"""
+
+HEAL_RUN = """## Run your own healer, and prove it worked
+
+No `magic_mirror` pipeline runs in the next cell. It is your `heal_spots`, your loop, your measurement — the only helper
+is the one that draws the pictures.
+
+- **Given:** the bundled acne photograph at 160 × 120, small enough that one pass of your Python loop stays under a
+  second.
+- **PROCESS:** fill the blanks, run it, then **run your healer again on its own output**. Each pass measures the new
+  image, so the second pass finds the spots that were only partly reduced by the first.
+- **OUTPUT:** your printed redness number after every pass, plus before/after/difference panels.
+
+Things worth trying, one change at a time, with the number as your evidence:
+
+- `radius` `7` (too small — the blotch hides inside its own window again), `13`, `25`;
+- `span` `6` (almost everything counts as a spot), `12`, `24` (only the angriest marks);
+- `passes` `1`, `2`, `3`. Watch the number stop improving — that is the point where more passes only cost time.
+
+**What this cannot do, and you should say so in your write-up:** the brown marks left behind by old spots are not
+red, so a redness rule cannot see them at all. Nothing here judges skin or diagnoses anything; it moves numbers that
+happen to be colours.
+"""
+
+HEAL_RUN_Q = """photo = magic_mirror.heal_photo()      # the bundled acne cheek, 160 x 120
+
+radius = ___     # width of the comparison area: wider than the blotch you want to find
+span = ___       # excess redness that counts as a full spot
+passes = ___     # run the healer this many times, each pass on the result of the last
+
+
+def average_redness(image):
+    \"\"\"One number for the whole picture: the average of R - (G + B) / 2.\"\"\"
+    pixels = np.asarray(image, dtype=np.float32)
+    redness = pixels[:, :, 0] - (pixels[:, :, 1] + pixels[:, :, 2]) / 2
+    return round(float(redness.mean()), 1)
+
+
+picture = photo
+print("before:", average_redness(picture))
+for step in range(passes):
+    picture = heal_spots(picture, radius, span)
+    print("after pass", step + 1, ":", average_redness(picture))
+
+magic_mirror.show_before_after(photo, picture)
+"""
+HEAL_RUN_A = HEAL_RUN_Q.replace(
+    "radius = ___ ", "radius = 13"
+).replace(
+    "span = ___ ", "span = 12"
+).replace(
+    "passes = ___ ", "passes = 2"
+)
+
+SMOOTH_RUN_Q = '''photo = magic_mirror.heal_photo()      # the same acne cheek, 160 x 120
+
+HEAL_RADIUS, HEAL_SPAN = 13, 12        # the settings you defended two cells ago
+STRENGTHS = (0.4, 0.7, 1.0)            # the three versions you are going to compare
+
+
+def roughness(image):
+    """GIVEN. One number for texture: the average brightness step between side-by-side pixels."""
+    grey = np.asarray(image.convert("L"), dtype=np.float32)
+    return round(float(np.abs(np.diff(grey, axis=1)).mean()), 2)
+
+
+# ============================================================================
+# YOUR PROGRAM. No ___ blanks here - this is the whole thing, and you write it.
+# You have every part already; what is new is putting them together yourself.
+#
+# 1. def polish(picture, passes, strength):
+#       a. heal `passes` times, each pass on the result of the last, with
+#          heal_spots(picture, HEAL_RADIUS, HEAL_SPAN)   <- the loop from the last cell
+#       b. skin = detect_skin(picture)                   <- your task 3
+#       c. area = choose_smooth_area(skin, None, None)   <- your task 9; None because
+#          the bundled photo has no Face Mesh landmarks. Your captured photo does.
+#       d. return smooth_skin(healed, area, strength)    <- your task 10
+#
+# 2. def report(label, before, after):
+#       print the label, then redness before -> after, then roughness before -> after.
+#       Use average_redness from the last cell and roughness from above.
+#
+# 3. Run polish on `photo` once for every value in STRENGTHS, report each one,
+#    and keep the images so you can look at them.
+#
+# 4. Decide which strength you would actually publish, and write one comment
+#    line saying why. The numbers alone will not answer it - 1.0 always wins on
+#    roughness and always looks the most fake.
+#
+# 5. magic_mirror.show_before_after(photo, the_one_you_chose)
+# ============================================================================
+
+'''
+
+SMOOTH_RUN_A = SMOOTH_RUN_Q + '''
+def polish(picture, passes, strength):
+    """The whole chain, in the order the lesson built it."""
+    healed = picture
+    for _ in range(passes):
+        healed = heal_spots(healed, HEAL_RADIUS, HEAL_SPAN)
+    skin = detect_skin(picture)
+    area = choose_smooth_area(skin, None, None)
+    return smooth_skin(healed, area, strength)
+
+
+def report(label, before, after):
+    """Print both measurements for one version."""
+    print(label,
+          "| redness", average_redness(before), "->", average_redness(after),
+          "| roughness", roughness(before), "->", roughness(after))
+
+
+versions = {}
+for strength in STRENGTHS:
+    versions[strength] = polish(photo, 2, strength)
+    report("strength %.1f" % strength, photo, versions[strength])
+
+# 0.4 still shows texture, 1.0 is plainly plastic around the nose and jaw.
+# 0.7 is the one that still reads as skin, so that is the one worth publishing.
+magic_mirror.show_before_after(photo, versions[0.7])
+'''
+
+PHOTO = """## Run your healer on one photograph of your own
+
+- **Given:** your eight functions and the settings you defended above. MediaPipe supplies a face-boundary landmark list
+  so nothing outside the face is touched.
 - **INPUT:** exactly one captured photograph. If the camera is unavailable, select a JPG, PNG, or WebP file from this device.
 - **PROCESS:** run the cell, frame one face, and press **Capture one photo**. The camera stops immediately. Face Mesh runs
-  once; NumPy and SciPy then run the pipeline once on that still image.
-- **OUTPUT:** five panels show the input, allowed skin region, stronger red region, magnified colour difference, and final
-  result. The report states how many pixels were selected, protected, and changed, plus your kernel and settings.
-- **Hands-on comparison:** two button rows appear under the result, and every press re-runs the whole pipeline on the
+  once, and then **your own `heal_spots`** runs on that still image — the same function the grader checked, not a library
+  version of it.
+- **OUTPUT:** four panels show the skin region your `detect_skin` selected, the pixels your healer changed, the magnified
+  colour difference, and the result. The report states how many pixels changed and the average redness before and after.
+- **Hands-on comparison:** two button rows appear under the result, and every press re-runs **your** function on the
   **same** photograph, so exactly one thing changes each time.
-  - *Kernel* — `gentle 3×3`, `balanced 3×3`, `strong 3×3`, `wide 5×5`, `widest 9×9`: which neighbours are averaged, and
-    how far the average reaches.
-  - *Smoothing strength* — `25%`, `55%`, `85%`, `100%`: how much of that calculated colour actually replaces the
-    original. This writes `skin_smooth_strength` for you; `0%` would keep the input untouched and `100%` uses the whole
-    smooth colour.
+  - *Comparison width* — `7`, `13`, `25`: how wide an area each pixel is compared against. Too small and a wide blotch
+    hides inside its own window; too wide and ordinary shading starts to count as a spot.
+  - *Passes* — `1`, `2`, `3`: how many times your healer runs on its own output.
 
-  Those two rows are the same split as `output = original × (1 - strength) + kernel_result × strength`: the kernel
-  decides the candidate colour, the strength decides how much of it is used. Write down the changed-pixel count for each
-  press. Does `widest 9×9` change that number as much as its 81 weights suggest it should — and does raising the
-  strength to `100%` make the difference between kernels easier or harder to see?
-- **The other settings** — the kernel weights themselves, `spot_smooth_strength`, `skin_brightness`,
-  `skin_kernel_passes`, and `redness_sensitivity` — stay in the settings cell above. Edit a number there, run that cell,
-  then press any button in these rows to re-run the same photograph with your new value. Running the settings cell also
-  puts the kernel and the strength back to the values written in it, so press the buttons again afterwards.
+  Write down the changed-pixel count and the two redness numbers for each press. Which press moved the redness most, and
+  did a third pass earn its extra second of work?
 
 The image stays only in this cell's visible output. It is not written to `localStorage`, and it disappears after a reload.
 Your code and progress remain. Processing uses 320 × 240 pixels and displays at 480 × 360 for a clear still-image result.
@@ -814,6 +1119,40 @@ CONVOLUTION_TRANSFER_A = CONVOLUTION_TRANSFER_Q.replace(
     "large_patch_count = ___", "large_patch_count = 9"
 ).replace(
     "blurred_rgb = (___, ___, ___)", "blurred_rgb = (188, 120, 99)"
+)
+
+BUILD_PIPELINE_Q = """# Your pipeline. Every stage is a function you wrote. Fill the four blanks,
+# run the cell, then change the order or the strength and run it again.
+calm_strength = ___          # 0.00 keeps the spot colour, 1.00 uses the target colour
+
+def my_pipeline(image):
+    # Step 1 - decide WHERE. Two masks: which pixels are skin, and which of
+    # those are a locally red spot. Neither one changes a colour yet.
+    picture = image.convert("RGB")
+    skin_mask = detect_skin(picture)
+    spot_mask = detect_pimples(picture, skin_mask)
+
+    # Step 2 - decide WHAT COLOUR to use. The whole skin region averages to one
+    # colour, and that colour is not red, because the spots are outnumbered.
+    target_color = average_skin_color(picture, skin_mask)
+
+    # Step 3 - act, one stage at a time. Each stage reads the image the stage
+    # before it wrote, which is why the order below changes the result.
+    # Stage 1 - replace the colour of the marked spots.
+    picture = calm_redness(___, spot_mask, ___, calm_strength)
+    # Stage 2 - soften what is left, so the new patch does not look pasted on.
+    picture = ___(picture)
+    return picture
+
+magic_mirror.preview_my_pipeline()
+"""
+BUILD_PIPELINE_A = BUILD_PIPELINE_Q.replace(
+    "calm_strength = ___ ", "calm_strength = 0.75"
+).replace(
+    "calm_redness(___, spot_mask, ___, calm_strength)",
+    "calm_redness(picture, spot_mask, target_color, calm_strength)"
+).replace(
+    "picture = ___(picture)", "picture = remove_pimples(picture)"
 )
 
 NUMPY_CREATE_CODE = """def my_numpy_filter(pixels):
@@ -890,10 +1229,23 @@ def build_skin_cells(solution):
         code_cell("task-remove-pimples", blocks["remove_pimples"],
                   ("autoload", "task:remove_pimples")),
         code_cell("skin-preview-cleanup", "magic_mirror.preview_cleanup()"),
+        markdown_cell("skin-color-gap", COLOR_GAP),
+        markdown_cell("skin-task-average-note", TASK_AVERAGE),
+        code_cell("task-average-skin-color", blocks["average_skin_color"],
+                  ("autoload", "task:average_skin_color")),
+        code_cell("skin-preview-average", "magic_mirror.preview_average_skin_color()"),
+        markdown_cell("skin-task-calm-note", TASK_CALM),
+        code_cell("task-calm-redness", blocks["calm_redness"],
+                  ("autoload", "task:calm_redness")),
+        code_cell("skin-preview-calm", "magic_mirror.preview_calm_redness()"),
         markdown_cell("skin-check-note", CHECK),
         code_cell("skin-check", "magic_mirror.check_skin_code()"),
         markdown_cell("skin-demo-note", DEMO),
         code_cell("skin-demo", "magic_mirror.skin_demo()"),
+        markdown_cell("skin-build-pipeline-note", BUILD_PIPELINE),
+        code_cell("skin-build-pipeline",
+                  BUILD_PIPELINE_A if solution else BUILD_PIPELINE_Q,
+                  ("autoload", "student-work")),
         markdown_cell("numpy-filters-note", NUMPY_FILTERS),
         code_cell("numpy-filter-gallery", "magic_mirror.numpy_filter_gallery()"),
         code_cell("numpy-kernel-gallery", "magic_mirror.numpy_kernel_gallery()"),
@@ -902,15 +1254,30 @@ def build_skin_cells(solution):
         markdown_cell("skin-public-images-note", PUBLIC_IMAGES),
         code_cell("skin-public-gallery", "magic_mirror.show_public_photo_gallery()"),
         code_cell("skin-public-test", "magic_mirror.try_public_photo(0)"),
+        markdown_cell("skin-heal-gap", HEAL_GAP),
+        markdown_cell("skin-task-heal-note", TASK_HEAL),
+        code_cell("task-heal-spots", blocks["heal_spots"], ("autoload", "task:heal_spots")),
+        markdown_cell("skin-heal-run-note", HEAL_RUN),
+        code_cell("skin-heal-run", HEAL_RUN_A if solution else HEAL_RUN_Q,
+                  ("autoload", "student-work")),
         markdown_cell("skin-face-gate-note", FACE_GATE),
         code_cell("skin-mechanism-face", 'magic_mirror.show_mechanism("face_gate")',
                   ("concept:face_gate",)),
         markdown_cell("skin-face-mesh-note", FACE_MESH),
         code_cell("skin-face-mesh-map", "magic_mirror.show_face_mesh_map()"),
         code_cell("skin-face-mask-pipeline", "magic_mirror.show_face_mask_pipeline()"),
-        markdown_cell("skin-pro-pipeline-note", PRO_PIPELINE),
-        code_cell("skin-pipeline-settings", PIPELINE_SETTINGS_CODE, ("autoload", "student-work")),
-        code_cell("skin-pro-pipeline-preview", "magic_mirror.preview_pro_skin_pipeline()"),
+        markdown_cell("skin-smooth-gap", SMOOTH_GAP),
+        markdown_cell("skin-task-area-note", TASK_AREA),
+        code_cell("task-choose-smooth-area", blocks["choose_smooth_area"],
+                  ("autoload", "task:choose_smooth_area")),
+        markdown_cell("skin-task-smooth-note", TASK_SMOOTH),
+        code_cell("task-smooth-skin", blocks["smooth_skin"],
+                  ("autoload", "task:smooth_skin")),
+        markdown_cell("skin-smooth-run-note", SMOOTH_RUN),
+        code_cell("skin-smooth-run", SMOOTH_RUN_A if solution else SMOOTH_RUN_Q,
+                  ("autoload", "student-work")),
+        markdown_cell("skin-check-all-note", CHECK_ALL),
+        code_cell("skin-check-all", "magic_mirror.check_skin_code()"),
         markdown_cell("skin-photo-note", PHOTO),
         code_cell("skin-photo", "magic_mirror.capture_skin_photo()"),
         markdown_cell("skin-reflect", REFLECT),

@@ -83,6 +83,47 @@ const PAGE = Object.assign(
 const SIMPLE = PAGE.mode.startsWith("simple");   // bản đơn giản: giữ tay để lật + bụi phép
 const SKIN = PAGE.mode.startsWith("skin");       // route riêng: tích chập + bộ lọc da, không training
 
+// Các vòng landmark của MediaPipe Face Mesh (refineLandmarks: true, 478 điểm).
+// `oval` là đường viền khuôn mặt — vùng ĐƯỢC phép sửa.
+// `lips` + hai mắt là các vùng PHẢI chừa ra: làm mịn ở đó thì mất nét mặt.
+const FACE_RINGS = {
+  oval: [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,
+    152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109],
+  lips: [61,146,91,181,84,17,314,405,321,375,291,409,270,269,267,0,37,39,40,185],
+  leftEye: [33,7,163,144,145,153,154,155,133,173,157,158,159,160,161,246],
+  rightEye: [362,382,381,380,374,373,390,249,263,466,388,387,386,385,384,398],
+};
+const FEATURE_RINGS = ["lips", "leftEye", "rightEye"];
+
+/** Tô một hay nhiều vòng landmark thành mặt nạ 0/255.
+ *  landmarks: mảng điểm của Face Mesh; rings: tên vòng trong FACE_RINGS;
+ *  mapPoint(landmark) -> {x, y} theo pixel (camera lật ngang, ảnh chụp thì không).
+ *  Trả về Uint8Array dài width*height, hoặc null nếu không vẽ được vòng nào. */
+function ringMaskBytes(landmarks, rings, width, height, mapPoint, canvas) {
+  const target = canvas || document.createElement("canvas");
+  target.width = width; target.height = height;
+  const ctx = target.getContext("2d", { willReadFrequently: true });
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#fff";
+  let drew = false;
+  for (const ring of rings) {
+    const points = FACE_RINGS[ring].map((index) => landmarks[index]).filter(Boolean);
+    if (points.length < 3) continue;
+    ctx.beginPath();
+    points.forEach((landmark, index) => {
+      const { x, y } = mapPoint(landmark);
+      if (index) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+    });
+    ctx.closePath(); ctx.fill();
+    drew = true;
+  }
+  if (!drew) return null;
+  const rgba = ctx.getImageData(0, 0, width, height).data;
+  const mask = new Uint8Array(width * height);
+  for (let index = 0; index < mask.length; index++) mask[index] = rgba[index * 4 + 3];
+  return mask;
+}
+
 /* --------------------------------- markdown --------------------------------- */
 const MD = {
   esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); },
@@ -568,30 +609,18 @@ const Cam = {
   },
 
   faceOval() {
-    const order = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,
-      152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
-    return order.map((index) => Cam.faceLandmarks[index]).filter(Boolean);
+    return FACE_RINGS.oval.map((index) => Cam.faceLandmarks[index]).filter(Boolean);
+  },
+
+  /** Ảnh camera lật ngang như soi gương, nên x phải đổi thành 1 - x. */
+  mapPoint(width, height) {
+    return (landmark) => ({ x: (1 - landmark.x) * width, y: landmark.y * height });
   },
 
   faceMaskBytes(width, height) {
     const canvas = Cam.maskCanvas || (Cam.maskCanvas = document.createElement("canvas"));
-    canvas.width = width; canvas.height = height;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const oval = Cam.faceOval();
-    if (oval.length) {
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      oval.forEach((landmark, index) => {
-        const x = (1 - landmark.x) * width;
-        const y = landmark.y * height;
-        if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.closePath(); ctx.fill();
-    }
-    const rgba = ctx.getImageData(0, 0, width, height).data;
-    const mask = new Uint8Array(width * height);
-    for (let index = 0; index < mask.length; index++) mask[index] = rgba[index * 4 + 3];
-    return mask;
+    return ringMaskBytes(Cam.faceLandmarks, ["oval"], width, height,
+      Cam.mapPoint(width, height), canvas);
   },
 
   drawFaceMesh() {
@@ -981,16 +1010,15 @@ const Snapshot = {
     message.className = "snapshot-message";
     message.textContent = "Requesting camera access…";
 
-    // Hai hàng nút dưới tấm ảnh đã chụp: chạy lại pipeline trên ĐÚNG ảnh đó,
-    // không mở lại camera — để học sinh đổi MỘT thứ mỗi lần, hoặc lưới kernel
-    // (bao xa) hoặc độ mạnh pha trộn (dùng bao nhiêu màu vừa tính).
-    const kernels = Snapshot.rerunRow("snapshot-kernels", "Try another kernel on the same photo:",
-      [["gentle", "gentle 3×3"], ["balanced", "balanced 3×3"], ["strong", "strong 3×3"],
-        ["wide", "wide 5×5"], ["widest", "widest 9×9"]],
-      "_set_snapshot_kernel", "The kernel could not be changed: ");
-    const strengths = Snapshot.rerunRow("snapshot-strengths", "Change the smoothing strength on the same photo:",
-      [[25, "25%"], [55, "55%"], [85, "85%"], [100, "100%"]],
-      "_set_snapshot_strength", "The strength could not be changed: ");
+    // Hai hàng nút dưới tấm ảnh đã chụp: chạy lại CHÍNH hàm heal_spots của học
+    // sinh trên ĐÚNG tấm ảnh đó, không mở lại camera — để đổi MỘT thứ mỗi lần,
+    // hoặc bề rộng vùng so sánh, hoặc số lần chạy lại trên kết quả của chính nó.
+    const kernels = Snapshot.rerunRow("snapshot-kernels", "Try another comparison width on the same photo:",
+      [[7, "width 7"], [13, "width 13"], [25, "width 25"]],
+      "_set_snapshot_radius", "The comparison width could not be changed: ");
+    const strengths = Snapshot.rerunRow("snapshot-strengths", "Run your healer more times on the same photo:",
+      [[1, "1 pass"], [2, "2 passes"], [3, "3 passes"]],
+      "_set_snapshot_passes", "The number of passes could not be changed: ");
 
     const results = document.createElement("div");
     results.className = "snapshot-results hidden";
@@ -1003,10 +1031,10 @@ const Snapshot = {
       return canvas;
     };
     const inputCanvas = makeResult("1 · INPUT with Face Mesh outline");
-    const skinCanvas = makeResult("2 · Skin region allowed for smoothing");
-    const spotCanvas = makeResult("3 · Red region with stronger smoothing");
-    const differenceCanvas = makeResult("4 · Changed colours, magnified ×6");
-    const outputCanvas = makeResult("5 · OUTPUT: red correction, smoothing, and brightness");
+    const skinCanvas = makeResult("2 · Skin region your detect_skin selected");
+    const spotCanvas = makeResult("3 · Pixels your heal_spots changed");
+    const differenceCanvas = makeResult("4 · Changed colours, magnified ×4");
+    const outputCanvas = makeResult("5 · OUTPUT of your own heal_spots");
 
     wrap.append(intro, live, bar, message, kernels, strengths, results);
     host.appendChild(wrap);
@@ -1142,28 +1170,23 @@ const Snapshot = {
   },
 
   faceOval(landmarks) {
-    const order = [10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,
-      152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109];
-    return order.map((index) => landmarks[index]).filter(Boolean);
+    return FACE_RINGS.oval.map((index) => landmarks[index]).filter(Boolean);
+  },
+
+  /** Ảnh đã chụp không lật, nên x giữ nguyên. */
+  mapPoint(width, height) {
+    return (landmark) => ({ x: landmark.x * width, y: landmark.y * height });
   },
 
   faceMaskBytes(landmarks, width, height) {
-    const canvas = document.createElement("canvas");
-    canvas.width = width; canvas.height = height;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    const oval = Snapshot.faceOval(landmarks);
-    if (oval.length) {
-      ctx.fillStyle = "#fff"; ctx.beginPath();
-      oval.forEach((point, index) => {
-        const x = point.x * width, y = point.y * height;
-        if (index) ctx.lineTo(x, y); else ctx.moveTo(x, y);
-      });
-      ctx.closePath(); ctx.fill();
-    }
-    const rgba = ctx.getImageData(0, 0, width, height).data;
-    const mask = new Uint8Array(width * height);
-    for (let index = 0; index < mask.length; index++) mask[index] = rgba[index * 4 + 3];
-    return mask;
+    return ringMaskBytes(landmarks, ["oval"], width, height,
+      Snapshot.mapPoint(width, height));
+  },
+
+  /** Môi + hai mắt: vùng học sinh phải chừa ra khi làm mịn. */
+  featureMaskBytes(landmarks, width, height) {
+    return ringMaskBytes(landmarks, FEATURE_RINGS, width, height,
+      Snapshot.mapPoint(width, height));
   },
 
   drawFaceOutline(canvas, landmarks) {
@@ -1205,11 +1228,12 @@ const Snapshot = {
     const source = canvas.getContext("2d", { willReadFrequently: true })
       .getImageData(0, 0, CFG.capture.w, CFG.capture.h).data;
     const faceMask = landmarks.length ? Snapshot.faceMaskBytes(landmarks, level.w, level.h) : null;
+    const featureMask = landmarks.length ? Snapshot.featureMaskBytes(landmarks, level.w, level.h) : null;
     Snapshot.message.textContent = "NumPy and SciPy are processing the photo…";
     try {
       const packed = new Uint8Array(Kernel.callBridge("_skin_snapshot", [
         new Uint8Array(source.buffer.slice(0)), CFG.capture.w, CFG.capture.h,
-        level.w, level.h, faceMask,
+        level.w, level.h, faceMask, featureMask,
       ]));
       const frameLength = CFG.capture.w * CFG.capture.h * 4;
       const targets = [Snapshot.skinCanvas, Snapshot.spotCanvas,

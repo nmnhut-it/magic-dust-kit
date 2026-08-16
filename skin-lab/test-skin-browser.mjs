@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -113,7 +113,13 @@ async function notebookState(cdp) {
   return result.result.value;
 }
 
-async function waitForNotebook(cdp, mode, label, expectedCells = 70) {
+// Read the count from the built notebook instead of repeating a literal here:
+// adding a cell to build_notebooks.py must not make this test fail by itself.
+const NOTEBOOK_CELLS = JSON.parse(
+  readFileSync(resolve(ROOT, "Skin_Lab.ipynb"), "utf8"),
+).cells.length;
+
+async function waitForNotebook(cdp, mode, label, expectedCells = NOTEBOOK_CELLS) {
   const state = await poll(
     () => notebookState(cdp),
     (value) => value?.page === mode && (value.state === "ready" || value.state === "error"),
@@ -273,7 +279,8 @@ try {
   }
 
   await cdp.evaluate("location.reload()");
-  await waitForNotebook(cdp, "skin", "resumed practice route", 71);
+  // One extra cell: the student-added "user-*" cell created earlier in this run.
+  await waitForNotebook(cdp, "skin", "resumed practice route", NOTEBOOK_CELLS + 1);
   const resumed = await poll(async () => {
     const result = await cdp.evaluate(`({
       source: Nb.cells.find((item) => item.id === "task-convolve-layer")?.source,
@@ -297,7 +304,10 @@ try {
   console.log("Browser check: answer notebook and Pyodide are ready.");
   const run = await cdp.evaluate(`(async () => {
     const ids = [
-      "skin-setup", "skin-overview", "skin-pixel-channels", "numpy-array", "numpy-channels",
+      // skin-library-setup định nghĩa np, MASK_ON, SOFTEN_KERNEL… Chạy tường minh
+      // để lỗi của nó hiện trong evidence.errors thay vì im lặng.
+      "skin-setup", "skin-library-setup",
+      "skin-overview", "skin-pixel-channels", "numpy-array", "numpy-channels",
       "numpy-change-one-number",
       "skin-mechanism-rgb", "skin-mechanism-rule", "skin-mechanism-neighbours",
       "skin-convolution-math", "skin-mechanism-kernel-filter", "skin-rgb-convolution",
@@ -307,7 +317,10 @@ try {
       "skin-mechanism-soften", "skin-preview-cleanup", "skin-mechanism-face",
       "skin-check", "skin-demo", "numpy-filter-gallery", "numpy-kernel-gallery",
       "skin-public-gallery", "skin-public-test", "skin-face-mesh-map", "skin-face-mask-pipeline",
-      "skin-pro-pipeline-preview",
+      "skin-preview-average", "skin-preview-calm", "skin-build-pipeline", "skin-heal-run",
+      // Hai task cuối chạy SAU ô chấm giữa trang, để ô đó vẫn đúng là
+      // "still to come" — rồi ô chấm cuối mới đủ 10/10.
+      "task-choose-smooth-area", "task-smooth-skin", "skin-smooth-run", "skin-check-all",
     ];
     for (const id of ids) {
       const index = Nb.cells.findIndex((item) => item.id === id);
@@ -348,14 +361,14 @@ try {
       await waitFor(() => Snapshot.message?.textContent.includes(expected), 40_000, label);
       return { message: Snapshot.message.textContent, seconds: (Date.now() - started) / 1000 };
     };
-    const gentle = await pressRerun("snapshot-kernels", "gentle", "Kernel gentle", "same-photo kernel switch");
-    const widest = await pressRerun("snapshot-kernels", "widest", "Kernel widest", "9 × 9 kernel switch");
-    const fullStrength = await pressRerun("snapshot-strengths", "100", "smoothing 100%", "smoothing-strength switch");
+    const narrow = await pressRerun("snapshot-kernels", "7", "comparison width 7", "same-photo width switch");
+    const wide = await pressRerun("snapshot-kernels", "25", "comparison width 25", "widest comparison switch");
+    const threePasses = await pressRerun("snapshot-strengths", "3", "3 pass(es)", "pass-count switch");
     const kernelEvidence = {
-      message: widest.message,
-      gentleMessage: gentle.message,
-      strengthMessage: fullStrength.message,
-      widestSeconds: widest.seconds,
+      message: wide.message,
+      gentleMessage: narrow.message,
+      strengthMessage: threePasses.message,
+      widestSeconds: threePasses.seconds,
       labels: [...document.querySelectorAll(".snapshot-rerun button")].map((button) => button.textContent),
       streamStillStopped: Snapshot.stream === null,
       barVisible: [...document.querySelectorAll(".snapshot-rerun")]
@@ -370,6 +383,9 @@ try {
     controlHost.remove();
     return {
       grader: output("skin-check").innerText,
+      graderAll: output("skin-check-all").innerText,
+      healRun: output("skin-heal-run").innerText,
+      smoothRun: output("skin-smooth-run").innerText,
       images: ids.filter((id) => output(id).querySelector("img")).length,
       errors: ids.flatMap((id) => [...output(id).querySelectorAll(".err")].map((item) => item.innerText)),
       answerKey: Nb.storageKey(),
@@ -386,8 +402,16 @@ try {
   const evidence = run.result.value;
   if (!Array.isArray(evidence.errors)) throw new Error(`Unexpected answer evidence: ${JSON.stringify(evidence)}`);
   if (evidence.errors.length) throw new Error(`Notebook errors: ${evidence.errors.join(" | ")}`);
-  if (!evidence.grader.includes("Result: 5/5")) {
-    throw new Error(`The browser grader did not reach 5/5: ${evidence.grader}`);
+  // Ô chấm giữa trang chạy TRƯỚC hai task cuối, nên nó phải báo "still to come"
+  // chứ không được tính là sai; ô chấm cuối trang mới đủ 10/10.
+  if (!evidence.grader.includes("still to come")) {
+    throw new Error(`The mid-page grader must excuse the tasks below it: ${evidence.grader}`);
+  }
+  if (!evidence.graderAll.includes("Result: 10/10")) {
+    throw new Error(`The final grader did not reach 10/10: ${evidence.graderAll}`);
+  }
+  if (!evidence.smoothRun.includes("roughness")) {
+    throw new Error(`The smoothing run printed no roughness measurement: ${evidence.smoothRun}`);
   }
   if (evidence.images < 20 || evidence.mechanisms !== 8) {
     throw new Error(`Expected at least 20 images and eight mechanisms, got ${evidence.images} and ${evidence.mechanisms}.`);
@@ -399,21 +423,25 @@ try {
   }
   if (!evidence.photoEvidence.streamStopped || evidence.photoEvidence.resultCanvases !== 5 ||
       evidence.photoEvidence.outputWidth !== 480 ||
-      !evidence.photoEvidence.message.includes("OUTPUT changed")) {
+      !evidence.photoEvidence.message.includes("Your heal_spots changed")) {
     throw new Error(`One-photo processing did not finish correctly: ${JSON.stringify(evidence.photoEvidence)}`);
   }
-  if (!evidence.kernelEvidence.gentleMessage.includes("Kernel gentle ran") ||
-      !evidence.kernelEvidence.message.includes("Kernel widest ran") ||
-      !evidence.kernelEvidence.strengthMessage.includes("smoothing 100%") ||
-      !evidence.kernelEvidence.labels.includes("widest 9×9") ||
-      !evidence.kernelEvidence.labels.includes("85%") ||
-      !evidence.kernelEvidence.streamStillStopped || !evidence.kernelEvidence.barVisible) {
-    throw new Error(`Same-photo kernel switching failed: ${JSON.stringify(evidence.kernelEvidence)}`);
+  const healing = evidence.healRun.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+  if (healing.length < 3 || !(healing[healing.length - 1] < healing[0])) {
+    throw new Error(`The student healing run did not reduce redness: ${evidence.healRun}`);
   }
-  // Kernel 9 × 9 chạy 81 phép nhân cho mỗi điểm ảnh; nếu nó vượt 20 giây thì nút
+  if (!evidence.kernelEvidence.gentleMessage.includes("comparison width 7") ||
+      !evidence.kernelEvidence.message.includes("comparison width 25") ||
+      !evidence.kernelEvidence.strengthMessage.includes("3 pass(es)") ||
+      !evidence.kernelEvidence.labels.includes("width 25") ||
+      !evidence.kernelEvidence.labels.includes("3 passes") ||
+      !evidence.kernelEvidence.streamStillStopped || !evidence.kernelEvidence.barVisible) {
+    throw new Error(`Same-photo re-run buttons failed: ${JSON.stringify(evidence.kernelEvidence)}`);
+  }
+  // Ba lượt heal_spots chạy vòng lặp Python trên từng điểm ảnh; nếu vượt 20 giây thì nút
   // so-sánh-tại-chỗ hết còn là thao tác "bấm rồi xem" của học sinh.
   if (evidence.kernelEvidence.widestSeconds > 20) {
-    throw new Error(`The 9 × 9 kernel took ${evidence.kernelEvidence.widestSeconds}s to re-run one photo.`);
+    throw new Error(`Three heal_spots passes took ${evidence.kernelEvidence.widestSeconds}s on one photo.`);
   }
   if (!evidence.answerKey.includes(":skin-answers:v3") || !evidence.practiceSaveStillPresent) {
     throw new Error("Practice and answer routes do not use separate localStorage records.");
@@ -436,8 +464,8 @@ try {
 
   console.log(
     `Browser OK (${REMOTE_BASE ? "live" : "local"}): autosave resumed by stable ID; ` +
-    `eight mechanisms persisted; one photo captured and camera stopped; answer grader 5/5; ` +
-    `9 × 9 kernel re-ran the same photo in ${evidence.kernelEvidence.widestSeconds.toFixed(1)}s; ` +
+    `eight mechanisms persisted; one photo captured and camera stopped; answer grader 10/10; ` +
+    `three heal_spots passes re-ran the same photo in ${evidence.kernelEvidence.widestSeconds.toFixed(1)}s; ` +
     `${evidence.images} illustrations; mobile fits; ` +
     `main route ${original.cells} cells.`,
   );
@@ -447,6 +475,12 @@ try {
   await stopChild(server);
   const safePrefix = join(tmpdir(), "magic-dust-skin-browser-");
   if (profile.startsWith(safePrefix)) {
-    rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+    // Windows can still hold the closed browser's profile handles. Losing a temp
+    // directory must not turn a passing run into a failure; the OS clears it.
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } catch (error) {
+      console.log(`Note: the temporary browser profile is still locked (${error.code}); leaving ${profile}.`);
+    }
   }
 }

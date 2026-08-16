@@ -11,12 +11,23 @@ TASKS = (
     "detect_skin",
     "detect_pimples",
     "remove_pimples",
+    "average_skin_color",
+    "calm_redness",
+    "heal_spots",
+    "choose_smooth_area",
+    "smooth_skin",
 )
 
 
 def source(cell):
     value = cell.get("source", "")
     return "".join(value) if isinstance(value, list) else value
+
+
+def code_blanks(text):
+    """Count ___ blanks the student actually fills, ignoring the comments that describe them."""
+    return sum(line.count("___") for line in text.splitlines()
+               if not line.lstrip().startswith("#"))
 
 
 class TestSkinNotebook(unittest.TestCase):
@@ -166,6 +177,11 @@ class TestSkinNotebook(unittest.TestCase):
                     "detect_skin": "detect-note",
                     "detect_pimples": "pimple-note",
                     "remove_pimples": "remove-note",
+                    "average_skin_color": "average-note",
+                    "calm_redness": "calm-note",
+                    "heal_spots": "heal-note",
+                    "choose_smooth_area": "area-note",
+                    "smooth_skin": "smooth-note",
                 }[task]
             )
             self.assertIn("**Given:**", task_text)
@@ -181,22 +197,112 @@ class TestSkinNotebook(unittest.TestCase):
             "detect_skin": "skin-task-detect-note",
             "detect_pimples": "skin-task-pimple-note",
             "remove_pimples": "skin-task-remove-note",
+            "average_skin_color": "skin-task-average-note",
+            "calm_redness": "skin-task-calm-note",
+            "heal_spots": "skin-task-heal-note",
+            "choose_smooth_area": "skin-task-area-note",
+            "smooth_skin": "skin-task-smooth-note",
         }
         blank_counts = {
             "skin_evidence": "three", "convolve_layer": "three",
             "detect_skin": "two", "detect_pimples": "two", "remove_pimples": "two",
+            "average_skin_color": "three", "calm_redness": "three",
+            "heal_spots": "five", "choose_smooth_area": "three",
+            "smooth_skin": "three",
         }
         teaching_order = (
             "skin_evidence", "convolve_layer", "detect_skin",
-            "detect_pimples", "remove_pimples",
+            "detect_pimples", "remove_pimples", "average_skin_color",
+            "calm_redness", "heal_spots", "choose_smooth_area", "smooth_skin",
         )
         cells = {cell["id"]: cell for cell in self.practice["cells"]}
         for number, task in enumerate(teaching_order, start=1):
             note = source(cells[note_ids[task]])
             code = source(cells["task-" + task.replace("_", "-")])
-            self.assertIn(f"Coding task {number} of 5 — complete `{task}`", note)
+            self.assertIn(f"Coding task {number} of 10 — complete `{task}`", note)
             self.assertIn(f"fill the {blank_counts[task]} `___` blanks", note)
             self.assertIn(f"# TASK {number} - fill the {blank_counts[task]} ___ blanks", code)
+
+    def test_the_colour_task_is_a_scaffold_with_one_channel_worked(self):
+        """Task 7 hands over a runnable skeleton; only the ideas are blank."""
+        cells = {cell["id"]: cell for cell in self.practice["cells"]}
+        note = source(cells["skin-task-calm-note"])
+        code = source(cells["task-calm-redness"])
+        self.assertIn("Coding task 7 of 10 — complete `calm_redness`", note)
+        self.assertNotIn("raise NotImplementedError", code)
+        # The loop, the copy and the red channel are given, not written by the student.
+        self.assertIn('result = img.convert("RGB").copy()', code)
+        self.assertIn("keep = 1 - strength", code)
+        self.assertIn("round(red * keep + skin_color[0] * strength)", code)
+        self.assertEqual(code_blanks(code), 3)
+        answer = source({cell["id"]: cell for cell in self.answers["cells"]}["task-calm-redness"])
+        self.assertNotIn("___", answer)
+
+    def test_a_task_below_the_grader_is_never_reported_as_a_failure(self):
+        """The mid-page grader runs before task 8 exists; that must not read as FIX."""
+        cells = [cell["id"] for cell in self.practice["cells"]]
+        self.assertLess(cells.index("skin-check"), cells.index("task-heal-spots"))
+        self.assertLess(cells.index("task-heal-spots"), cells.index("skin-check-all"))
+        helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
+        self.assertIn("still to come further down the page", helpers)
+        self.assertIn("if not callable(getattr(__main__, task_id, None)):", helpers)
+        note = source({c["id"]: c for c in self.practice["cells"]}["skin-check-note"])
+        self.assertIn("Result: 7/7 parts correct.", note)
+        self.assertIn("Result: 10/10 parts correct.", note)
+        final = {c["id"]: c for c in self.practice["cells"]}["skin-check-all"]
+        self.assertEqual(source(final), "magic_mirror.check_skin_code()")
+
+    def test_the_capstone_task_is_also_a_scaffold(self):
+        """Task 8's five blanks are the three ideas; the loop is given."""
+        cells = {cell["id"]: cell for cell in self.practice["cells"]}
+        note = source(cells["skin-task-heal-note"])
+        code = source(cells["task-heal-spots"])
+        self.assertIn("Coding task 8 of 10 — complete `heal_spots`", note)
+        self.assertIn("it is code, not settings", note)
+        self.assertNotIn("raise NotImplementedError", code)
+        self.assertIn("uniform_filter", code)          # the one given library call
+        self.assertIn("result.putpixel((x, y), tuple(healed))", code)
+        self.assertEqual(code_blanks(code), 5)
+        answers = {cell["id"]: cell for cell in self.answers["cells"]}
+        worked = source(answers["task-heal-spots"])
+        self.assertNotIn("___", worked)
+        self.assertIn("result.putpixel", worked)
+
+    def test_no_task_cell_ever_hands_the_student_a_blank_page(self):
+        """The whole point of the rewrite: eight scaffolds, zero empty bodies."""
+        cells = {cell["id"]: cell for cell in self.practice["cells"]}
+        for task in TASKS:
+            code = source(cells["task-" + task.replace("_", "-")])
+            self.assertNotIn("raise NotImplementedError", code)
+            self.assertGreater(code_blanks(code), 0, f"{task} has no blanks to fill")
+            self.assertIn("return", code)
+
+    def test_students_assemble_their_own_pipeline_after_the_demo(self):
+        practice = source({c["id"]: c for c in self.practice["cells"]}["skin-build-pipeline"])
+        answer = source({c["id"]: c for c in self.answers["cells"]}["skin-build-pipeline"])
+        self.assertIn("calm_strength = ___", practice)
+        self.assertEqual(practice.count("___"), 4)
+        self.assertIn("calm_strength = 0.75", answer)
+        self.assertIn("calm_redness(picture, spot_mask, target_color, calm_strength)", answer)
+        self.assertIn("picture = remove_pimples(picture)", answer)
+        self.assertNotIn("___", answer)
+
+    def test_the_slice_notation_is_explained_before_it_is_used(self):
+        """`pixels[:, :, 0]` appears in almost every task, so `:` must be taught, not assumed."""
+        cells = {cell["id"]: cell for cell in self.practice["cells"]}
+        intro = source(cells["numpy-intro"])
+        self.assertIn("What the `:` means", intro)
+        self.assertIn('read `:` out loud as "every"', intro)
+        self.assertIn("`[row, column, channel]`", intro)
+        for row in ("| `pixels[2, 2]` |", "| `pixels[2, 2, 0]` |",
+                    "| `pixels[2, :, 0]` |", "| `pixels[:, :, 0]` |"):
+            self.assertIn(row, intro)
+        self.assertIn("has shape `(5, 5)`", intro)
+        lesson_order = [cell["id"] for cell in self.practice["cells"]]
+        first_task = min(lesson_order.index("task-" + task.replace("_", "-")) for task in TASKS)
+        self.assertLess(lesson_order.index("numpy-intro"), first_task)
+        glossary = source(cells["skin-glossary"])
+        self.assertIn("| `:` |", glossary)
 
     def test_learner_survival_kit_covers_cells_errors_and_vocabulary(self):
         cells = {cell["id"]: cell for cell in self.practice["cells"]}
@@ -235,7 +341,8 @@ class TestSkinNotebook(unittest.TestCase):
             for cell in self.practice["cells"]
             if "student-work" in cell.get("metadata", {}).get("tags", [])
         }
-        self.assertEqual(tagged, {"skin-convolution-transfer", "skin-pipeline-settings"})
+        self.assertEqual(tagged, {"skin-convolution-transfer", "skin-build-pipeline",
+                                  "skin-heal-run", "skin-smooth-run"})
 
     def test_route_has_no_training_dependency_or_diagnostic_claim(self):
         code = (ROOT / "skin_filters_solution.py").read_text(encoding="utf-8").lower()
@@ -250,7 +357,7 @@ class TestSkinNotebook(unittest.TestCase):
         answer_ids = [cell["id"] for cell in self.answers["cells"]]
         self.assertEqual(practice_ids, answer_ids)
         self.assertEqual(len(practice_ids), len(set(practice_ids)))
-        self.assertEqual(len(practice_ids), 70)
+        self.assertEqual(len(practice_ids), 90)
         for notebook in (self.practice, self.answers):
             self.assertEqual(notebook["nbformat"], 4)
             self.assertEqual(notebook["nbformat_minor"], 5)
@@ -313,8 +420,8 @@ class TestSkinNotebook(unittest.TestCase):
         self.assertIn("two button rows appear under the result", lesson)
         self.assertIn("Capture one photo", runtime)
         self.assertIn("Choose an image file", runtime)
-        self.assertIn("Try another kernel on the same photo:", runtime)
-        self.assertIn('"_set_snapshot_kernel", "The kernel could not be changed: "', runtime)
+        self.assertIn("Try another comparison width on the same photo:", runtime)
+        self.assertIn('"_set_snapshot_radius", "The comparison width could not be changed: "', runtime)
         self.assertIn("Kernel.callBridge(bridge, [value]);", runtime)
         self.assertIn("Snapshot.renderPipeline()", runtime)
         self.assertIn("Snapshot.stopStream();", runtime)
@@ -325,52 +432,35 @@ class TestSkinNotebook(unittest.TestCase):
         self.assertEqual(source(photo_cell), "magic_mirror.capture_skin_photo()")
         self.assertNotIn("magic_mirror.run()", lesson)
 
-    def test_capstone_exposes_kernel_smoothing_and_brightness_controls(self):
+    def test_capstone_runs_the_students_own_heal_spots(self):
+        """The final photo cell must run their function, not a library pipeline."""
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
-        settings = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-pipeline-settings")
-        self.assertIn("autoload", settings["metadata"]["tags"])
-        for phrase in (
-            'kernel_choice = "wide"', "SOFTEN_KERNEL = kernel_options[kernel_choice]",
-            "skin_smooth_strength = 0.55", "spot_smooth_strength = 0.90",
-            "skin_brightness = 5", "skin_kernel_passes = 2",
-            "mixed = 200 × (1 - 0.55) + 188 × 0.55",
-            "skin region", "red region", "difference panel",
-            "How far does a kernel reach?",
-        ):
-            self.assertIn(phrase, lesson)
+        helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
+        for gone in ("preview_pro_skin_pipeline", "describe_skin_pipeline_settings",
+                     "_adaptive_skin_pipeline", "skin_smooth_strength", "kernel_choice"):
+            self.assertNotIn(gone, helpers)
+            self.assertNotIn(gone, lesson)
+        self.assertIn('_student_function("heal_spots")', helpers)
+        self.assertIn("your own `heal_spots`", lesson)
+        cells = {cell["id"]: cell for cell in self.practice["cells"]}
+        for gone_id in ("skin-pipeline-settings", "skin-pro-pipeline-preview",
+                        "skin-pro-pipeline-note"):
+            self.assertNotIn(gone_id, cells)
 
-    def test_capstone_offers_a_nine_by_nine_kernel_with_its_cost_explained(self):
+    def test_photo_buttons_change_the_width_and_the_pass_count(self):
         lesson = "\n".join(source(cell) for cell in self.practice["cells"])
         runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
         helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
-        settings = next(cell for cell in self.practice["cells"] if cell["id"] == "skin-pipeline-settings")
-        self.assertIn('"widest": (', source(settings))
-        self.assertEqual(source(settings).count("(1, 1, 1, 1, 1, 1, 1, 1, 1),"), 9)
+        self.assertIn("Try another comparison width on the same photo:", runtime)
+        self.assertIn('"_set_snapshot_radius"', runtime)
+        self.assertIn("Run your healer more times on the same photo:", runtime)
+        self.assertIn('"_set_snapshot_passes"', runtime)
+        self.assertIn("SNAPSHOT_RADIUS_CHOICES = (7, 13, 25)", helpers)
+        self.assertIn("SNAPSHOT_PASS_CHOICES = (1, 2, 3)", helpers)
         for phrase in (
-            'Choose "gentle", "balanced", "strong", "wide", or "widest".',
-            "a 9 × 9 kernel reaches four",
-            "averages 81 pixels for every output value instead of 9",
-            "difference between 5 × 5 and 9 × 9 on one 320 × 240 photograph is small",
-            "`widest 9×9`",
-        ):
-            self.assertIn(phrase, lesson)
-        self.assertIn('["widest", "widest 9×9"]', runtime)
-        self.assertIn("KERNEL_SHAPES = ((3, 3), (5, 5), (9, 9))", helpers)
-
-    def test_students_can_set_the_smoothing_strength_from_the_photo_buttons(self):
-        lesson = "\n".join(source(cell) for cell in self.practice["cells"])
-        runtime = (ROOT / "assets" / "notebook.js").read_text(encoding="utf-8")
-        helpers = (ROOT / "assets" / "magic_mirror.py").read_text(encoding="utf-8")
-        self.assertIn("Change the smoothing strength on the same photo:", runtime)
-        self.assertIn('"_set_snapshot_strength"', runtime)
-        self.assertIn("[[25, \"25%\"], [55, \"55%\"], [85, \"85%\"], [100, \"100%\"]]", runtime)
-        self.assertIn("SNAPSHOT_STRENGTHS = (25, 55, 85, 100)", helpers)
-        self.assertIn("__main__.skin_smooth_strength = value / 100", helpers)
-        for phrase in (
-            "*Smoothing strength* — `25%`, `55%`, `85%`, `100%`",
-            "This writes `skin_smooth_strength` for you",
-            "output = original × (1 - strength) + kernel_result × strength",
-            "stay in the settings cell above",
+            "*Comparison width* — `7`, `13`, `25`",
+            "*Passes* — `1`, `2`, `3`",
+            "runs on its own output",
         ):
             self.assertIn(phrase, lesson)
 

@@ -843,6 +843,9 @@ def show_rgb_matrix(matrix=None, zoom=42):
 # ===========================================================================
 
 SKIN_TONE = (183, 127, 103)
+# Cùng hai giá trị mặt nạ mà skin_filters.py dùng. Grader phải nói đúng ngôn ngữ
+# của bài học sinh, nên đặt tên ở đây thay vì rải 0/255 trong các hàm chấm.
+MASK_OFF, MASK_ON = 0, 255
 SKIN_SHADOW = (145, 91, 75)
 PIMPLE_RED = (225, 62, 66)
 SKIN_BACKGROUND = (35, 80, 185)
@@ -1442,298 +1445,161 @@ def _mask_overlay(image, mask, color, alpha=0.55):
 
 _snapshot_status = ""
 
-SNAPSHOT_KERNELS = {
-    "gentle": ((1, 2, 1), (2, 4, 2), (1, 2, 1)),
-    "balanced": ((1, 1, 1), (1, 1, 1), (1, 1, 1)),
-    "strong": ((1, 1, 1), (1, 0, 1), (1, 1, 1)),
-    "wide": (
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1),
-    ),
-    "widest": (
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-        (1, 1, 1, 1, 1, 1, 1, 1, 1),
-    ),
-}
-
-# Học sinh sửa được trọng số, nhưng chỉ trong ba cỡ lưới lẻ này — mọi chỗ kiểm
-# tra hình dạng kernel đều đọc từ đây để không lệch nhau.
-KERNEL_SHAPES = ((3, 3), (5, 5), (9, 9))
-KERNEL_SHAPE_TEXT = "3 x 3, 5 x 5, or 9 x 9"
+# Hai hàng nút dưới tấm ảnh đã chụp chạy lại CHÍNH hàm heal_spots của học sinh
+# trên đúng tấm ảnh đó: một hàng đổi bề rộng vùng so sánh, một hàng đổi số lần chạy.
+SNAPSHOT_RADIUS_CHOICES = (7, 13, 25)
+SNAPSHOT_PASS_CHOICES = (1, 2, 3)
+SNAPSHOT_SPAN = 12
+SNAPSHOT_SMOOTH_STRENGTH = 0.7
+_snapshot_radius = SNAPSHOT_RADIUS_CHOICES[1]
+_snapshot_passes = SNAPSHOT_PASS_CHOICES[1]
 
 
-def _set_snapshot_kernel(name):
-    """The kernel buttons under the captured photo call this before re-running.
-
-    A student's own kernel_options entry (typed in the settings cell) wins over
-    the canonical grid, so hands-on edits stay visible in the camera result.
-    """
-    if name not in SNAPSHOT_KERNELS:
-        raise MagicMirrorError(
-            "Unknown kernel '%s'. Choose %s." % (name, ", ".join(SNAPSHOT_KERNELS)))
-    kernel = SNAPSHOT_KERNELS[name]
-    custom = getattr(__main__, "kernel_options", None)
-    if isinstance(custom, dict) and name in custom:
-        candidate = np.asarray(custom[name], dtype=np.float32)
-        if candidate.shape in KERNEL_SHAPES:
-            kernel = custom[name]
-    __main__.kernel_choice = name
-    __main__.SOFTEN_KERNEL = kernel
-    return name
-
-
-SNAPSHOT_STRENGTHS = (25, 55, 85, 100)
-
-
-def _set_snapshot_strength(percent):
-    """The strength buttons under the captured photo call this before re-running.
-
-    The kernel decides which colour is calculated; skin_smooth_strength decides
-    how much of it is used. Writing the notebook variable keeps that one meaning
-    of "intensity" — the settings cell and the buttons cannot drift apart.
-    """
+def _snapshot_choice(value, allowed, what):
     try:
-        value = int(percent)
+        number = int(value)
     except (TypeError, ValueError):
-        raise MagicMirrorError("The strength must be a whole percentage.")
-    if value not in SNAPSHOT_STRENGTHS:
-        raise MagicMirrorError("Unknown strength '%s'. Choose %s." % (
-            percent, ", ".join("%d%%" % option for option in SNAPSHOT_STRENGTHS)))
-    __main__.skin_smooth_strength = value / 100
-    return value
+        raise MagicMirrorError("The %s must be a whole number." % what)
+    if number not in allowed:
+        raise MagicMirrorError("Unknown %s '%s'. Choose %s."
+                               % (what, value, ", ".join(str(item) for item in allowed)))
+    return number
 
 
-def _pipeline_number(name, default, minimum, maximum):
-    """Read one learner setting from the notebook and keep it in a safe range."""
-    value = getattr(__main__, name, default)
-    try:
-        value = float(value)
-    except (TypeError, ValueError):
-        raise MagicMirrorError("%s must be a number from %s to %s." % (name, minimum, maximum))
-    if not minimum <= value <= maximum:
-        raise MagicMirrorError("%s must be between %s and %s." % (name, minimum, maximum))
-    return value
+def _set_snapshot_radius(value):
+    """The comparison-width buttons under the captured photo call this before re-running."""
+    global _snapshot_radius
+    _snapshot_radius = _snapshot_choice(value, SNAPSHOT_RADIUS_CHOICES, "comparison width")
+    return _snapshot_radius
 
 
-def _pipeline_settings():
-    """Validate the kernel and strengths that learners may edit in the capstone cell."""
-    kernel = np.asarray(getattr(__main__, "SOFTEN_KERNEL", SKIN_SOFTEN_KERNEL), dtype=np.float32)
-    if kernel.shape not in KERNEL_SHAPES:
-        raise MagicMirrorError("SOFTEN_KERNEL must be a %s grid of weights." % KERNEL_SHAPE_TEXT)
-    if not np.isfinite(kernel).all() or (kernel < 0).any() or float(kernel.sum()) <= 0:
-        raise MagicMirrorError("The SOFTEN_KERNEL weights must be non-negative and their total must exceed 0.")
-    return {
-        "kernel": kernel,
-        "kernel_choice": str(getattr(__main__, "kernel_choice", "balanced")),
-        "skin_strength": _pipeline_number("skin_smooth_strength", 0.55, 0, 1),
-        "spot_strength": _pipeline_number("spot_smooth_strength", 0.90, 0, 1),
-        "brightness": _pipeline_number("skin_brightness", 5, -25, 25),
-        "passes": int(_pipeline_number("skin_kernel_passes", 2, 1, 4)),
-        "redness_sensitivity": _pipeline_number("redness_sensitivity", 1.6, 0.5, 4),
-    }
+def _set_snapshot_passes(value):
+    """The pass-count buttons under the captured photo call this before re-running."""
+    global _snapshot_passes
+    _snapshot_passes = _snapshot_choice(value, SNAPSHOT_PASS_CHOICES, "number of passes")
+    return _snapshot_passes
 
 
-def _adaptive_skin_pipeline(image, face_mask=None):
-    """Run the capstone pipeline and retain masks/numbers for learner-facing evidence."""
-    settings = _pipeline_settings()
+def _smooth_with_student_code(picture, source, face_mask, feature_mask):
+    """Apply the student's choose_smooth_area + smooth_skin, if they have written them.
+
+    The tasks sit at the end of the page, so a student part-way through must
+    still see the healer run. When either function is missing the picture is
+    returned untouched rather than raising.
+    """
+    for name in ("choose_smooth_area", "smooth_skin"):
+        if not callable(getattr(__main__, name, None)):
+            return picture
+    skin_mask = _student_function("detect_skin")(source)
+    area = _student_function("choose_smooth_area")(skin_mask, face_mask, feature_mask)
+    smoothed = _student_function("smooth_skin")(picture, area, SNAPSHOT_SMOOTH_STRENGTH)
+    return _require_image(smoothed, "smooth_skin")
+
+
+def _run_student_healer(image, face_mask=None, radius=None, passes=None, feature_mask=None):
+    """Run the student's whole chain over one image and collect learner-facing evidence.
+
+    Every algorithm here is theirs: heal_spots takes the redness out, then
+    choose_smooth_area (Face Mesh + their skin mask) decides where smoothing is
+    allowed and smooth_skin takes the roughness out. This only repeats their
+    functions, keeps changes inside the face, and measures what happened.
+    """
+    heal = _student_function("heal_spots")
+    steps = _snapshot_passes if passes is None else passes
+    width = _snapshot_radius if radius is None else radius
     source = image.convert("RGB")
-    pixels = np.asarray(source, dtype=np.float32)
-    height, width = pixels.shape[:2]
+    picture = source
+    for _ in range(steps):
+        picture = _require_image(heal(picture, width, SNAPSHOT_SPAN), "heal_spots")
+    picture = _smooth_with_student_code(picture, source, face_mask, feature_mask)
 
-    if face_mask is None:
-        face = np.ones((height, width), dtype=bool)
-    else:
-        face = np.asarray(face_mask) > 0
-        if face.shape != (height, width):
+    before = np.asarray(source, dtype=np.int16)
+    after = np.asarray(picture, dtype=np.int16)
+    if face_mask is not None:
+        inside = np.asarray(face_mask) > 0
+        if inside.shape != before.shape[:2]:
             raise MagicMirrorError("face_mask must have the same height and width as the image.")
-        inset = ndimage.binary_erosion(face, iterations=max(1, min(height, width) // 120))
-        if inset.any():
-            face = inset
-
-    red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
-    luminance = 0.299 * red + 0.587 * green + 0.114 * blue
-    blue_difference = 128 - 0.168736 * red - 0.331264 * green + 0.5 * blue
-    red_difference = 128 + 0.5 * red - 0.418688 * green - 0.081312 * blue
-    colour_skin = (
-        (luminance >= 25)
-        & (blue_difference >= 65) & (blue_difference <= 150)
-        & (red_difference >= 110) & (red_difference <= 205)
-    )
-
-    basic_skin = np.asarray(_student_function("detect_skin")(source)) > 0
-    if basic_skin.shape != (height, width):
-        raise MagicMirrorError("detect_skin must return a mask with the image's height and width.")
-    skin = face & (colour_skin | basic_skin)
-    skin = ndimage.uniform_filter(skin.astype(np.float32), size=5, mode="nearest") >= 0.45
-    skin &= face
-
-    redness = red - (green + blue) / 2
-    local_redness = ndimage.gaussian_filter(redness, sigma=3, mode="nearest")
-    red_residual = redness - local_redness
-
-    edge_x = ndimage.sobel(luminance, axis=1, mode="nearest")
-    edge_y = ndimage.sobel(luminance, axis=0, mode="nearest")
-    edge_strength = np.hypot(edge_x, edge_y)
-    skin_edges = edge_strength[skin]
-    edge_limit = max(24.0, float(np.percentile(skin_edges, 88))) if skin_edges.size else 24.0
-    # Mụn đỏ chính là "cạnh" mạnh nhất trên má nhiều mụn — nếu không loại vùng đỏ
-    # ra khỏi lớp bảo vệ chi tiết thì pipeline bảo vệ đúng thứ nó phải làm mềm.
-    reddish = ndimage.gaussian_filter((red_residual >= 2.0).astype(np.float32), sigma=1) > 0.2
-    protected = ndimage.binary_dilation(edge_strength >= edge_limit, iterations=1) & face & ~(reddish & skin)
-    allowed = skin & ~protected
-
-    student_spots = np.asarray(_student_function("detect_pimples")(source, basic_skin.astype(np.uint8) * 255)) > 0
-    samples = red_residual[allowed]
-    if samples.size:
-        median = float(np.median(samples))
-        mad = float(np.median(np.abs(samples - median)))
-        red_limit = max(4.0, median + settings["redness_sensitivity"] * max(1.5, 1.4826 * mad))
+        after = np.where(inside[:, :, None], after, before)
+        picture = Image.fromarray(after.astype(np.uint8), "RGB")
     else:
-        red_limit = 4.0
-    adaptive_spots = red_residual >= red_limit
-    spots = ndimage.binary_dilation(student_spots | adaptive_spots, iterations=1) & skin & face
+        inside = np.ones(before.shape[:2], dtype=bool)
 
-    student_cleaned = np.asarray(
-        _require_image(_student_function("remove_pimples")(source), "remove_pimples"),
-        dtype=np.float32,
-    )
-    kernel = settings["kernel"][:, :, None]
-    softened = pixels.copy()
-    for _ in range(settings["passes"]):
-        softened = ndimage.convolve(softened, kernel, mode="nearest") / float(kernel.sum())
-
-    detail_keep = 1 - ndimage.gaussian_filter(protected.astype(np.float32), sigma=0.8)
-    skin_alpha = np.clip(
-        ndimage.gaussian_filter(allowed.astype(np.float32), sigma=1.2)
-        * settings["skin_strength"] * detail_keep * face,
-        0, 1,
-    )
-    # Vùng đỏ được kéo về MÀU DA quanh nó (gaussian theo kênh), không chỉ blur:
-    # kernel nhỏ chỉ làm mềm kết cấu, còn một mảng đỏ rộng phải đổi màu mới thấy.
-    # detail_keep không nhân vào đây — mụn thường nằm ngay trên "cạnh" của chính nó.
-    spot_alpha = np.clip(
-        ndimage.gaussian_filter(spots.astype(np.float32), sigma=0.9)
-        * settings["spot_strength"] * face,
-        0, 1,
-    )
-    result = pixels * (1 - skin_alpha[:, :, None]) + softened * skin_alpha[:, :, None]
-    background = ndimage.gaussian_filter(softened, sigma=(3, 3, 0), mode="nearest")
-    spot_target = (background * 2 + student_cleaned) / 3
-    result = result * (1 - spot_alpha[:, :, None]) + spot_target * spot_alpha[:, :, None]
-    brightness_alpha = np.clip(
-        ndimage.gaussian_filter(allowed.astype(np.float32), sigma=1.5) * detail_keep * face,
-        0, 1,
-    )
-    result += settings["brightness"] * brightness_alpha[:, :, None]
-    output = np.clip(np.rint(result), 0, 255).astype(np.uint8)
-    before = pixels.astype(np.int16)
-    after = output.astype(np.int16)
+    skin = np.asarray(_student_function("detect_skin")(source)) > 0
     changed = np.any(np.abs(after - before) >= 1, axis=2)
-    difference = np.clip(np.abs(after - before) * 6, 0, 255).astype(np.uint8)
-
+    difference = np.clip(np.abs(after - before) * DIFFERENCE_GAIN, 0, 255).astype(np.uint8)
+    redness = lambda values: values[:, :, 0] - (values[:, :, 1] + values[:, :, 2]) / 2
     return {
         "source": source,
-        "result": Image.fromarray(output, "RGB"),
-        "skin": skin,
-        "spots": spots,
-        "protected": protected,
+        "result": picture,
+        "skin": skin & inside,
         "changed": changed,
         "difference": Image.fromarray(difference, "RGB"),
-        "red_limit": red_limit,
-        "settings": settings,
+        "radius": width,
+        "passes": steps,
+        "redness_before": float(redness(before.astype(np.float32))[skin].mean()) if skin.any() else 0.0,
+        "redness_after": float(redness(after.astype(np.float32))[skin].mean()) if skin.any() else 0.0,
+        "rough_before": _roughness(source),
+        "rough_after": _roughness(picture),
+        "smoothed": callable(getattr(__main__, "smooth_skin", None)),
     }
 
 
-def _pipeline_panels(data):
-    """Build coloured evidence pictures from one completed pipeline run."""
+def _roughness(picture):
+    """Average brightness step between side-by-side pixels: how rough the skin reads."""
+    grey = np.asarray(picture.convert("L"), dtype=np.float32)
+    return float(np.abs(np.diff(grey, axis=1)).mean())
+
+
+def _healer_panels(data):
+    """Build coloured evidence pictures from one completed healing run."""
     original = data["source"]
     return (
         _mask_overlay(original, data["skin"], (255, 210, 80), 0.48),
-        _mask_overlay(original, data["spots"], (255, 35, 45), 0.78),
+        _mask_overlay(original, data["changed"], (255, 35, 45), 0.78),
         data["difference"],
         data["result"],
     )
 
 
-def _pipeline_report(data):
-    total = data["skin"].size
-    skin_count = int(data["skin"].sum())
-    protected_count = int(data["protected"].sum())
-    spot_count = int(data["spots"].sum())
-    changed_count = int(data["changed"].sum())
-    settings = data["settings"]
-    return (
-        "Skin region: %d/%d pixels. Detail protection: %d pixels. Red region: %d pixels. "
-        "OUTPUT changed %d pixels. Kernel %s ran %d time(s); smoothing %.0f%%; brightness %+.0f."
-        % (skin_count, total, protected_count, spot_count, changed_count,
-           settings["kernel_choice"], settings["passes"],
-           settings["skin_strength"] * 100, settings["brightness"])
+def _healer_report(data):
+    report = (
+        "Skin region: %d/%d pixels. Your heal_spots changed %d pixels in %d pass(es) "
+        "with comparison width %d. Average redness on the skin: %.1f -> %.1f."
+        % (int(data["skin"].sum()), data["skin"].size, int(data["changed"].sum()),
+           data["passes"], data["radius"], data["redness_before"], data["redness_after"])
     )
+    if data["smoothed"]:
+        report += (" Your smooth_skin then softened the allowed area: roughness %.2f -> %.2f."
+                   % (data["rough_before"], data["rough_after"]))
+    else:
+        report += " smooth_skin is still to come further down the page."
+    return report
 
 
-def describe_skin_pipeline_settings():
-    """Print the learner's current kernel and three visible effect controls."""
-    settings = _pipeline_settings()
-    kernel = settings["kernel"]
-    print("Kernel '%s':" % settings["kernel_choice"])
-    for row in kernel:
-        print("  " + "  ".join("%g" % value for value in row))
-    print("Weight total = %g; kernel passes = %d." % (float(kernel.sum()), settings["passes"]))
-    print("Skin smoothing: %.0f%% | Red-region smoothing: %.0f%% | Brightness: %+.0f" %
-          (settings["skin_strength"] * 100, settings["spot_strength"] * 100,
-           settings["brightness"]))
+def _unpack_mask(mask, small_w, small_h):
+    """Turn one flat Face Mesh mask from the browser into a 2-D array, or None."""
+    if mask is None:
+        return None
+    flat = np.frombuffer(mask.to_py(), dtype=np.uint8)
+    return flat.reshape(small_h, small_w) if flat.size == small_w * small_h else None
 
 
-def preview_pro_skin_pipeline():
-    """Run the capstone pipeline on the bundled acne photo before a personal photo is used."""
-    original = _public_photo(PUBLIC_PHOTOS[0][0], (320, 240))
-    height, width = original.height, original.width
-    y, x = np.ogrid[:height, :width]
-    face = (((x - width * 0.50) / (width * 0.34)) ** 2
-            + ((y - height * 0.48) / (height * 0.50)) ** 2 <= 1)
-    data = _adaptive_skin_pipeline(original, face)
-    kernel = data["settings"]["kernel"]
-    center_weight = float(kernel[kernel.shape[0] // 2, kernel.shape[1] // 2] / kernel.sum())
-    print(_pipeline_report(data))
-    print("Normalised centre-pixel weight = %.3f." % center_weight)
-    print("DIFFERENCE ×6 brightens changed colours; dark areas were kept close to the input.")
-    skin_panel, spot_panel, difference, result = _pipeline_panels(data)
-    return _image_grid(
-        (original, skin_panel, spot_panel, data["difference"], data["result"]),
-        ("1 INPUT", "2 SKIN REGION", "3 RED REGION", "4 DIFFERENCE ×6", "5 OUTPUT"),
-        columns=3, tile_size=(200, 150), resample=Image.Resampling.LANCZOS,
-    )
-
-
-def _skin_snapshot(buffer, width, height, small_w, small_h, face_mask=None):
+def _skin_snapshot(buffer, width, height, small_w, small_h, face_mask=None, feature_mask=None):
     """Return four packed RGBA panels for the one-photo browser capstone."""
     global _snapshot_status
     raw = np.frombuffer(buffer.to_py(), dtype=np.uint8).reshape(height, width, 4)
     image = Image.fromarray(np.ascontiguousarray(raw[..., :CHANNELS]), "RGB")
     small = image.resize((small_w, small_h), Image.Resampling.LANCZOS)
-    mask_array = None
-    if face_mask is not None:
-        flat_mask = np.frombuffer(face_mask.to_py(), dtype=np.uint8)
-        if flat_mask.size == small_w * small_h:
-            mask_array = flat_mask.reshape(small_h, small_w)
-    data = _adaptive_skin_pipeline(small, mask_array)
-    _snapshot_status = _pipeline_report(data)
-    return b"".join(_to_rgba_bytes(panel) for panel in _pipeline_panels(data))
+    data = _run_student_healer(small, _unpack_mask(face_mask, small_w, small_h),
+                               feature_mask=_unpack_mask(feature_mask, small_w, small_h))
+    _snapshot_status = _healer_report(data)
+    return b"".join(_to_rgba_bytes(panel) for panel in _healer_panels(data))
 
 
 def _skin_snapshot_report():
     """Return the numbers produced by the most recent one-photo run."""
     return _snapshot_status
+
 
 
 def preview_library_convolution():
@@ -1810,6 +1676,117 @@ def preview_cleanup():
         (original, cleaned, _numpy_picture(difference)),
         ("BEFORE", "AFTER", "DIFFERENCE ×4"),
     )
+
+
+CALM_DEMO_STRENGTH = 0.8
+SWATCH_SIZE = (160, 120)
+
+
+def _excess_redness(pixel):
+    """The same R - (G + B) / 2 measure the whole lab uses, for one RGB tuple."""
+    return pixel[0] - (pixel[1] + pixel[2]) / 2
+
+
+def _red_spot_point(image):
+    """The location of the first drawn red spot, used for before/after printouts."""
+    return (image.width * 40 // 100, image.height * 58 // 100)
+
+
+def preview_average_skin_color():
+    """Show the target colour the student's average produced, next to its source region."""
+    original = skin_sample_image()
+    skin_mask = _student_function("detect_skin")(original)
+    color = tuple(_student_function("average_skin_color")(original, skin_mask))
+    if len(color) != CHANNELS:
+        raise MagicMirrorError("average_skin_color() must return three numbers (r, g, b).")
+    print("The selected skin region averages to %s. That single colour is the target for the red spots." % (color,))
+    print("Averaging hides the spots because they are a few pixels among thousands of ordinary skin pixels.")
+    return _image_grid(
+        (original, _mask_overlay(original, skin_mask, (255, 210, 80)),
+         Image.new("RGB", SWATCH_SIZE, color)),
+        ("RGB INPUT", "AVERAGED REGION", "TARGET COLOUR"),
+    )
+
+
+def preview_calm_redness():
+    """Run the student's colour blend on the drawn face and measure the redness it removed."""
+    original = skin_sample_image()
+    skin_mask = _student_function("detect_skin")(original)
+    spot_mask = _student_function("detect_pimples")(original, skin_mask)
+    color = tuple(_student_function("average_skin_color")(original, skin_mask))
+    calmed = _require_image(
+        _student_function("calm_redness")(original, spot_mask, color, CALM_DEMO_STRENGTH),
+        "calm_redness")
+
+    point = _red_spot_point(original)
+    before, after = original.getpixel(point), calmed.getpixel(point)
+    difference = np.clip(
+        np.abs(np.asarray(calmed, dtype=np.int16) - np.asarray(original, dtype=np.int16)) * 4,
+        0, 255).astype(np.uint8)
+    print("Target colour %s, strength %.2f." % (color, CALM_DEMO_STRENGTH))
+    print("Spot pixel: %s -> %s. Excess redness %.1f -> %.1f." %
+          (before, after, _excess_redness(before), _excess_redness(after)))
+    print("Smoothing averages the neighbours; this step replaces the colour itself, so the redness has nowhere to hide.")
+    return _image_grid(
+        (original, calmed, _numpy_picture(difference)),
+        ("BEFORE", "AFTER COLOUR BLEND", "DIFFERENCE ×4"),
+    )
+
+
+def preview_my_pipeline():
+    """Run the pipeline the student assembled and report what each stage cost."""
+    original = skin_sample_image()
+    guard = np.asarray(original, dtype=np.uint8).copy()
+    result = _require_image(_student_function("my_pipeline")(original), "my_pipeline")
+    if not np.array_equal(np.asarray(original, dtype=np.uint8), guard):
+        raise MagicMirrorError("my_pipeline() edited its input image. Work on a copy instead.")
+
+    before = np.asarray(original, dtype=np.int16)
+    after = np.asarray(result, dtype=np.int16)
+    point = _red_spot_point(original)
+    print("%d/%d pixels changed colour." %
+          (int(np.any(before != after, axis=2).sum()), before.shape[0] * before.shape[1]))
+    print("Spot pixel: %s -> %s. Excess redness %.1f -> %.1f." %
+          (tuple(before[point[1], point[0]]), tuple(after[point[1], point[0]]),
+           _excess_redness(before[point[1], point[0]]),
+           _excess_redness(after[point[1], point[0]])))
+    print("Change the order or the strength in your cell, run it again, and compare these two numbers.")
+    return _image_grid(
+        (original, result,
+         _numpy_picture(np.clip(np.abs(after - before) * 4, 0, 255).astype(np.uint8))),
+        ("INPUT", "YOUR PIPELINE", "DIFFERENCE ×4"),
+    )
+
+
+HEAL_SIZE = (160, 120)
+HEAL_PHOTO = "face-acne-cheek.jpg"
+HEAL_VIEW = (320, 240)
+DIFFERENCE_GAIN = 4
+
+
+def heal_photo(size=HEAL_SIZE):
+    """Hand back the bundled acne cheek for the student's own healing loop.
+
+    Small on purpose: the healer they write walks the pixels in Python, and this
+    size keeps one pass under a second in the browser.
+    """
+    return _public_photo(HEAL_PHOTO, size)
+
+
+def show_before_after(before, after, labels=("BEFORE", "AFTER", "DIFFERENCE ×%d" % DIFFERENCE_GAIN)):
+    """Display only: two images side by side plus where they differ.
+
+    No filtering happens here - the healing is the student's own code. This
+    draws the evidence and nothing else.
+    """
+    first = _require_image(before, "show_before_after").convert("RGB")
+    second = _require_image(after, "show_before_after").convert("RGB")
+    if first.size != second.size:
+        raise MagicMirrorError("Both images must have the same size to compare them.")
+    gap = np.abs(np.asarray(second, dtype=np.int16) - np.asarray(first, dtype=np.int16))
+    difference = np.clip(gap * DIFFERENCE_GAIN, 0, 255).astype(np.uint8)
+    return _image_grid((first, second, _numpy_picture(difference)), labels,
+                       columns=3, tile_size=HEAL_VIEW)
 
 
 def skin_demo(size=DEMO_SIZE):
@@ -2044,26 +2021,171 @@ def _test_remove_pimples():
     return ""
 
 
+CALM_TEST_STRENGTH = 0.5
+
+
+def _test_average_skin_color():
+    image = _skin_test_image()
+    mask = _student_function("detect_skin")(image)
+    color = _student_function("average_skin_color")(image, mask)
+    if not isinstance(color, tuple) or len(color) != CHANNELS:
+        return "return a tuple of three numbers, one per channel"
+    if any(not isinstance(value, int) for value in color):
+        return "round each average to a whole number with int(round(...))"
+    if not all(abs(value - skin) <= 8 for value, skin in zip(color, SKIN_TONE)):
+        return ("the average of a plain skin patch must stay near %s, but %s was returned"
+                % (SKIN_TONE, color))
+    empty = np.zeros((9, 9), dtype=np.uint8)
+    if _student_function("average_skin_color")(image, empty) != (0, 0, 0):
+        return "an empty mask must return (0, 0, 0) instead of failing"
+    return ""
+
+
+def _test_calm_redness():
+    image = _skin_test_image()
+    before = image.copy()
+    mask = np.zeros(image.size[::-1], dtype=np.uint8)
+    mask[4, 4] = COLOR_MAX
+    result = _student_function("calm_redness")(image, mask, SKIN_TONE, CALM_TEST_STRENGTH)
+    if not isinstance(result, Image.Image) or result.size != image.size:
+        return "return a PIL image with the same size"
+    expected = tuple(int(round(spot * (1 - CALM_TEST_STRENGTH) + skin * CALM_TEST_STRENGTH))
+                     for spot, skin in zip(PIMPLE_RED, SKIN_TONE))
+    if any(abs(new - want) > 1 for new, want in zip(result.getpixel((4, 4)), expected)):
+        return ("the marked pixel must mix to about %s at strength %.2f, but became %s"
+                % (expected, CALM_TEST_STRENGTH, result.getpixel((4, 4))))
+    if result.getpixel((0, 0)) != SKIN_TONE:
+        return "a pixel outside spot_mask must keep its original colour"
+    if image.getpixel((4, 4)) != before.getpixel((4, 4)):
+        return "do not edit the input image in place"
+    return ""
+
+
+SMOOTH_TEST_SIZE = (16, 16)
+SMOOTH_TEST_STRENGTH = 1.0
+
+
+def _test_choose_smooth_area():
+    """Skin AND inside the face AND NOT a feature - all three must be used."""
+    on = np.full(SMOOTH_TEST_SIZE, MASK_ON, dtype=np.uint8)
+    off = np.zeros(SMOOTH_TEST_SIZE, dtype=np.uint8)
+    choose = _student_function("choose_smooth_area")
+
+    skin = on.copy()
+    skin[0, 0] = MASK_OFF                      # not skin
+    face = on.copy()
+    face[0, 1] = MASK_OFF                      # outside the face oval
+    feature = off.copy()
+    feature[0, 2] = MASK_ON                    # a lip or an eye
+    area = np.asarray(choose(skin, face, feature))
+
+    if area[0, 0] != MASK_OFF:
+        return "a pixel that is not skin must not be smoothed"
+    if area[0, 1] != MASK_OFF:
+        return "a pixel outside face_mask must not be smoothed"
+    if area[0, 2] != MASK_OFF:
+        return "a lip or eye pixel must be excluded - remember the ~ in front of the feature mask"
+    if area[8, 8] != MASK_ON:
+        return "ordinary skin inside the face must be allowed"
+    if np.asarray(choose(skin, None, None))[8, 8] != MASK_ON:
+        return "when Face Mesh finds no face the skin must still be smoothable"
+    return ""
+
+
+def _test_smooth_skin():
+    """The allowed area must soften; everything else must be untouched."""
+    image = Image.new("RGB", SMOOTH_TEST_SIZE, SKIN_TONE)
+    image.putpixel((4, 4), (255, 255, 255))    # inside the allowed area
+    image.putpixel((12, 12), (255, 255, 255))  # outside it
+    area = np.zeros(SMOOTH_TEST_SIZE, dtype=np.uint8)
+    area[:8, :8] = MASK_ON
+    result = _student_function("smooth_skin")(image, area, SMOOTH_TEST_STRENGTH)
+    result = _require_image(result, "smooth_skin")
+
+    if result.getpixel((4, 4)) == (255, 255, 255):
+        return "the white pixel inside area_mask must be softened by the 1-2-1 kernel"
+    if result.getpixel((12, 12)) != (255, 255, 255):
+        return "a pixel outside area_mask must keep its original colour exactly"
+    if result.getpixel((5, 4)) == SKIN_TONE:
+        return "the neighbours of the white pixel must pick up some of its brightness"
+    return ""
+
+
+HEAL_TEST_SIZE = (32, 32)
+HEAL_TEST_RADIUS = 21
+HEAL_TEST_SPAN = 12
+HEAL_TEST_BLOTCH = (205, 115, 100)   # redder than skin, but still inside the skin rule
+HEAL_TEST_CENTRE = (16, 16)
+HEAL_TEST_DROP = 20
+
+
+def _heal_test_image():
+    """A plain skin square with one wide red blotch - the case a 5x5 rule misses."""
+    image = Image.new("RGB", HEAL_TEST_SIZE, SKIN_TONE)
+    draw = ImageDraw.Draw(image)
+    x, y = HEAL_TEST_CENTRE
+    draw.ellipse((x - 3, y - 3, x + 3, y + 3), fill=HEAL_TEST_BLOTCH)
+    return image
+
+
+def _test_heal_spots():
+    image = _heal_test_image()
+    before = image.copy()
+    result = _student_function("heal_spots")(image, HEAL_TEST_RADIUS, HEAL_TEST_SPAN)
+    if not isinstance(result, Image.Image) or result.size != image.size:
+        return "return a PIL image with the same size"
+    was = _excess_redness(before.getpixel(HEAL_TEST_CENTRE))
+    now = _excess_redness(result.getpixel(HEAL_TEST_CENTRE))
+    if now > was - HEAL_TEST_DROP:
+        return ("the middle of the wide red area barely changed (excess redness %.0f -> %.0f); "
+                "check that excess compares with wide_redness, not with the pixel itself"
+                % (was, now))
+    corner = result.getpixel((1, 1))
+    if max(abs(new - old) for new, old in zip(corner, SKIN_TONE)) > 2:
+        return "plain skin far from the red area must stay as it was"
+    if image.getpixel(HEAL_TEST_CENTRE) != before.getpixel(HEAL_TEST_CENTRE):
+        return "do not edit the input image in place"
+    return ""
+
+
 SKIN_TESTS = (
     ("convolve_layer", "convolve_layer  (apply a kernel)", _test_skin_convolution),
     ("skin_evidence", "skin_evidence   (test RGB evidence)", _test_skin_evidence),
     ("detect_skin", "detect_skin     (count a 3x3 area)", _test_skin_mask),
     ("detect_pimples", "detect_pimples  (compare a 5x5 area)", _test_pimple_mask),
     ("remove_pimples", "remove_pimples  (selective smoothing)", _test_remove_pimples),
+    ("average_skin_color", "average_skin_color (one target colour)", _test_average_skin_color),
+    ("calm_redness", "calm_redness    (blend toward that colour)", _test_calm_redness),
+    ("heal_spots", "heal_spots      (clear a whole blotch)", _test_heal_spots),
+    ("choose_smooth_area", "choose_smooth_area (skin AND face NOT features)", _test_choose_smooth_area),
+    ("smooth_skin", "smooth_skin     (soften only that area)", _test_smooth_skin),
 )
 
 
 def check_skin_code():
-    """Grade only the five functions in the isolated Skin Lab notebook."""
+    """Grade the Skin Lab functions the student has reached so far.
+
+    The grader cell sits half-way down the page, so functions from the tasks
+    below it are not written yet. Those are reported as "still to come" and left
+    out of the score: a task nobody has reached must never read as a failure.
+    """
     print("=== SKIN LAB CHECK ===")
     passed = 0
+    written = 0
     progress = getattr(js, "MagicMirrorUI", None)
     for task_id, name, test in SKIN_TESTS:
+        if not callable(getattr(__main__, task_id, None)):
+            print("   --   %s -> still to come further down the page" % name)
+            continue
+        written += 1
         ok = _try_skin(name, test)
         passed += int(ok)
         if progress is not None and hasattr(progress, "progress"):
             progress.progress(task_id, ok)
     print("-" * 54)
-    print("Result: %d/%d parts correct." % (passed, len(SKIN_TESTS)))
-    if passed == len(SKIN_TESTS):
+    print("Result: %d/%d parts correct." % (passed, written))
+    if written < len(SKIN_TESTS):
+        print("%d function(s) still to come. Run this cell again after the last task."
+              % (len(SKIN_TESTS) - written))
+    elif passed == written:
         print("Good. Run magic_mirror.skin_demo(), then test one still image with capture_skin_photo().")

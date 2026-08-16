@@ -12,7 +12,7 @@ Trong này có bốn trang:
 | `index.html` (trang chủ) | **Trang làm bài — vào đây trước.** Chín ô kiểu sổ tay: gõ Python, bấm CHẠY, máy chấm ngay và dựng ẢNH VÀO / ẢNH RA bằng chính code bạn vừa viết. Xong năm ô bắt buộc thì cổng sang sân khấu mở. Cuối trang có BẢNG ĐIỂM trên 10 để chụp màn hình gửi bố mẹ |
 | `san-khau.html` | **Sân khấu thật** — camera bật lên, tay bạn hiện trong khung, và mã Python bạn vừa viết quyết định phép nào hiện ra |
 | `lessons/islandFXFORGE.html` | **Đảo GƯƠNG VÔ CỰC** — nơi bạn học lật ảnh, ghép lớp, chỉnh sáng trên lưới số nhỏ |
-| `skin-lab/index.html` | **Skin Lab** (bài đọc tiếng Anh) — sổ tay NumPy + SciPy: sáu cơ chế ảnh đánh số 1–6, năm hàm điền chỗ trống, chụp đúng một tấm ảnh để chạy cả quy trình với Face Mesh; xem `skin-lab/README.md` |
+| `skin-lab/index.html` | **Skin Lab** (bài đọc tiếng Anh) — sổ tay NumPy + SciPy: sáu cơ chế ảnh đánh số 1–6, mười hàm điền chỗ trống (bốn hàm cuối lo phần màu và phần mịn: trừ đỏ, rồi dùng Face Mesh chọn vùng được phép làm mịn — chừa môi và mắt), rồi ô cuối không còn chỗ trống nào, học sinh tự viết cả chương trình ghép mười hàm đó lại và chạy trên ảnh mụn thật; chụp đúng một tấm ảnh để chạy cả quy trình với Face Mesh; xem `skin-lab/README.md` |
 
 **Không cài Python cũng học được.** Python chạy sẵn trong trình duyệt (Pyodide),
 bài lưu trong `localStorage` của chính máy bạn. Mở trang chủ, làm, rồi bấm nút

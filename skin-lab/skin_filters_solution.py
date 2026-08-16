@@ -95,3 +95,158 @@ def remove_pimples(img):
     combined = np.where(pimple_mask[:, :, None] == MASK_ON, softened, pixels)
     output = np.clip(np.rint(combined), 0, 255).astype(np.uint8)
     return Image.fromarray(output, "RGB")
+
+
+# === TASK: average_skin_color ===
+def average_skin_color(img, skin_mask):
+    """Add up the colours of the selected skin pixels, then divide by how many there were.
+
+    INPUT : one PIL image and its skin_mask (MASK_ON where the pixel is skin).
+    OUTPUT: one (r, g, b) tuple of whole numbers - the "normal" colour of this
+            person's skin in this light, used as the target for red spots.
+    """
+    picture = img.convert("RGB")
+    # Three running totals plus a counter: the ordinary average, done by hand.
+    total_red, total_green, total_blue, counted = 0, 0, 0, 0
+
+    for y in range(picture.height):
+        for x in range(picture.width):
+            # The mask decides membership; only selected pixels join the average.
+            if skin_mask[y][x] != MASK_ON:
+                continue
+            red, green, blue = picture.getpixel((x, y))
+            # Each channel is averaged on its own - red never mixes with blue.
+            total_red = total_red + red
+            total_green = total_green + green
+            total_blue = total_blue + blue
+            counted = counted + 1
+
+    # No skin found: return black rather than dividing by zero.
+    if counted == 0:
+        return (0, 0, 0)
+    # Thousands of ordinary skin pixels outvote the few spot pixels, so the
+    # average describes the skin even though the spots were counted too.
+    return (round(total_red / counted), round(total_green / counted),
+            round(total_blue / counted))
+
+
+# === TASK: calm_redness ===
+def calm_redness(img, spot_mask, skin_color, strength):
+    """Move the marked red pixels toward skin_color; keep every other pixel.
+
+    Blurring cannot remove redness, because the average of a red area is red.
+    This function replaces the colour instead: every marked pixel slides along
+    the line between its own colour and skin_color, and strength says how far.
+
+    INPUT : img, spot_mask (MASK_ON where a red spot was found), skin_color from
+            average_skin_color, strength 0.0 (no change) to 1.0 (target colour).
+    OUTPUT: a new PIL image; img itself is never touched.
+    """
+    # .copy() is what protects the input: every write below lands on result.
+    result = img.convert("RGB").copy()
+    # The two shares always add to 1, so the mix stays inside 0..255 by itself.
+    keep = 1 - strength
+
+    for y in range(result.height):
+        for x in range(result.width):
+            # Outside the mask nothing is written, so those pixels stay original.
+            if spot_mask[y][x] != MASK_ON:
+                continue
+            red, green, blue = result.getpixel((x, y))
+            # Same mixing formula per channel: old * keep + target * strength.
+            result.putpixel((x, y), (
+                round(red * keep + skin_color[0] * strength),
+                round(green * keep + skin_color[1] * strength),
+                round(blue * keep + skin_color[2] * strength),
+            ))
+    return result
+
+
+# === TASK: heal_spots ===
+def heal_spots(img, radius, span):
+    """Reduce every red area on the skin, not just the single-pixel ones.
+
+    Three upgrades over calm_redness: a wide comparison area (a whole blotch
+    stands out, not only its rim), a soft 0..1 amount instead of a yes/no mask
+    (no visible patch edge), and a target that keeps the local brightness (the
+    cheek stays shaded and the bump's own shadow flattens with its colour).
+    """
+    picture = img.convert("RGB")
+    pixels = np.asarray(picture, dtype=np.float32)
+    red, green, blue = pixels[:, :, 0], pixels[:, :, 1], pixels[:, :, 2]
+    redness = red - (green + blue) / 2
+    brightness = (red + green + blue) / 3
+
+    # The same tool detect_pimples used, only much wider than 5.
+    wide_redness = ndimage.uniform_filter(redness, size=radius, mode="nearest")
+    wide_brightness = ndimage.uniform_filter(brightness, size=radius, mode="nearest")
+
+    skin_mask = detect_skin(picture)
+    skin_color = average_skin_color(picture, skin_mask)
+    skin_brightness = sum(skin_color) / 3
+
+    result = picture.copy()
+    height, width = pixels.shape[:2]
+    for y in range(height):
+        for x in range(width):
+            if skin_mask[y][x] != MASK_ON:
+                continue
+            # How much redder is this pixel than the wide area around it?
+            excess = redness[y][x] - wide_redness[y][x]
+            share = min(1.0, max(0.0, excess / span))
+            if share == 0:
+                continue
+            # The light here, measured on the surrounding skin, not on the spot.
+            scale = wide_brightness[y][x] / skin_brightness
+            healed = []
+            for channel in range(3):
+                target = skin_color[channel] * scale
+                value = pixels[y][x][channel] * (1 - share) + target * share
+                healed.append(int(min(255, max(0, round(value)))))
+            result.putpixel((x, y), tuple(healed))
+    return result
+
+
+# === TASK: choose_smooth_area ===
+def choose_smooth_area(skin_mask, face_mask, feature_mask):
+    """Decide where smoothing is allowed: on the skin, inside the face, off the features.
+
+    Pure mask algebra. The ~ is the important part: smoothing lips and eyes is
+    exactly what makes an edited photo look plastic.
+    """
+    is_skin = np.asarray(skin_mask) == MASK_ON
+    # A missing Face Mesh mask must not block everything: no face_mask means the
+    # whole picture is allowed, no feature_mask means nothing needs protecting.
+    inside_face = (np.ones_like(is_skin) if face_mask is None
+                   else np.asarray(face_mask) == MASK_ON)
+    is_feature = (np.zeros_like(is_skin) if feature_mask is None
+                  else np.asarray(feature_mask) == MASK_ON)
+
+    allowed = is_skin & inside_face & ~is_feature
+    return np.where(allowed, MASK_ON, MASK_OFF).astype(np.uint8)
+
+
+# === TASK: smooth_skin ===
+def smooth_skin(img, area_mask, strength):
+    """Soften the skin inside area_mask and leave everything else exactly as it is.
+
+    heal_spots takes the redness out; this takes the roughness out. Together they
+    are what "smooth skin" means. The blur comes from the student's own
+    convolve_layer, so task 2 finally does real work on a real photograph.
+    """
+    source = img.convert("RGB")
+    pixels = np.asarray(source, dtype=np.float32)
+    weights = np.asarray(SOFTEN_KERNEL, dtype=np.float32)
+
+    allowed = np.asarray(area_mask) == MASK_ON
+    layers = []
+    for channel in range(3):
+        original = pixels[:, :, channel]
+        blurred = convolve_layer(original, weights, weights.sum())
+        # The same mix as calm_redness: strength decides how much blur is used,
+        # so the result can stop well short of plastic.
+        mixed = original * (1 - strength) + blurred * strength
+        layers.append(np.where(allowed, mixed, original))
+
+    output = np.clip(np.rint(np.stack(layers, axis=2)), 0, 255).astype(np.uint8)
+    return Image.fromarray(output, "RGB")

@@ -85,41 +85,31 @@ class TestTeachingHelpers(unittest.TestCase):
         self.assertEqual(live.size, magic_mirror.OUTPUT_SIZE)
         self.assertTrue(all(isinstance(preview, Image.Image) for preview in previews))
 
-    def test_capstone_pipeline_changes_skin_and_keeps_pixels_outside_face(self):
-        names = (
-            "convolve_layer", "skin_evidence", "detect_skin",
-            "detect_pimples", "remove_pimples",
-        )
+    def test_capstone_runs_the_students_healer_and_keeps_pixels_outside_the_face(self):
+        """The one-photo capstone must be the student's heal_spots, repeated."""
+        names = ("convolve_layer", "skin_evidence", "detect_skin", "detect_pimples",
+                 "remove_pimples", "average_skin_color", "calm_redness", "heal_spots")
+        image = magic_mirror.skin_sample_image((80, 60))
+        face = np.zeros((60, 80), dtype=bool)
+        face[8:53, 18:63] = True
         with ExitStack() as stack:
             main_module = sys.modules["__main__"]
             for name in names:
                 stack.enter_context(patch.object(
                     main_module, name, getattr(skin_filters_solution, name), create=True))
-            stack.enter_context(patch.object(main_module, "SOFTEN_KERNEL", (
-                (1, 1, 1), (1, 1, 1), (1, 1, 1),
-            ), create=True))
-            stack.enter_context(patch.object(main_module, "skin_smooth_strength", 0.55, create=True))
-            stack.enter_context(patch.object(main_module, "spot_smooth_strength", 0.90, create=True))
-            stack.enter_context(patch.object(main_module, "skin_brightness", 10, create=True))
-            stack.enter_context(patch.object(main_module, "skin_kernel_passes", 2, create=True))
-            stack.enter_context(patch.object(main_module, "redness_sensitivity", 1.6, create=True))
-            image = magic_mirror.skin_sample_image((80, 60))
-            face = [[False] * 80 for _ in range(60)]
-            for row in range(8, 53):
-                for column in range(18, 63):
-                    face[row][column] = True
-            data = magic_mirror._adaptive_skin_pipeline(image, face)
-            with redirect_stdout(io.StringIO()):
-                preview = magic_mirror.preview_pro_skin_pipeline()
+            data = magic_mirror._run_student_healer(image, face, radius=9, passes=2)
+            report = magic_mirror._healer_report(data)
+            panels = magic_mirror._healer_panels(data)
 
+        self.assertEqual(data["passes"], 2)
+        self.assertEqual(data["radius"], 9)
         self.assertGreater(int(data["skin"].sum()), 0)
-        self.assertGreater(int(data["changed"].sum()), image.width * image.height // 20)
-        before = np.asarray(image, dtype=np.float32)
-        after = np.asarray(data["result"], dtype=np.float32)
-        self.assertGreater(float(after[data["skin"]].mean()), float(before[data["skin"]].mean()) + 2)
+        self.assertGreater(int(data["changed"].sum()), 0)
+        self.assertFalse(data["changed"][~face].any(), "pixels outside the face were changed")
         self.assertEqual(data["result"].getpixel((0, 0)), image.getpixel((0, 0)))
-        self.assertIsInstance(preview, Image.Image)
-        self.assertGreater(preview.width, 600)
+        self.assertLess(data["redness_after"], data["redness_before"])
+        self.assertIn("Your heal_spots changed", report)
+        self.assertEqual(len(panels), 4)
 
     def test_skin_explanation_helpers_return_visible_illustrations(self):
         helpers = (
@@ -299,57 +289,25 @@ class TestTeachingHelpers(unittest.TestCase):
             self.assertIn("skin_sample_image", uses[name], name)
             self.assertNotIn("demo_face_photo", uses[name], name)
 
-    def test_snapshot_kernel_buttons_switch_the_capstone_kernel(self):
-        main_module = sys.modules["__main__"]
-        custom_gentle = ((0, 1, 0), (1, 4, 1), (0, 1, 0))
-        with ExitStack() as stack:
-            stack.enter_context(patch.object(
-                main_module, "kernel_options", {"gentle": custom_gentle}, create=True))
-            stack.enter_context(patch.object(main_module, "kernel_choice", "wide", create=True))
-            stack.enter_context(patch.object(
-                main_module, "SOFTEN_KERNEL", magic_mirror.SNAPSHOT_KERNELS["wide"], create=True))
-            magic_mirror._set_snapshot_kernel("gentle")
-            self.assertEqual(main_module.kernel_choice, "gentle")
-            self.assertEqual(main_module.SOFTEN_KERNEL, custom_gentle)
-            magic_mirror._set_snapshot_kernel("wide")
-            self.assertEqual(np.asarray(main_module.SOFTEN_KERNEL).shape, (5, 5))
-            magic_mirror._set_snapshot_kernel("widest")
-            self.assertEqual(np.asarray(main_module.SOFTEN_KERNEL).shape, (9, 9))
-        with self.assertRaises(magic_mirror.MagicMirrorError):
-            magic_mirror._set_snapshot_kernel("mystery")
-
-    def test_every_snapshot_kernel_is_a_supported_odd_square_of_weights(self):
-        self.assertEqual(
-            tuple(magic_mirror.SNAPSHOT_KERNELS),
-            ("gentle", "balanced", "strong", "wide", "widest"))
-        for name, kernel in magic_mirror.SNAPSHOT_KERNELS.items():
-            weights = np.asarray(kernel, dtype=np.float32)
-            self.assertIn(weights.shape, magic_mirror.KERNEL_SHAPES, name)
-            self.assertGreater(float(weights.sum()), 0, name)
-            self.assertTrue((weights >= 0).all(), name)
-
-    def test_strength_buttons_write_the_notebook_smoothing_variable(self):
-        main_module = sys.modules["__main__"]
-        with patch.object(main_module, "skin_smooth_strength", 0.55, create=True):
-            for percent in magic_mirror.SNAPSHOT_STRENGTHS:
-                magic_mirror._set_snapshot_strength(percent)
-                self.assertAlmostEqual(main_module.skin_smooth_strength, percent / 100)
-                self.assertAlmostEqual(
-                    magic_mirror._pipeline_settings()["skin_strength"], percent / 100)
-        for wrong in (0, 60, "fast", None):
+    def test_photo_buttons_set_the_comparison_width_and_the_pass_count(self):
+        for radius in magic_mirror.SNAPSHOT_RADIUS_CHOICES:
+            self.assertEqual(magic_mirror._set_snapshot_radius(radius), radius)
+            self.assertEqual(magic_mirror._snapshot_radius, radius)
+        for passes in magic_mirror.SNAPSHOT_PASS_CHOICES:
+            self.assertEqual(magic_mirror._set_snapshot_passes(passes), passes)
+            self.assertEqual(magic_mirror._snapshot_passes, passes)
+        for wrong in (0, 9, "wide", None):
             with self.assertRaises(magic_mirror.MagicMirrorError):
-                magic_mirror._set_snapshot_strength(wrong)
+                magic_mirror._set_snapshot_radius(wrong)
+            with self.assertRaises(magic_mirror.MagicMirrorError):
+                magic_mirror._set_snapshot_passes(wrong)
+        magic_mirror._set_snapshot_radius(magic_mirror.SNAPSHOT_RADIUS_CHOICES[1])
+        magic_mirror._set_snapshot_passes(magic_mirror.SNAPSHOT_PASS_CHOICES[1])
 
-    def test_capstone_settings_accept_a_nine_by_nine_kernel_and_reject_other_shapes(self):
-        main_module = sys.modules["__main__"]
-        with patch.object(
-            main_module, "SOFTEN_KERNEL", magic_mirror.SNAPSHOT_KERNELS["widest"], create=True
-        ):
-            self.assertEqual(magic_mirror._pipeline_settings()["kernel"].shape, (9, 9))
-        with patch.object(main_module, "SOFTEN_KERNEL", np.ones((7, 7)), create=True):
-            with self.assertRaises(magic_mirror.MagicMirrorError) as caught:
-                magic_mirror._pipeline_settings()
-        self.assertIn("3 x 3, 5 x 5, or 9 x 9", str(caught.exception))
+    def test_the_comparison_width_is_wider_than_the_five_by_five_rule(self):
+        """The whole point of heal_spots is a window bigger than detect_pimples uses."""
+        self.assertTrue(all(width > 5 for width in magic_mirror.SNAPSHOT_RADIUS_CHOICES))
+        self.assertEqual(magic_mirror.SNAPSHOT_PASS_CHOICES[0], 1)
 
     def test_grader_translates_unfilled_blanks_into_plain_instructions(self):
         def unfilled():
@@ -364,13 +322,21 @@ class TestTeachingHelpers(unittest.TestCase):
         self.assertNotIn("NameError", report)
 
     def test_solution_uses_vectorized_image_libraries(self):
+        """The five whole-image filters stay vectorized; the two colour tasks may loop.
+
+        Detection and smoothing touch every pixel of a 320x240 photograph inside the
+        capstone, so a Python loop there would stall the browser. average_skin_color and
+        calm_redness run only on the small teaching images, where a plain loop is worth
+        more than speed: it is the code a student can read.
+        """
         source = (Path(__file__).parent / "skin_filters_solution.py").read_text(encoding="utf-8")
         for call in (
             "ndimage.convolve", "ndimage.uniform_filter", "ndimage.maximum_filter",
             "np.where", "np.asarray",
         ):
             self.assertIn(call, source)
-        self.assertNotRegex(source, r"for\s+(row|column|x|y)\s+in")
+        vectorized = source.split("# === TASK: average_skin_color ===")[0]
+        self.assertNotRegex(vectorized, r"for\s+(row|column|x|y)\s+in")
 
 
 if __name__ == "__main__":
